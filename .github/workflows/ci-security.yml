@@ -35,7 +35,7 @@ jobs:
     name: 🔑 Поиск секретов в коде
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # нужна вся история: секрет мог попасть в старый коммит
 
@@ -61,9 +61,9 @@ jobs:
     name: 🧹 Типы, линтер, формат, тесты
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
@@ -91,7 +91,7 @@ jobs:
       contents: read
       security-events: write # для загрузки отчёта в Security-вкладку GitHub
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Semgrep
         uses: semgrep/semgrep-action@v1
@@ -123,8 +123,8 @@ jobs:
     name: 📦 Уязвимости в библиотеках
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
@@ -158,13 +158,13 @@ jobs:
     name: 🐳 Docker и Terraform
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Сборка образа
         run: docker build -f infra/docker/Dockerfile -t efremova:ci .
 
       - name: Trivy · уязвимости в образе
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: efremova:ci
           format: table
@@ -180,7 +180,7 @@ jobs:
           soft_fail: false
 
       - name: Hadolint · качество Dockerfile
-        uses: hadolint/hadolint-action@v3.1.0
+        uses: hadolint/hadolint-action@v3.5.0
         with:
           dockerfile: infra/docker/Dockerfile
 
@@ -205,8 +205,8 @@ jobs:
         image: redis:7-alpine
         ports: ['6379:6379']
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
@@ -234,7 +234,7 @@ jobs:
         run: npx wait-on http://localhost:3000 --timeout 60000
 
       - name: ZAP Baseline Scan
-        uses: zaproxy/action-baseline@v0.12.0
+        uses: zaproxy/action-baseline@v0.15.0
         with:
           target: 'http://localhost:3000'
           rules_file_name: '.zap/rules.tsv'
@@ -254,8 +254,8 @@ jobs:
     needs: [quality]
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
