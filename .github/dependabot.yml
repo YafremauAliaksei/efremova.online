@@ -1,36 +1,85 @@
 # Автоматическое обновление зависимостей.
 #
-# Зачем именно в публичном репозитории: код открыт, значит видно, какие версии
-# библиотек мы используем. Если в библиотеке найдут дыру — видно, что мы уязвимы.
-# Dependabot закрывает этот риск: он сам присылает PR с обновлением
-# (docs/06-public-repo-strategy.md, п.3).
+# ⚠️ ИСТОРИЯ ЭТОГО ФАЙЛА
+# Первая версия открыла 17 pull request'ов за минуту и завалила почту письмами.
+# Причина: группировка работала только для minor/patch, а каждое мажорное
+# обновление (next 15→16, prisma 6→7, eslint 9→10) приходило отдельным PR
+# и на каждый запускался полный конвейер CI.
+#
+# ПРИНЦИП НОВОЙ ВЕРСИИ
+# Обновления безопасности приходят сразу и всегда — это их работа.
+# Всё остальное приезжает одним PR в неделю, и мажорные версии не приезжают
+# вообще: переход на новую мажорную версию фреймворка — это осознанное
+# решение с проверкой, а не то, что стоит делать по уведомлению робота.
 
 version: 2
 updates:
+  # ──────────────────────── Библиотеки npm ────────────────────────
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
       day: monday
       time: '06:00'
-    open-pull-requests-limit: 10
-    # Мелкие обновления объединяем в один PR, чтобы не тонуть в уведомлениях.
-    # Обновления безопасности Dependabot присылает отдельно и немедленно.
+      timezone: Europe/Warsaw
+
+    # Максимум два PR одновременно. Больше — это уже не помощь, а шум.
+    open-pull-requests-limit: 2
+
+    # Свежая версия отлёживается неделю. Большинство «сломанных» релизов
+    # чинят патчем в первые дни — мы их просто не увидим.
+    cooldown:
+      default-days: 7
+
+    # Всё минорное и патчи — одним pull request'ом
     groups:
-      minor-and-patch:
+      all-minor-and-patch:
+        patterns: ['*']
         update-types: ['minor', 'patch']
+
+    # Мажорные версии Dependabot не предлагает.
+    # ⚠️ Это НЕ значит «не обновляемся»: раз в квартал обновление мажорных
+    # версий делается вручную, по одной, с прогоном npm run verify
+    # (запись в PROJECT_LOG → Roadmap).
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+
     labels: ['dependencies']
     commit-message:
-      prefix: 'deps'
+      prefix: deps
 
-  - package-ecosystem: docker
-    directory: /infra/docker
-    schedule:
-      interval: weekly
-    labels: ['dependencies', 'docker']
-
+  # ──────────────────────── GitHub Actions ────────────────────────
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    open-pull-requests-limit: 1
+    cooldown:
+      default-days: 7
+    groups:
+      all-actions:
+        patterns: ['*']
     labels: ['dependencies', 'ci']
+    commit-message:
+      prefix: ci
+
+  # ──────────────────────── Базовые образы Docker ────────────────────────
+  - package-ecosystem: docker
+    directory: /infra/docker
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 1
+    cooldown:
+      default-days: 7
+    groups:
+      all-images:
+        patterns: ['*']
+    # Node 22 — версия с долгой поддержкой (LTS). Переход на следующую LTS
+    # делается осознанно, а не потому, что вышел новый номер.
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+    labels: ['dependencies', 'docker']
+    commit-message:
+      prefix: docker

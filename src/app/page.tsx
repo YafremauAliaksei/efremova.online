@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { headers } from 'next/headers';
 import { formatPrice, getContentBlock, getServices } from '@/lib/content';
+import { SiteFooter } from '@/components/SiteFooter';
 
 /**
  * Главная страница.
@@ -112,24 +113,7 @@ export default async function HomePage() {
         </Link>
       </section>
 
-      <footer className="border-t border-[var(--color-line)]">
-        <div className="mx-auto max-w-3xl px-6 py-10 text-sm text-[var(--color-ink-soft)]">
-          <nav aria-label="Правовая информация">
-            <ul className="flex flex-wrap gap-6">
-              <li>
-                <Link href="/privacy" className="underline underline-offset-4">
-                  Политика конфиденциальности
-                </Link>
-              </li>
-              <li>
-                <Link href="/terms" className="underline underline-offset-4">
-                  Публичная оферта
-                </Link>
-              </li>
-            </ul>
-          </nav>
-        </div>
-      </footer>
+      <SiteFooter />
     </main>
   );
 }
