@@ -11,17 +11,17 @@
 #
 # Замените @OWNER на свой ник на GitHub после публикации репозитория.
 
-* @OWNER
+* @YafremauAliaksei
 
 # Инфраструктура и безопасность
-/infra/                      @OWNER
-/prisma/                     @OWNER
-/src/lib/security/           @OWNER
-/src/lib/auth/               @OWNER
-/src/middleware.ts           @OWNER
+/infra/                      @YafremauAliaksei
+/prisma/                     @YafremauAliaksei
+/src/lib/security/           @YafremauAliaksei
+/src/lib/auth/               @YafremauAliaksei
+/src/middleware.ts           @YafremauAliaksei
 
 # Правила процесса: менять только владельцу
-/.github/workflows/          @OWNER
-/.githooks/                  @OWNER
-/.claude/                    @OWNER
-/CLAUDE.md                   @OWNER
+/.github/workflows/          @YafremauAliaksei
+/.githooks/                  @YafremauAliaksei
+/.claude/                    @YafremauAliaksei
+/CLAUDE.md                   @YafremauAliaksei
