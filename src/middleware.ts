@@ -25,14 +25,28 @@ import { buildCanaryPayload, checkPathTrap, looksLikeLegitimateBot } from '@/lib
 
 const SESSION_COOKIE = '__Host-session';
 const PRIVATE_PREFIXES = ['/cabinet', '/api/private'] as const;
+
+/**
+ * Админка закрыта целиком, кроме двух адресов: обмена одноразовой ссылки
+ * на сессию и страницы отказа. Проверка здесь дешёвая — только наличие
+ * cookie; подпись проверяется в самой странице (два независимых рубежа).
+ */
+const ADMIN_PREFIX = '/admin';
+const ADMIN_PUBLIC_PATHS = ['/admin/enter', '/admin/denied'] as const;
+const ADMIN_COOKIE =
+  process.env.NODE_ENV === 'production' ? '__Host-admin-session' : 'admin-session';
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
   const isDev = process.env.NODE_ENV === 'development';
-  const isPrivate = PRIVATE_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
-  );
+  const isAdminArea =
+    (pathname === ADMIN_PREFIX || pathname.startsWith(`${ADMIN_PREFIX}/`)) &&
+    !ADMIN_PUBLIC_PATHS.some((allowed) => pathname === allowed);
+
+  const isPrivate =
+    isAdminArea ||
+    PRIVATE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 
   // ────────────────────────────────────────────────────────────────
   // 1. ЛОВУШКИ
@@ -110,7 +124,13 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   // странице/обработчике: middleware не должен быть единственной
   // преградой (принцип «не доверяй одному рубежу»).
   // ────────────────────────────────────────────────────────────────
-  if (isPrivate) {
+  if (isAdminArea && !request.cookies.has(ADMIN_COOKIE)) {
+    // Без объяснений и без редиректа на форму входа: формы входа в админку
+    // не существует, войти можно только по ссылке из терминала сервера
+    return withPrivateHeaders(NextResponse.redirect(new URL('/admin/denied', request.url)));
+  }
+
+  if (isPrivate && !isAdminArea) {
     const hasSession = request.cookies.has(SESSION_COOKIE);
 
     if (!hasSession) {

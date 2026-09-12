@@ -23,6 +23,7 @@
 | [`docs/07-database-security.md`](docs/07-database-security.md) | 🔐 Можно ли взломать базу и как этому мешаем |
 | [`docs/08-auth-availability-and-privacy.md`](docs/08-auth-availability-and-privacy.md) | 🔑 Кнопки входа, которые знают правду о себе + приватность IP |
 | [`docs/09-ai-agent-safety.md`](docs/09-ai-agent-safety.md) | 🤖 Доступы ИИ-агента и защита от подмены инструкций |
+| [`docs/10-how-we-work.md`](docs/10-how-we-work.md) | 🔄 Как устроена работа: проверки, цикл, обратная связь |
 
 ---
 
@@ -74,6 +75,10 @@ docker compose up -d
 
 | Команда | Что делает |
 |---|---|
+| **`npm run ci`** | **Все проверки GitHub локально. Зелёное здесь = зелёное там** |
+| `npm run ci:quick` | Быстрая часть проверок, без Docker |
+| `npm run admin:link` | Одноразовая ссылка для входа в админку (15 минут) |
+| `npm run stack:up` | Поднять приложение в Docker — «как на сервере» |
 | `npm run setup` | Первичная настройка одной командой |
 | `npm run dev` | Запуск в режиме разработки, с автообновлением |
 | `npm run dev:db` | Поднять только базу и Redis |
