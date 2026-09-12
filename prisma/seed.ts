@@ -10,7 +10,8 @@
  * Запуск: npm run db:seed
  */
 
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
+import { LEGAL_DOCUMENTS } from './legal-content';
 
 const db = new PrismaClient();
 
@@ -137,6 +138,31 @@ async function main(): Promise<void> {
     });
   }
   console.log(`  ✓ Отзывов: ${String(TESTIMONIALS.length)}`);
+
+  // ─── Правовые документы ───
+  // Опубликованная редакция не правится «на месте»: upsert обновляет только
+  // черновик той же версии. Новая редакция = новый version.
+  for (const doc of LEGAL_DOCUMENTS) {
+    await db.legalDocument.upsert({
+      where: {
+        slug_locale_version: { slug: doc.slug, locale: doc.locale, version: doc.version },
+      },
+      create: {
+        slug: doc.slug,
+        locale: doc.locale,
+        version: doc.version,
+        title: doc.title,
+        sections: doc.sections as unknown as Prisma.InputJsonValue,
+        isDraft: true,
+        isCurrent: true,
+      },
+      update: {
+        title: doc.title,
+        sections: doc.sections as unknown as Prisma.InputJsonValue,
+      },
+    });
+  }
+  console.log(`  ✓ Правовых документов: ${String(LEGAL_DOCUMENTS.length)} (черновики, pl + ru)`);
 
   console.log('Готово. Настоящие тексты добавляются через админку, а не сюда.');
 }

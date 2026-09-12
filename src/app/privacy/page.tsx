@@ -1,160 +1,66 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
+import { LegalDocument, LegalDocumentMissing } from '@/components/LegalDocument';
 import { SiteFooter } from '@/components/SiteFooter';
+import { getLegalDocument, LOCALE_TAGS, resolveLocale, SUPPORTED_LOCALES } from '@/lib/legal';
 
 /**
  * Политика конфиденциальности.
  *
- * ⚠️ ВАЖНО: это КАРКАС документа, а не готовый юридический текст.
- * Структура соответствует требованиям GDPR (ст. 13–14: какие данные, зачем,
- * на каком основании, как долго, какие у человека права), но перед запуском
- * текст обязан проверить юрист — владелец находится в Польше, и ответственность
- * за содержание документа лежит на нём, а не на разработчике.
+ * Текст живёт в базе (модель LegalDocument) на двух языках: польском —
+ * как того требует место ведения деятельности — и русском.
  *
- * Разделы, которые описывают ТЕХНИЧЕСКУЮ реальность (что именно передаётся
- * при входе через Google, что шифруется), заполнены точно — они описывают
- * то, что реально делает код, и должны обновляться вместе с ним.
+ * Прямые ссылки:
+ *   /privacy?lang=pl        польская версия
+ *   /privacy?lang=ru        русская версия
+ *   /privacy?lang=pl#auth   сразу к разделу о передаче данных при входе
+ *   /privacy?lang=pl#cookies раздел о файлах cookie
  */
 
-export const metadata: Metadata = {
-  title: 'Политика конфиденциальности',
-  description:
-    'Какие данные собирает сайт, зачем, как долго хранит и какие права есть у пользователя.',
-};
+export const dynamic = 'force-dynamic';
 
-const UPDATED_AT = '2026-09-12';
-const DOCUMENT_VERSION = 'privacy-2026-09-12-draft';
+interface PageProps {
+  searchParams: Promise<{ lang?: string }>;
+}
 
-export default function PrivacyPage() {
+export async function generateMetadata({ searchParams }: PageProps): Promise<Metadata> {
+  const { lang } = await searchParams;
+  const headerList = await headers();
+  const locale = resolveLocale(lang, headerList.get('accept-language'));
+  const document = await getLegalDocument('privacy', locale);
+
+  // hreflang сообщает поисковику, что это одна страница на разных языках,
+  // а не дубли. Без этого Google считает версии конкурирующими копиями.
+  const languages: Record<string, string> = {};
+  for (const supported of SUPPORTED_LOCALES) {
+    languages[LOCALE_TAGS[supported]] = `/privacy?lang=${supported}`;
+  }
+
+  return {
+    title: document?.title ?? 'Polityka prywatności',
+    description:
+      'Jakie dane zbiera serwis, w jakim celu, jak długo je przechowuje i jakie prawa przysługują użytkownikowi.',
+    alternates: {
+      canonical: `/privacy?lang=${locale}`,
+      languages: { ...languages, 'x-default': '/privacy?lang=pl' },
+    },
+  };
+}
+
+export default async function PrivacyPage({ searchParams }: PageProps) {
+  const { lang } = await searchParams;
+  const headerList = await headers();
+  const locale = resolveLocale(lang, headerList.get('accept-language'));
+  const document = await getLegalDocument('privacy', locale);
+
   return (
     <>
       <main id="main" className="mx-auto max-w-3xl px-6 py-16">
-        <h1 className="text-3xl font-semibold">Политика конфиденциальности</h1>
-        <p className="mt-2 text-sm text-[var(--color-ink-soft)]">
-          Версия документа: {DOCUMENT_VERSION} · обновлено {UPDATED_AT}
-        </p>
-
-        <div
-          role="note"
-          className="mt-6 rounded-lg border border-[var(--color-warning)] bg-[#fdf8f0] p-5"
-        >
-          <p className="font-medium text-[var(--color-warning)]">Черновик</p>
-          <p className="mt-2 text-sm text-[var(--color-ink-soft)]">
-            Документ находится в подготовке и должен быть проверен юристом до запуска сайта.
-            Технические разделы (что передаётся при входе, что шифруется) уже соответствуют
-            действительности.
-          </p>
-        </div>
-
-        <section className="mt-10">
-          <h2 className="text-2xl font-semibold">1. Кто обрабатывает данные</h2>
-          <p className="mt-3 text-[var(--color-ink-soft)]">
-            Администратором персональных данных является владелец сайта. Полные реквизиты, адрес и
-            контакт для обращений будут указаны здесь до запуска.
-          </p>
-        </section>
-
-        <section className="mt-10">
-          <h2 className="text-2xl font-semibold">2. Какие данные собираются</h2>
-          <ul className="mt-3 space-y-2 text-[var(--color-ink-soft)]">
-            <li>
-              <strong className="text-[var(--color-ink)]">Учётные данные:</strong> адрес электронной
-              почты или идентификатор в мессенджере — чтобы вы могли войти в кабинет.
-            </li>
-            <li>
-              <strong className="text-[var(--color-ink)]">Данные о записи:</strong> дата, время и
-              тип консультации.
-            </li>
-            <li>
-              <strong className="text-[var(--color-ink)]">Данные о здоровье:</strong> то, что вы
-              сообщаете в анкете и во время консультаций. По GDPR это особая категория данных (ст.
-              9) и они обрабатываются только с вашего явного согласия.
-            </li>
-            <li>
-              <strong className="text-[var(--color-ink)]">Платёжные данные:</strong> сумма, валюта и
-              статус оплаты. Номера карт на сайт не попадают: их обрабатывает платёжная система.
-            </li>
-            <li>
-              <strong className="text-[var(--color-ink)]">Технические данные:</strong> IP-адрес и
-              сведения об устройстве — для защиты от атак и подбора паролей.
-            </li>
-          </ul>
-        </section>
-
-        <section className="mt-10">
-          <h2 className="text-2xl font-semibold">3. Как данные защищены</h2>
-          <ul className="mt-3 space-y-2 text-[var(--color-ink-soft)]">
-            <li>Соединение шифруется (TLS 1.3): посторонний не прочитает передаваемое.</li>
-            <li>
-              Записи о консультациях шифруются алгоритмом AES-256 отдельно от остальной базы. Ключ
-              шифрования хранится вне базы данных — при краже базы записи останутся нечитаемыми.
-            </li>
-            <li>Серверы расположены в Европейском союзе, данные не покидают ЕС.</li>
-            <li>Каждое обращение к записям фиксируется в неизменяемом журнале доступа.</li>
-            <li>Паролей не существует: вход только по одноразовому коду или через Google/Apple.</li>
-          </ul>
-        </section>
-
-        {/*
-          Этот раздел связан ссылкой со страницы входа (/privacy#auth).
-          Он описывает реальное поведение кода — см. docs/08.
-        */}
-        <section id="auth" className="mt-10 scroll-mt-8">
-          <h2 className="text-2xl font-semibold">4. Вход без пароля и передача данных</h2>
-          <p className="mt-3 text-[var(--color-ink-soft)]">
-            Мы не храним паролей. Украсть то, чего нет, невозможно, а значит исчезает целый класс
-            угроз: утечка базы паролей, подбор, повторное использование пароля с другого сайта.
-          </p>
-          <p className="mt-3 text-[var(--color-ink-soft)]">
-            Пока вы не нажали кнопку входа, ваш браузер не обращается ни к Google, ни к Apple, ни к
-            какому-либо другому внешнему сервису: доступность способов входа проверяет наш сервер со
-            своего адреса. Шрифты и изображения тоже раздаются с нашего домена — ваш IP-адрес не
-            передаётся третьим лицам просто за то, что вы открыли страницу.
-          </p>
-          <p className="mt-3 text-[var(--color-ink-soft)]">
-            Если вы выбираете вход через Google или Apple, этот сервис узнает ваш IP-адрес и факт
-            входа именно на этот сайт — избежать этого при входе через внешний аккаунт невозможно.
-            Содержание консультаций, записи и заметки не передаются никому и никогда. Если такая
-            передача для вас нежелательна, используйте вход по одноразовому коду в мессенджере.
-          </p>
-        </section>
-
-        <section className="mt-10">
-          <h2 className="text-2xl font-semibold">5. Сколько данные хранятся</h2>
-          <p className="mt-3 text-[var(--color-ink-soft)]">
-            Точные сроки будут указаны после юридической проверки. Ориентир: записи о консультациях
-            хранятся в течение срока, установленного законом для медицинской документации;
-            финансовые документы — 5 лет; технические журналы безопасности — до 12 месяцев.
-          </p>
-        </section>
-
-        <section className="mt-10">
-          <h2 className="text-2xl font-semibold">6. Ваши права</h2>
-          <p className="mt-3 text-[var(--color-ink-soft)]">
-            По GDPR вы вправе получить копию своих данных, исправить их, удалить, ограничить
-            обработку, перенести к другому поставщику услуг и отозвать согласие. Запрос выполняется
-            в течение 30 дней. В личном кабинете для этого будут отдельные кнопки.
-          </p>
-          <p className="mt-3 text-[var(--color-ink-soft)]">
-            Если вы считаете, что ваши права нарушены, вы можете подать жалобу в надзорный орган по
-            защите данных (в Польше — UODO).
-          </p>
-        </section>
-
-        <section className="mt-10">
-          <h2 className="text-2xl font-semibold">7. Файлы cookie</h2>
-          <p className="mt-3 text-[var(--color-ink-soft)]">
-            Сайт использует только технически необходимые cookie — те, без которых невозможно войти
-            в кабинет и остаться в нём. Рекламных и аналитических трекеров нет.
-          </p>
-        </section>
-
-        <section className="mt-10">
-          <h2 className="text-2xl font-semibold">8. Изменения документа</h2>
-          <p className="mt-3 text-[var(--color-ink-soft)]">
-            У каждой версии этого документа есть номер. Ваше согласие фиксируется вместе с номером
-            версии, которую вы видели, — чтобы всегда было понятно, с чем именно вы согласились.
-          </p>
-        </section>
+        {document === null ? (
+          <LegalDocumentMissing locale={locale} />
+        ) : (
+          <LegalDocument document={document} basePath="/privacy" />
+        )}
       </main>
       <SiteFooter />
     </>

@@ -164,7 +164,7 @@ jobs:
         run: docker build -f infra/docker/Dockerfile -t efremova:ci .
 
       - name: Trivy · уязвимости в образе
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: efremova:ci
           format: table
@@ -173,14 +173,14 @@ jobs:
           ignore-unfixed: true # то, для чего ещё нет патча, только предупреждение
 
       - name: Checkov · ошибки в Terraform
-        uses: bridgecrewio/checkov-action@master
+        uses: bridgecrewio/checkov-action@v12.3123.0
         with:
           directory: infra/terraform
           framework: terraform
           soft_fail: false
 
       - name: Hadolint · качество Dockerfile
-        uses: hadolint/hadolint-action@v3.1.0
+        uses: hadolint/hadolint-action@v3.5.0
         with:
           dockerfile: infra/docker/Dockerfile
 
@@ -234,7 +234,7 @@ jobs:
         run: npx wait-on http://localhost:3000 --timeout 60000
 
       - name: ZAP Baseline Scan
-        uses: zaproxy/action-baseline@v0.12.0
+        uses: zaproxy/action-baseline@v0.15.0
         with:
           target: 'http://localhost:3000'
           rules_file_name: '.zap/rules.tsv'

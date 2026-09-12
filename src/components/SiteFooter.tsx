@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { PrivacySettingsLink } from '@/components/PrivacySettingsLink';
 
 /**
  * Общий подвал сайта.
@@ -35,11 +36,28 @@ export function SiteFooter() {
             </li>
             <li>
               <Link href="/terms" className="underline underline-offset-4">
-                Публичная оферта
+                Условия услуг
               </Link>
+            </li>
+            <li>
+              <PrivacySettingsLink label="Настройки приватности" />
             </li>
           </ul>
         </nav>
+
+        {/* Прямые ссылки на языковые версии: по польскому праву документы
+            должны быть доступны на польском, и попасть на них нужно
+            в один клик, а не через автоопределение языка */}
+        <p className="mt-4 text-xs">
+          Dokumenty prawne:{' '}
+          <Link href="/privacy?lang=pl" hrefLang="pl-PL" className="underline underline-offset-4">
+            Polityka prywatności (PL)
+          </Link>
+          {' · '}
+          <Link href="/terms?lang=pl" hrefLang="pl-PL" className="underline underline-offset-4">
+            Regulamin (PL)
+          </Link>
+        </p>
       </div>
     </footer>
   );

@@ -29,3 +29,22 @@ services:
   redis:
     ports:
       - '127.0.0.1:6379:6379'
+
+  # Приложение в контейнере — «как на сервере».
+  #
+  # В повседневной разработке оно НЕ нужно: `npm run dev` на самой машине
+  # перезагружает страницу за доли секунды, а пересборка образа занимает минуты.
+  # Контейнер нужен, чтобы проверить ровно то, что поедет на сервер:
+  # ту же версию Node, те же права пользователя, ту же файловую систему
+  # только для чтения.
+  #
+  # Запуск:  npm run stack:up      (остановка: npm run stack:down)
+  app:
+    ports:
+      - '127.0.0.1:3000:3000'
+    environment:
+      # Внутри сети Docker база доступна по имени сервиса, а не по localhost:
+      # localhost в контейнере — это сам контейнер.
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      APP_URL: http://localhost:3000

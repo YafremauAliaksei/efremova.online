@@ -25,6 +25,17 @@ const FORBIDDEN_PATHS = [
 ];
 
 /**
+ * Исключения из списка выше — по точному пути, а не по расширению.
+ *
+ * Миграции Prisma это .sql, но они не данные, а описание структуры базы,
+ * и обязаны быть в репозитории: без них на сервере поднимется пустая база.
+ * Правило «никаких .sql», написанное против дампов, едва не увело их из git
+ * молча — поэтому исключение прописано явно и узко: только файл migration.sql
+ * внутри prisma/migrations. Проверка СОДЕРЖИМОГО к ним по-прежнему применяется.
+ */
+const ALLOWED_PATHS = [/^prisma\/migrations\/[^/]+\/migration\.sql$/];
+
+/**
  * Шаблоны секретов в содержимом файлов.
  * Списки намеренно узкие: цель — ноль ложных срабатываний, иначе
  * проверку начнут обходить через --no-verify, и толку от неё не будет.
@@ -89,7 +100,10 @@ const problems = [];
 
 for (const file of staged) {
   // 1. Запрещённые файлы — по имени, без чтения содержимого
-  const forbidden = FORBIDDEN_PATHS.find((pattern) => pattern.test(file));
+  const isAllowedPath = ALLOWED_PATHS.some((pattern) => pattern.test(file));
+  const forbidden = isAllowedPath
+    ? undefined
+    : FORBIDDEN_PATHS.find((pattern) => pattern.test(file));
   if (forbidden !== undefined) {
     problems.push(`${file}\n     такие файлы никогда не коммитятся (секреты, ключи, дампы)`);
     continue;
