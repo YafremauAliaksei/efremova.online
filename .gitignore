@@ -1,0 +1,49 @@
+# ─── Секреты. Попадание сюда в git = инцидент безопасности ───
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+.secrets/
+*.age
+terraform.tfvars
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# ─── Зависимости и сборка ───
+node_modules/
+.next/
+out/
+build/
+dist/
+.turbo/
+*.tsbuildinfo
+next-env.d.ts
+
+# ─── Данные и бэкапы (никогда не в репозитории) ───
+*.sql
+*.dump
+backups/
+postgres-data/
+redis-data/
+uploads/
+
+# ─── Отчёты инструментов ───
+coverage/
+.lighthouseci/
+zap-report*
+trivy-report*
+gitleaks-report*
+
+# ─── Системное ───
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+.vscode/*
+!.vscode/extensions.json
+.idea/

@@ -1,0 +1,22 @@
+# Контейнер резервного копирования.
+#
+# Что делает: каждую ночь снимает дамп базы, шифрует его и увозит в другую
+# страну (S3-совместимое хранилище, например Backblaze B2 в ЕС).
+#
+# ⚠️ Бэкап, который ни разу не восстанавливали, бэкапом не считается.
+#    Тест восстановления — раз в квартал, отметка в PROJECT_LOG.md.
+
+FROM postgres:17-alpine
+
+RUN apk add --no-cache \
+      age \
+      aws-cli \
+      dcron \
+      curl \
+      tzdata
+
+COPY backup.sh /usr/local/bin/backup.sh
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/backup.sh /usr/local/bin/entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

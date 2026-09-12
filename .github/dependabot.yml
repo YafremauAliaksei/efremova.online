@@ -1,0 +1,36 @@
+# Автоматическое обновление зависимостей.
+#
+# Зачем именно в публичном репозитории: код открыт, значит видно, какие версии
+# библиотек мы используем. Если в библиотеке найдут дыру — видно, что мы уязвимы.
+# Dependabot закрывает этот риск: он сам присылает PR с обновлением
+# (docs/06-public-repo-strategy.md, п.3).
+
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+    open-pull-requests-limit: 10
+    # Мелкие обновления объединяем в один PR, чтобы не тонуть в уведомлениях.
+    # Обновления безопасности Dependabot присылает отдельно и немедленно.
+    groups:
+      minor-and-patch:
+        update-types: ['minor', 'patch']
+    labels: ['dependencies']
+    commit-message:
+      prefix: 'deps'
+
+  - package-ecosystem: docker
+    directory: /infra/docker
+    schedule:
+      interval: weekly
+    labels: ['dependencies', 'docker']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    labels: ['dependencies', 'ci']

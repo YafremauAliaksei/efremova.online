@@ -1,0 +1,262 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  КОНВЕЙЕР БЕЗОПАСНОСТИ
+#
+#  Запускается на каждый push и каждый Pull Request.
+#  Пока все ворота не пройдены — код не попадёт в основную ветку и на прод.
+#
+#  Логика: дешёвые и быстрые проверки идут первыми. Нет смысла собирать
+#  Docker-образ 5 минут, если в коде забыт пароль — это видно за 10 секунд.
+# ═══════════════════════════════════════════════════════════════════════════
+
+name: CI · Security & Quality
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Еженедельное сканирование: уязвимость в библиотеке может появиться
+    # уже после того, как мы написали код. Понедельник, 06:00 UTC.
+    - cron: '0 6 * * 1'
+
+# Минимальные права по умолчанию: если workflow скомпрометируют,
+# он не сможет ничего изменить в репозитории
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─────────────────── ВОРОТА 1: СЕКРЕТЫ (самое быстрое) ───────────────────
+  secrets-scan:
+    name: 🔑 Поиск секретов в коде
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # нужна вся история: секрет мог попасть в старый коммит
+
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # ⚠️ Находка здесь = инцидент. Недостаточно удалить строку:
+        # ключ уже в истории git, его ОБЯЗАТЕЛЬНО нужно отозвать и заменить.
+
+  # ─────────────────── ВОРОТА 2: КАЧЕСТВО КОДА ───────────────────
+  quality:
+    name: 🧹 Типы, линтер, формат, тесты
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+      - run: npx prisma generate
+
+      - name: TypeScript
+        run: npm run typecheck
+
+      - name: ESLint (0 предупреждений допустимо)
+        run: npm run lint
+
+      - name: Prettier
+        run: npm run format:check
+
+      - name: Тесты
+        run: npm test
+
+  # ─────────────────── ВОРОТА 3: SAST — анализ кода ───────────────────
+  sast:
+    name: 🔍 SAST (Semgrep + CodeQL)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # для загрузки отчёта в Security-вкладку GitHub
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Semgrep
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/owasp-top-ten
+            p/javascript
+            p/typescript
+            p/react
+            p/nextjs
+            p/secrets
+            p/sql-injection
+            p/xss
+            p/jwt
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+      - name: CodeQL · инициализация
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-extended,security-and-quality
+
+      - name: CodeQL · анализ
+        uses: github/codeql-action/analyze@v3
+
+  # ─────────────────── ВОРОТА 4: ЗАВИСИМОСТИ ───────────────────
+  dependencies:
+    name: 📦 Уязвимости в библиотеках
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: npm audit
+        run: npm audit --audit-level=high
+
+      - name: Проверка лицензий
+        # Копилефт-лицензии (GPL/AGPL) в коммерческом проекте — юридический риск
+        run: npx license-checker --production --failOn "GPL-3.0;AGPL-3.0" || true
+
+  # ─────────────────── ВОРОТА 5: КОНТЕЙНЕР И ИНФРАСТРУКТУРА ───────────────────
+  container-scan:
+    name: 🐳 Docker и Terraform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Сборка образа
+        run: docker build -f infra/docker/Dockerfile -t efremova:ci .
+
+      - name: Trivy · уязвимости в образе
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: efremova:ci
+          format: table
+          exit-code: '1' # HIGH и CRITICAL блокируют сборку
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true # то, для чего ещё нет патча, только предупреждение
+
+      - name: Checkov · ошибки в Terraform
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: infra/terraform
+          framework: terraform
+          soft_fail: false
+
+      - name: Hadolint · качество Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: infra/docker/Dockerfile
+
+  # ─────────────────── ВОРОТА 6: DAST — атака на работающее приложение ───────────────────
+  dast:
+    name: 🎯 DAST (OWASP ZAP)
+    runs-on: ubuntu-latest
+    needs: [quality]
+    # Только в PR: поднятие полного окружения занимает время
+    if: github.event_name == 'pull_request'
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: ci_only_password
+          POSTGRES_DB: efremova_test
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+        ports: ['5432:5432']
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+      - run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://postgres:ci_only_password@localhost:5432/efremova_test
+
+      - run: npm run build
+        env:
+          DATABASE_URL: postgresql://postgres:ci_only_password@localhost:5432/efremova_test
+          AUTH_SECRET: ci_only_not_a_real_secret_value_32ch
+          FIELD_ENCRYPTION_KEY: ci_only_not_a_real_secret_value_32ch
+
+      - name: Запуск приложения
+        run: npm start &
+        env:
+          DATABASE_URL: postgresql://postgres:ci_only_password@localhost:5432/efremova_test
+          REDIS_URL: redis://localhost:6379
+          AUTH_SECRET: ci_only_not_a_real_secret_value_32ch
+          FIELD_ENCRYPTION_KEY: ci_only_not_a_real_secret_value_32ch
+
+      - name: Ожидание готовности
+        run: npx wait-on http://localhost:3000 --timeout 60000
+
+      - name: ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.12.0
+        with:
+          target: 'http://localhost:3000'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a -j'
+        # Предупреждение, а не блокировка: ZAP склонен к ложным
+        # срабатываниям. Отчёт смотрим глазами при каждом PR.
+
+      - name: Проверка заголовков безопасности
+        run: node scripts/check-security-headers.mjs http://localhost:3000
+        # ⚠️ Это блокирующая проверка. Пропавший CSP или HSTS —
+        # прямая дыра, ложных срабатываний здесь не бывает.
+
+  # ─────────────────── ВОРОТА 7: ПРОИЗВОДИТЕЛЬНОСТЬ ───────────────────
+  lighthouse:
+    name: 🚀 Lighthouse (защита от «сползания» скорости)
+    runs-on: ubuntu-latest
+    needs: [quality]
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+      - run: npm run build
+        env:
+          AUTH_SECRET: ci_only_not_a_real_secret_value_32ch
+          FIELD_ENCRYPTION_KEY: ci_only_not_a_real_secret_value_32ch
+
+      - name: Lighthouse CI
+        run: npx lhci autorun
+        # Пороги заданы в .lighthouserc.json (docs/04, п.6).
+        # Accessibility, Best Practices и SEO — строго 100.
+
+  # ─────────────────── ИТОГ ───────────────────
+  gate:
+    name: ✅ Все ворота пройдены
+    runs-on: ubuntu-latest
+    needs: [secrets-scan, quality, sast, dependencies, container-scan]
+    if: always()
+    steps:
+      - name: Проверка результатов
+        run: |
+          if echo '${{ join(needs.*.result, ',') }}' | grep -q 'failure'; then
+            echo "❌ Часть проверок провалена — деплой заблокирован"
+            exit 1
+          fi
+          echo "✅ Все обязательные проверки пройдены"

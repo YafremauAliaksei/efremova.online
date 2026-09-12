@@ -1,0 +1,73 @@
+@import 'tailwindcss';
+
+/*
+ * Дизайн-токены.
+ *
+ * Все цвета определяются здесь, а не разбросаны по компонентам.
+ * Причина практическая: контраст текста к фону должен быть ≥ 4.5:1
+ * (требование Accessibility 100/100, docs/04 п.2). Проверить одно место
+ * реально, проверить сто мест по всему коду — нет.
+ */
+@theme {
+  --color-ink: #1a1a1f;
+  --color-ink-soft: #4a4a55;
+  --color-paper: #fbfaf8;
+  --color-paper-alt: #f2efe9;
+  --color-accent: #4a6b5d;
+  --color-accent-soft: #e3ebe7;
+  --color-danger: #8c2f2f;
+  --color-warning: #8a5a1b;
+  --color-line: #ddd8d0;
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+}
+
+/*
+ * Уважение к системной настройке «уменьшить движение».
+ * Для сайта психолога это не формальность: анимации способны
+ * усиливать тревогу и провоцировать вестибулярные реакции.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Видимый фокус обязателен: без него сайтом нельзя пользоваться с клавиатуры */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/*
+ * Ловушка-honeypot типа «невидимое поле» (docs/03, п.4.2).
+ *
+ * ⚠️ Намеренно НЕ display:none и НЕ visibility:hidden — продвинутые боты
+ * такие поля распознают и пропускают. Смещение за пределы экрана
+ * при сохранении «видимости» для программ работает надёжнее.
+ * aria-hidden + tabindex="-1" гарантируют, что скринридер и клавиатура
+ * до поля не доберутся, то есть живой человек его не заполнит физически.
+ */
+.hp-field {
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}

@@ -1,0 +1,27 @@
+#!/bin/sh
+# Проверка перед каждым коммитом.
+#
+# Порядок от быстрого к медленному: сначала секреты (доли секунды),
+# потом форматирование. Смысл — не дать уехать в публичный репозиторий
+# тому, что оттуда уже не вернуть (docs/06-public-repo-strategy.md).
+#
+# Устанавливается командой: npm run hooks:install
+
+set -e
+
+echo "-> Проверка на секреты..."
+node scripts/check-staged-secrets.mjs
+
+FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|tsx|mjs|json|css)$' || true)
+
+if [ -n "$FILES" ]; then
+  echo "-> Проверка форматирования..."
+  # shellcheck disable=SC2086
+  if ! npx --no-install prettier --check $FILES; then
+    echo ""
+    echo "   Форматирование не совпадает. Исправить одной командой: npm run format"
+    exit 1
+  fi
+fi
+
+echo "OK: проверки пройдены"

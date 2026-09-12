@@ -1,0 +1,41 @@
+Copyright (c) 2026. Все права защищены. All rights reserved.
+
+РУССКИЙ
+
+Исходный код этого репозитория опубликован открыто с единственной целью:
+обеспечить возможность независимой проверки того, как платформа обрабатывает
+и защищает персональные и медицинские данные пользователей.
+
+Разрешается:
+  • просматривать и изучать код;
+  • анализировать его на предмет уязвимостей и сообщать о находках
+    в порядке, описанном в SECURITY.md;
+  • цитировать фрагменты в исследовательских и образовательных целях
+    с указанием источника.
+
+Не разрешается без письменного согласия правообладателя:
+  • использовать код или его части в других проектах, включая коммерческие;
+  • копировать, распространять, изменять и публиковать производные работы;
+  • использовать название, оформление и тексты сайта.
+
+Программное обеспечение предоставляется «как есть», без каких-либо гарантий.
+
+---
+
+ENGLISH
+
+The source code in this repository is published openly for one purpose only:
+to allow independent verification of how the platform processes and protects
+users' personal and health-related data.
+
+You may:
+  • view and study the code;
+  • analyse it for vulnerabilities and report findings as described in SECURITY.md;
+  • quote excerpts for research or educational purposes with attribution.
+
+You may NOT, without the copyright holder's written permission:
+  • use this code or any part of it in other projects, commercial or otherwise;
+  • copy, distribute, modify, or publish derivative works;
+  • use the site's name, design, or content.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
