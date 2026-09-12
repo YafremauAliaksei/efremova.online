@@ -40,7 +40,7 @@ jobs:
           fetch-depth: 0 # нужна вся история: секрет мог попасть в старый коммит
 
       - name: Gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # ⚠️ Находка здесь = инцидент. Недостаточно удалить строку:
