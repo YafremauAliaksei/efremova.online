@@ -6,7 +6,7 @@
 # ⚠️ Бэкап, который ни разу не восстанавливали, бэкапом не считается.
 #    Тест восстановления — раз в квартал, отметка в PROJECT_LOG.md.
 
-FROM postgres:17-alpine
+FROM postgres:18-alpine
 
 RUN apk add --no-cache \
       age \
