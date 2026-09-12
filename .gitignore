@@ -39,6 +39,11 @@ zap-report*
 trivy-report*
 gitleaks-report*
 
+# ─── Личные настройки Claude Code ───
+# .claude/settings.json — общий для проекта, коммитится (правила безопасности).
+# settings.local.json — личные разрешения конкретного разработчика: не коммитится.
+.claude/settings.local.json
+
 # ─── Системное ───
 .DS_Store
 Thumbs.db

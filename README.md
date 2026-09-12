@@ -22,6 +22,7 @@
 | [`docs/06-public-repo-strategy.md`](docs/06-public-repo-strategy.md) | 🔓 Публичный репозиторий без утечки личного |
 | [`docs/07-database-security.md`](docs/07-database-security.md) | 🔐 Можно ли взломать базу и как этому мешаем |
 | [`docs/08-auth-availability-and-privacy.md`](docs/08-auth-availability-and-privacy.md) | 🔑 Кнопки входа, которые знают правду о себе + приватность IP |
+| [`docs/09-ai-agent-safety.md`](docs/09-ai-agent-safety.md) | 🤖 Доступы ИИ-агента и защита от подмены инструкций |
 
 ---
 
