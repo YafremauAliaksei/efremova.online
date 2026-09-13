@@ -45,16 +45,9 @@
     "admin:link": "node scripts/admin-link.mjs"
   },
   "dependencies": {
-    "@auth/prisma-adapter": "^2.7.4",
     "@prisma/client": "^6.3.0",
-    "bullmq": "^5.34.0",
-    "date-fns": "^4.1.0",
-    "date-fns-tz": "^3.2.0",
-    "ioredis": "^5.4.2",
     "jose": "^5.9.6",
     "next": "^15.1.6",
-    "next-auth": "^5.0.0-beta.25",
-    "pino": "^9.6.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "server-only": "^0.0.1",
