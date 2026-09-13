@@ -10,7 +10,7 @@
  */
 
 import { execSync } from 'node:child_process';
-import { readFileSync, statSync } from 'node:fs';
+import { closeSync, fstatSync, openSync, readFileSync } from 'node:fs';
 
 /** Файлы, которых в репозитории быть не должно ни при каких обстоятельствах */
 const FORBIDDEN_PATHS = [
@@ -110,10 +110,21 @@ for (const file of staged) {
   }
 
   // 2. Содержимое — только текстовые файлы разумного размера
+  // Открываем файл ОДИН раз и спрашиваем размер у полученного дескриптора,
+  // а не у имени. Прежний вариант (statSync по имени, потом readFileSync по имени)
+  // обращался к диску дважды, и между обращениями файл можно было подменить —
+  // например, ссылкой на другой файл (CodeQL js/file-system-race, находка #2).
+  // Дескриптор указывает на конкретный файл, открытый в конкретный момент,
+  // и подмена имени на него уже не влияет.
   let content;
   try {
-    if (statSync(file).size > 2_000_000) continue;
-    content = readFileSync(file, 'utf8');
+    const fd = openSync(file, 'r');
+    try {
+      if (fstatSync(fd).size > 2_000_000) continue;
+      content = readFileSync(fd, 'utf8');
+    } finally {
+      closeSync(fd);
+    }
   } catch {
     continue; // бинарный файл или уже удалён
   }

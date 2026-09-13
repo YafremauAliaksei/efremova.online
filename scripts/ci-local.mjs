@@ -18,11 +18,34 @@
  * Каждая проверка печатает, ЧТО она означает и что делать, если она упала.
  */
 
-import { execSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 
 const quick = process.argv.includes('--quick');
 
-/** @type {{name: string, gate: string, why: string, cmd: string, needsDocker?: boolean, slow?: boolean}[]} */
+/**
+ * Проверка задаётся ОДНИМ из двух способов:
+ *
+ *   cmd  — строка, которую исполняет командная оболочка. Годится, когда команда
+ *          целиком является константой и нужны возможности оболочки (например,
+ *          перенаправление файла на вход через `<`).
+ *   argv — массив «программа + аргументы». Оболочки нет вовсе.
+ *
+ * ⚠️ ПРАВИЛО: всё, куда подставляется путь к проекту (%CWD%), обязано быть argv.
+ *
+ * Почему. В строке для оболочки путь становится частью исполняемого текста.
+ * Кавычки спасают от пробелов, но не от кавычки или $(...) в самом имени папки:
+ * проект, лежащий в каталоге пользователя O'Brien, превращает служебную команду
+ * в исполнение чего-то постороннего. У нас путь сейчас безобидный — но «у нас
+ * путь нормальный» плохо стареет и не переносится на другую машину.
+ * Находка CodeQL js/shell-command-injection-from-environment (#3).
+ *
+ * В массиве аргумент остаётся ровно одним аргументом, что бы внутри него ни было:
+ * разбирать его некому, оболочка не участвует. Тот же приём и по той же причине
+ * применён в scripts/run-next.mjs.
+ *
+ * @type {{name: string, gate: string, why: string, cmd?: string, argv?: string[],
+ *         needsDocker?: boolean, slow?: boolean}[]}
+ */
 const CHECKS = [
   {
     name: 'Типы TypeScript',
@@ -34,7 +57,11 @@ const CHECKS = [
     name: 'Линтер',
     gate: '🧹 Типы, линтер, формат, тесты',
     why: 'Опасные конструкции: eval, any, dangerouslySetInnerHTML',
-    cmd: 'npx eslint . --max-warnings=0',
+    // Через npm run lint, а не напрямую npx eslint: у скрипта в package.json
+    // стоит ограничение памяти (scripts/run-eslint.mjs), без которого линтер
+    // на этой машине падает с out of memory. Прямой вызов его обходил —
+    // и локальный прогон отличался бы от того, что делает workflow.
+    cmd: 'npm run lint',
   },
   {
     name: 'Форматирование',
@@ -58,9 +85,22 @@ const CHECKS = [
     name: 'Секреты в истории git',
     gate: '🔑 Поиск секретов в коде',
     why: 'Ключ, попавший в коммит, придётся отзывать — лучше поймать сейчас',
-    cmd:
-      'docker run --rm -v "%CWD%:/repo" zricethezav/gitleaks:latest ' +
-      'detect --source /repo --redact -v --config /repo/.gitleaks.toml',
+    // argv, а не cmd: сюда подставляется путь к проекту — см. правило выше
+    argv: [
+      'docker',
+      'run',
+      '--rm',
+      '-v',
+      '%CWD%:/repo',
+      'zricethezav/gitleaks:latest',
+      'detect',
+      '--source',
+      '/repo',
+      '--redact',
+      '-v',
+      '--config',
+      '/repo/.gitleaks.toml',
+    ],
     needsDocker: true,
   },
   {
@@ -94,9 +134,21 @@ const CHECKS = [
     name: 'Terraform',
     gate: '🐳 Docker и Terraform',
     why: 'Checkov: открытые порты, незашифрованные хранилища и подобное',
-    cmd:
-      'docker run --rm -v "%CWD%:/tf" bridgecrew/checkov:latest ' +
-      '--directory /tf/infra/terraform --framework terraform --compact --quiet',
+    // argv, а не cmd: сюда подставляется путь к проекту — см. правило выше
+    argv: [
+      'docker',
+      'run',
+      '--rm',
+      '-v',
+      '%CWD%:/tf',
+      'bridgecrew/checkov:latest',
+      '--directory',
+      '/tf/infra/terraform',
+      '--framework',
+      'terraform',
+      '--compact',
+      '--quiet',
+    ],
     needsDocker: true,
     slow: true,
   },
@@ -122,24 +174,46 @@ for (const check of selected) {
   const slowHint = check.slow === true ? ' (может занять несколько минут)' : '';
   process.stdout.write(`${prefix} ${check.name}${slowHint}... `);
 
-  try {
-    execSync(check.cmd.replace(/%CWD%/g, cwd), {
-      stdio: ['ignore', 'pipe', 'pipe'],
-      encoding: 'utf8',
-      maxBuffer: 20 * 1024 * 1024,
-    });
+  const result = runCheck(check);
+
+  if (result.error === undefined && result.status === 0) {
     console.log('OK');
-  } catch (error) {
+  } else {
     console.log('ОШИБКА');
     const output = [
-      error instanceof Error && 'stdout' in error ? String(error.stdout ?? '') : '',
-      error instanceof Error && 'stderr' in error ? String(error.stderr ?? '') : '',
+      String(result.stdout ?? ''),
+      String(result.stderr ?? ''),
+      result.error ? `Не удалось запустить команду: ${result.error.message}` : '',
     ]
       .join('\n')
       .trim();
 
     failed.push({ check, output });
   }
+}
+
+/**
+ * Запускает проверку и возвращает результат, не бросая исключений.
+ *
+ * Ветка argv идёт БЕЗ оболочки (shell: false) — путь к проекту подставляется
+ * в отдельный аргумент, а не в исполняемую строку. Ветка cmd оболочку использует,
+ * но там команда целиком константа: подставлять в неё нечего.
+ *
+ * @param {{cmd?: string, argv?: string[]}} check
+ */
+function runCheck(check) {
+  const options = { encoding: /** @type {const} */ ('utf8'), maxBuffer: 20 * 1024 * 1024 };
+
+  if (check.argv !== undefined) {
+    const [file, ...args] = check.argv;
+    return spawnSync(
+      file,
+      args.map((arg) => arg.replace(/%CWD%/g, cwd)),
+      { ...options, shell: false }
+    );
+  }
+
+  return spawnSync(String(check.cmd), { ...options, shell: true });
 }
 
 console.log('\n════════════════════════════════════════════════════════════');
@@ -157,7 +231,8 @@ for (const { check, output } of failed) {
   console.log(`─── ${check.name} ───`);
   console.log(`Ворота на GitHub: ${check.gate}`);
   console.log(`Что проверяет:    ${check.why}`);
-  console.log(`Команда:          ${check.cmd.replace(/%CWD%/g, '<проект>')}`);
+  const shown = check.argv !== undefined ? check.argv.join(' ') : String(check.cmd);
+  console.log(`Команда:          ${shown.replace(/%CWD%/g, '<проект>')}`);
   console.log('\nВывод (последние строки):');
   console.log(
     output
