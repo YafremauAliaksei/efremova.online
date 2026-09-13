@@ -15,9 +15,18 @@ generator client {
   previewFeatures = ["postgresqlExtensions"]
 }
 
+// ⚠️ Здесь больше НЕТ строки url = env("DATABASE_URL").
+//
+// Prisma 7 убрала подключение к базе из схемы. Причин две, и обе полезные:
+// схема описывает структуру данных, а не то, к какому серверу подключаться,
+// и пароль от базы больше физически не может оказаться в файле, который
+// лежит в публичном репозитории.
+//
+// Теперь адрес базы живёт в двух местах, у каждого своя задача:
+//   • prisma.config.ts — для команд миграций (prisma migrate, prisma studio);
+//   • src/lib/db.ts    — для самого приложения, через адаптер драйвера.
 datasource db {
   provider   = "postgresql"
-  url        = env("DATABASE_URL")
   extensions = [pgcrypto, citext]
 }
 

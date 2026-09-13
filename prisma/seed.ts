@@ -10,10 +10,19 @@
  * Запуск: npm run db:seed
  */
 
+import { PrismaPg } from '@prisma/adapter-pg';
 import { Prisma, PrismaClient } from '@prisma/client';
 import { LEGAL_DOCUMENTS } from './legal-content';
 
-const db = new PrismaClient();
+// Свой экземпляр клиента, а не общий из src/lib/db.ts: тот помечен
+// 'server-only' и предназначен для приложения, а это отдельный скрипт.
+//
+// Адаптер обязателен начиная с Prisma 7 — без него клиент не знает, куда
+// подключаться. Строку берём из окружения: prisma db seed загружает .env
+// через prisma.config.ts ещё до запуска этого файла.
+const db = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+});
 
 /** Тексты-заглушки: понятно, что это демо, и никого не вводит в заблуждение */
 const CONTENT_BLOCKS = [
