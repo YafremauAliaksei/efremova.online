@@ -24,6 +24,7 @@
 | [`docs/08-auth-availability-and-privacy.md`](docs/08-auth-availability-and-privacy.md) | 🔑 Кнопки входа, которые знают правду о себе + приватность IP |
 | [`docs/09-ai-agent-safety.md`](docs/09-ai-agent-safety.md) | 🤖 Доступы ИИ-агента и защита от подмены инструкций |
 | [`docs/10-how-we-work.md`](docs/10-how-we-work.md) | 🔄 Как устроена работа: проверки, цикл, обратная связь |
+| [`docs/11-git-workflow.md`](docs/11-git-workflow.md) | 🌿 Git: ветки, коммиты, pull request — по командам |
 
 ---
 
