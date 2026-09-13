@@ -15,16 +15,10 @@
  */
 
 import { randomBytes } from 'node:crypto';
-import { existsSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const ENV_PATH = resolve(process.cwd(), '.env');
-
-if (existsSync(ENV_PATH)) {
-  console.log('.env уже существует — ничего не меняю.');
-  console.log('Чтобы пересоздать: удалите файл и запустите команду снова.');
-  process.exit(0);
-}
 
 /** hex, а не base64: такие значения безопасно подставлять в строку подключения */
 const secret = (bytes = 32) => randomBytes(bytes).toString('hex');
@@ -90,7 +84,33 @@ CRYPTO_ENABLED=false
 DEFAULT_CURRENCY=EUR
 `;
 
-writeFileSync(ENV_PATH, content, { encoding: 'utf8', mode: 0o600 });
+// ⚠️ ЕДИНСТВЕННАЯ проверка существования .env — вот эта запись, и она же создание.
+//
+// flag: 'wx' означает «создай файл, а если он уже существует — верни ошибку».
+// Проверка и создание происходят ОДНОЙ неделимой операцией на уровне ядра.
+//
+// Раньше здесь стояла привычная пара: сначала existsSync в начале файла, потом
+// запись в конце. Между ними проходило время, за которое на место .env можно
+// подложить символическую ссылку — и сгенерированные секреты ушли бы по ней,
+// в чужой файл. Классическая гонка «проверил — сделал», CodeQL js/file-system-race.
+//
+// Отдельный existsSync убран СОВСЕМ, а не оставлен «для удобного сообщения»:
+// после появления wx он ничего не защищал, но сохранял в коде форму уязвимости —
+// и читающий (человек или анализатор) вынужден был каждый раз разбираться заново.
+// Сообщение для обычного случая теперь живёт там, где ему и место: в обработке
+// ошибки EEXIST.
+try {
+  writeFileSync(ENV_PATH, content, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
+} catch (error) {
+  const code = error instanceof Error && 'code' in error ? String(error.code) : '';
+  if (code === 'EEXIST') {
+    // Не ошибка: так ведёт себя повторный запуск npm run setup.
+    console.log('.env уже существует — ничего не меняю.');
+    console.log('Чтобы пересоздать: удалите файл и запустите команду снова.');
+    process.exit(0);
+  }
+  throw error;
+}
 
 console.log('✓ Создан .env со случайными локальными секретами');
 console.log('  Внешние ключи оставлены пустыми — так и задумано.');
