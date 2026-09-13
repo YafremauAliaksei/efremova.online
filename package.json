@@ -74,7 +74,9 @@
     "vitest": "^5.0.0"
   },
   "overrides": {
-    "postcss": "$postcss"
+    "postcss": "$postcss",
+    "tmp": "^0.2.6",
+    "uuid": "^11.1.1"
   },
   "prisma": {
     "schema": "prisma/schema.prisma",
