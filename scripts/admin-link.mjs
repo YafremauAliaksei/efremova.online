@@ -17,9 +17,24 @@
  */
 
 import { createHash, randomBytes } from 'node:crypto';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 
-const db = new PrismaClient();
+// Начиная с Prisma 7 клиент не читает адрес базы из схемы: подключением
+// занимается адаптер, а .env приходится загружать самим. Node умеет это
+// встроенными средствами с версии 20.6, отдельная библиотека не нужна.
+//
+// Внутри контейнера файла .env нет — переменные приходят из окружения,
+// поэтому его отсутствие не ошибка.
+try {
+  process.loadEnvFile('.env');
+} catch {
+  // .env отсутствует — значит, работаем в контейнере или в CI.
+}
+
+const db = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+});
 const TTL_MINUTES = 15;
 
 async function main() {
