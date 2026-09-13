@@ -131,6 +131,14 @@ const CHECKS = [
     slow: true,
   },
   {
+    name: 'Заголовки безопасности',
+    gate: '🎯 DAST (OWASP ZAP)',
+    why: 'Блокирующая проверка требования №5 из CLAUDE.md: no-store и noindex у кабинета',
+    cmd: 'npm run security:headers:local',
+    needsDocker: true,
+    slow: true,
+  },
+  {
     name: 'Terraform',
     gate: '🐳 Docker и Terraform',
     why: 'Checkov: открытые порты, незашифрованные хранилища и подобное',
@@ -163,7 +171,35 @@ console.log('══════════════════════�
 console.log(
   `  Проверок: ${String(selected.length)}${quick ? '  (Docker-проверки пропущены)' : ''}`
 );
-console.log('  Если всё зелёное — GitHub тоже будет зелёным\n');
+console.log('  Зелёный результат покрывает 7 ворот из 8 (см. приписку в конце)\n');
+
+// ── Подготовка: клиент Prisma ────────────────────────────────────────────
+//
+// В workflow после `npm ci` стоит отдельной строкой `npx prisma generate`,
+// а здесь такого шага не было. Пока клиент лежал в node_modules с прошлой
+// установки, расхождение не проявлялось. Проявилось в первый же `npm ci`:
+// клиент исчез вместе с node_modules, типы Prisma стали `any`, и линтер
+// выдал 143 ошибки в файлах, которых никто не трогал.
+//
+// Восстановить его автоматически больше нечему: npm 11 блокирует
+// установочные скрипты пакетов, и postinstall самой Prisma не выполняется.
+// Поэтому генерируем явно — как это делает и Dockerfile.
+process.stdout.write('[подготовка] Клиент Prisma... ');
+
+const prismaGenerate = spawnSync('npx', ['prisma', 'generate'], {
+  encoding: 'utf8',
+  maxBuffer: 20 * 1024 * 1024,
+  shell: true, // npx на Windows — .cmd, без оболочки не запускается
+});
+
+if (prismaGenerate.status === 0) {
+  console.log('OK');
+} else {
+  console.log('ОШИБКА');
+  console.error(prismaGenerate.stderr ?? prismaGenerate.stdout ?? '');
+  console.error('\nБез клиента Prisma проверка типов и линтер дадут ложные ошибки.');
+  process.exit(1);
+}
 
 const failed = [];
 let index = 0;
@@ -221,6 +257,7 @@ console.log('\n═════════════════════�
 if (failed.length === 0) {
   console.log('  ВСЁ ЗЕЛЁНОЕ. Можно отправлять на GitHub:');
   console.log('    git push\n');
+  printCoverageNote();
   process.exit(0);
 }
 
@@ -245,4 +282,28 @@ for (const { check, output } of failed) {
 }
 
 console.log('Отправлять на GitHub пока не нужно — там будет то же самое.\n');
+printCoverageNote();
 process.exit(1);
+
+/**
+ * Что этот прогон НЕ проверяет.
+ *
+ * Обещание «зелёное здесь — зелёное на GitHub» держится ровно до тех пор,
+ * пока оно правдиво. Один гейт локально воспроизвести нечем, и молчать об этом
+ * опаснее, чем сказать: человек, уверенный в полном покрытии, не станет
+ * смотреть на результат PR.
+ */
+function printCoverageNote() {
+  console.log('────────────────────────────────────────────────────────────');
+  console.log('  Чего этот прогон НЕ покрывает:');
+  console.log('');
+  console.log('  🚀 Lighthouse — на Windows падает при уборке временной папки');
+  console.log('     (EPERM в chrome-launcher). Отрабатывает только в PR на Linux.');
+  console.log('');
+  console.log('  🎯 ZAP — сканируется полностью только в PR; локально проверяются');
+  console.log('     заголовки безопасности, то есть блокирующая часть этих ворот.');
+  console.log('');
+  console.log('  Оба гейта запускаются ТОЛЬКО на pull request. Прямой push в main');
+  console.log('  их не вызывает вовсе — это ещё одна причина работать через PR.');
+  console.log('────────────────────────────────────────────────────────────\n');
+}

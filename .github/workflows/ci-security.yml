@@ -68,7 +68,20 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      - run: npm ci
+      # ⚠️ --ignore-scripts запрещает пакетам выполнять свой код при установке.
+      #
+      # postinstall и preinstall чужих библиотек — прямой путь для атаки через
+      # цепочку поставок: код выполняется на раннере, у которого есть доступ
+      # к репозиторию, ДО того как что-либо успеет его проверить.
+      #
+      # Это не новое правило для проекта, а его же приём: в infra/docker/Dockerfile
+      # ровно так и написано (`npm ci --ignore-scripts && npx prisma generate`).
+      # Конвейер просто не повторял того, что делает сборка образа.
+      #
+      # Побочное следствие: postinstall самой Prisma больше не выполняется,
+      # поэтому клиент генерируем явной командой — она и так уже стояла здесь.
+      # В остальных задачах её пришлось добавить.
+      - run: npm ci --ignore-scripts
       - run: npx prisma generate
 
       - name: TypeScript
@@ -129,7 +142,7 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      - run: npm ci
+      - run: npm ci --ignore-scripts
 
       # Блокирует сборку только то, что реально уезжает в продакшен.
       #
@@ -222,7 +235,9 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      - run: npm ci
+      - run: npm ci --ignore-scripts
+      # Клиент Prisma нужен сборке; postinstall его больше не создаёт
+      - run: npx prisma generate
       - run: npx prisma migrate deploy
         env:
           DATABASE_URL: postgresql://postgres:ci_only_password@localhost:5432/efremova_test
@@ -278,7 +293,9 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      - run: npm ci
+      - run: npm ci --ignore-scripts
+      # Клиент Prisma нужен сборке; postinstall его больше не создаёт
+      - run: npx prisma generate
       - run: npm run build
         env:
           AUTH_SECRET: ci_only_not_a_real_secret_value_32ch
