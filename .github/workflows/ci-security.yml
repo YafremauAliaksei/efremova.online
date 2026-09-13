@@ -250,6 +250,13 @@ jobs:
           target: 'http://localhost:3000'
           rules_file_name: '.zap/rules.tsv'
           cmd_options: '-a -j'
+          # ⚠️ Без этого шаг падает, даже когда сканирование прошло чисто.
+          # Действие по умолчанию пытается завести issue с отчётом, а у workflow
+          # стоит permissions: contents: read — получаем «Resource not accessible
+          # by integration». Права НЕ расширяем: право записи в публичном
+          # репозитории ради удобства не раздаём. Отчёт и так остаётся
+          # в артефактах прогона.
+          allow_issue_writing: false
         # Предупреждение, а не блокировка: ZAP склонен к ложным
         # срабатываниям. Отчёт смотрим глазами при каждом PR.
 
@@ -286,13 +293,23 @@ jobs:
   gate:
     name: ✅ Все ворота пройдены
     runs-on: ubuntu-latest
-    needs: [secrets-scan, quality, sast, dependencies, container-scan]
+    # ⚠️ В списке обязаны быть ВСЕ ворота. Раньше здесь не было dast и lighthouse,
+    # и гейт рапортовал «все проверки пройдены» за 4 секунды, пока эти двое горели
+    # красным (PR #21). Опасность не во вранье как таковом, а в том, что этот гейт
+    # выбран обязательной проверкой в защите ветки: пропусти его — и защита
+    # разрешает мерж сломанного кода, выглядя при этом полностью исправной.
+    needs: [secrets-scan, quality, sast, dependencies, container-scan, dast, lighthouse]
     if: always()
     steps:
       - name: Проверка результатов
+        # dast и lighthouse при push в main помечаются skipped (они объявлены
+        # только для pull_request). skipped — не failure, гейт остаётся зелёным.
+        # cancelled ловим тоже: отменённая задача ничего не проверила, а значит
+        # считать её пройденной нельзя.
         run: |
-          if echo '${{ join(needs.*.result, ',') }}' | grep -q 'failure'; then
+          if echo '${{ join(needs.*.result, ',') }}' | grep -qE 'failure|cancelled'; then
             echo "❌ Часть проверок провалена — деплой заблокирован"
+            echo "Результаты: ${{ join(needs.*.result, ', ') }}"
             exit 1
           fi
           echo "✅ Все обязательные проверки пройдены"
