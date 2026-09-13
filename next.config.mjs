@@ -44,11 +44,6 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
 
-  experimental: {
-    // Импортируем только используемые части библиотек — меньше JS в бандле
-    optimizePackageImports: ['date-fns'],
-  },
-
   // В продакшене вырезаем console.* при сборке: защита от случайной
   // утечки персональных данных в консоль браузера (docs/03, красная линия №6)
   compiler: {
