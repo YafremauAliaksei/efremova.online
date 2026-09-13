@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="efremova.online">
+  <!--
+    Иконка сайта (favicon).
+
+    ЗАЧЕМ ЭТОТ ФАЙЛ ВООБЩЕ ЕСТЬ. Браузер на каждой странице сам просит /favicon.ico.
+    Пока файла не было, он получал 404, писал ошибку в консоль — и Lighthouse
+    заваливал аудит errors-in-console, роняя Best Practices с 1.00 до 0.96
+    на всех страницах сразу. Next.js из src/app/icon.svg сам добавляет
+    <link rel="icon">, после чего браузер перестаёт искать /favicon.ico.
+
+    ЭТО ЗАГЛУШКА. Оформление временное и намеренно нейтральное: фирменный знак
+    появится вместе с визуалом (Sprint 1, шаг 1.1). Цвет взят из токена
+    color-accent в globals.css, чтобы заглушка не выбивалась из палитры.
+
+    SVG, а не .ico — потому что это текст: он читается в diff, правится
+    в редакторе и не тянет бинарный файл в публичный репозиторий.
+  -->
+  <rect width="32" height="32" rx="8" fill="#4a6b5d" />
+  <circle cx="14" cy="14" r="7" fill="none" stroke="#fbfaf8" stroke-width="2.5" />
+  <circle cx="22.5" cy="22.5" r="3.5" fill="#fbfaf8" />
+</svg>

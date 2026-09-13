@@ -22,6 +22,7 @@
  */
 
 import { spawn } from 'node:child_process';
+import { cpSync, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
@@ -38,15 +39,59 @@ const nodeOptions = [process.env.NODE_OPTIONS ?? '', `--max-old-space-size=${mem
 
 console.log(`[run-next] ${command}, лимит памяти Node.js: ${memoryLimitMb} МБ`);
 
+/**
+ * ⚠️ ПОЧЕМУ `start` ЗАПУСКАЕТСЯ НЕ ЧЕРЕЗ `next start`
+ *
+ * В next.config.mjs включён `output: 'standalone'` — сборка кладёт в
+ * .next/standalone самодостаточный сервер, и именно он уезжает в Docker-образ.
+ * `next start` при таком режиме сам печатает предупреждение «does not work with
+ * output: standalone» и поднимает ДРУГОЙ сервер: страницы он отдаёт, а
+ * служебные маршруты метаданных (иконка сайта, манифест) теряет — они отвечают
+ * 404, и <link rel="icon"> в разметку не попадает.
+ *
+ * Последствие было не теоретическим. Lighthouse и ZAP в CI проверяли сайт
+ * через `npm start`, то есть проверяли сервер, которого нет ни в продакшене,
+ * ни в образе. Lighthouse честно ловил ошибку 404 на /favicon.ico и валил
+ * Best Practices до 0.96 — а добавление иконки этого не чинило, потому что
+ * тот сервер её всё равно не отдавал.
+ *
+ * Это та же ошибка, что с порогом Hadolint: проверяем не то, что везём.
+ * Правило проекта — локальный прогон, CI и продакшен обязаны работать
+ * с одним и тем же артефактом.
+ *
+ * Подробнее о цикле проверок: docs/10-how-we-work.md.
+ */
+const standaloneServer = '.next/standalone/server.js';
+const useStandalone = command === 'start' && existsSync(standaloneServer);
+
+if (useStandalone) {
+  // Сборка кладёт в .next/standalone только код сервера: статика и public
+  // остаются снаружи, потому что в образе их копирует Dockerfile отдельными
+  // слоями. Для локального запуска доносим их сами.
+  for (const [from, to] of [
+    ['.next/static', '.next/standalone/.next/static'],
+    ['public', '.next/standalone/public'],
+  ]) {
+    if (existsSync(from)) cpSync(from, to, { recursive: true, force: true });
+  }
+  console.log('[run-next] запускаю standalone-сервер — тот же, что в Docker-образе');
+} else if (command === 'start') {
+  console.warn('[run-next] .next/standalone не найден: сначала `npm run build`');
+}
+
 // Запускаем сам файл Next.js через node, без shell.
 // Так безопаснее (аргументы не склеиваются в строку командной оболочки)
 // и одинаково работает на Windows, Linux и macOS.
 const nextBin = require.resolve('next/dist/bin/next');
 
-const child = spawn(process.execPath, [nextBin, command, ...extraArgs], {
-  stdio: 'inherit',
-  env: { ...process.env, NODE_OPTIONS: nodeOptions },
-});
+const child = spawn(
+  process.execPath,
+  useStandalone ? [standaloneServer] : [nextBin, command, ...extraArgs],
+  {
+    stdio: 'inherit',
+    env: { ...process.env, NODE_OPTIONS: nodeOptions },
+  }
+);
 
 // Пробрасываем сигнал остановки дочернему процессу.
 // Без этого Ctrl+C убивает только обёртку, а сам сервер остаётся висеть
