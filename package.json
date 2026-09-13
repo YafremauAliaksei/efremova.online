@@ -62,7 +62,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",
-    "@lhci/cli": "^0.14.0",
+    "@lhci/cli": "^0.15.1",
     "@next/eslint-plugin-next": "^15.1.6",
     "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "^22.10.7",
