@@ -26,6 +26,7 @@ import {
   getPrivateAreaHeaders,
 } from '@/lib/security/headers';
 import { buildCanaryPayload, checkPathTrap, looksLikeLegitimateBot } from '@/lib/security/honeypot';
+import { createThrottle, throttleKey } from '@/lib/security/throttle';
 
 /**
  * Админка закрыта целиком, кроме двух адресов: обмена одноразовой ссылки
@@ -37,6 +38,28 @@ const ADMIN_PUBLIC_PATHS = ['/admin/enter', '/admin/denied'] as const;
 const ADMIN_COOKIE =
   process.env.NODE_ENV === 'production' ? '__Host-admin-session' : 'admin-session';
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+/**
+ * Ограничитель на уровне модуля — один на процесс.
+ *
+ * ⚠️ ЭТО САМАЯ ВАЖНАЯ СТРОКА В ФАЙЛЕ С ТОЧКИ ЗРЕНИЯ УСТОЙЧИВОСТИ.
+ *
+ * Без него каждое попадание в ловушку стоило нам: одного внутреннего
+ * HTTP-запроса (атака удваивалась сама), 2–5 секунд удержанного соединения
+ * и строки в базе. Тысяча запросов в секунду превращали защиту от сканеров
+ * в способ положить сервер.
+ *
+ * Теперь первое попадание с адреса за минуту обрабатывается полностью,
+ * а все последующие получают мгновенный 404 — без ожидания и без записи.
+ * Счётчик пропущенных не теряется: он уходит в базу со следующей записью.
+ *
+ * Состояние живёт в памяти и теряется при перезапуске. Это осознанно:
+ * нужен потолок, а не точность (src/lib/security/throttle.ts).
+ */
+const honeypotThrottle = createThrottle();
+
+/** Тот же приём для событий безопасности: поток отказов тоже бывает потоком */
+const eventThrottle = createThrottle();
 
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
@@ -64,12 +87,28 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     const hit = checkPathTrap(pathname);
 
     if (hit !== null && !looksLikeLegitimateBot(userAgent)) {
-      // Событие уходит в фон: middleware не должен ждать записи в базу
-      void reportHoneypotHit(request, hit.trapId, hit.trapType, hit.scoreDelta);
+      const decision = honeypotThrottle.register(
+        throttleKey(clientIp(request), hit.trapType),
+        Date.now(),
+        hit.delayMs
+      );
 
-      // Намеренная задержка: сканер перебирает тысячи путей, каждая секунда
-      // ожидания снижает скорость его работы и повышает шанс, что он уйдёт
-      await sleep(hit.delayMs);
+      if (decision.report) {
+        // Событие уходит в фон: middleware не должен ждать записи в базу
+        void reportHoneypotHit(request, hit, decision.count);
+      }
+
+      // Задержка только вместе с записью.
+      //
+      // Раньше ждали на каждом попадании. Замысел был «тратить время сканера»,
+      // но сканер ответа не ждёт — он шлёт следующий запрос сразу. Ждали МЫ,
+      // своими соединениями: при 1000 запросах в секунду через пять секунд
+      // висело бы пять тысяч соединений, и лимит кончился бы у нас раньше,
+      // чем терпение у атакующего.
+      //
+      // Одиночный сканер по-прежнему получает свои 2–5 секунд на каждом
+      // новом типе ловушки — против него приём работает как задумано.
+      if (decision.delayMs > 0) await sleep(decision.delayMs);
 
       // Фальшивый API отдаёт «утёкшие» данные с канарейками.
       // Остальные ловушки — обычный 404, чтобы не выдать факт обнаружения.
@@ -102,16 +141,40 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     const sameSite = fetchSite === 'same-origin' || fetchSite === 'none';
     const originOk = origin === null || origin === selfOrigin;
 
-    // Исключений нет ни одного. Раньше здесь было исключение для платёжных
-    // webhook — они приходят с чужих доменов и проверяются подписью. Платежей
-    // на основном домене не будет, а мёртвое исключение в проверке источника —
-    // это дверь, которую однажды кто-нибудь найдёт.
-    if (!originOk || !sameSite) {
-      void reportSecurityEvent(request, 'CSRF_FAIL', 'HIGH', {
-        origin,
-        fetchSite,
-        path: pathname,
-      });
+    // Единственное исключение — внутренние обработчики журнала безопасности.
+    //
+    // ⚠️ ЭТО ИСКЛЮЧЕНИЕ ОБЯЗАТЕЛЬНО, И ВОТ ПОЧЕМУ ОНО БЕЗОПАСНО.
+    //
+    // Middleware сам вызывает /api/internal/security/* через fetch, чтобы
+    // записать событие: в Edge Runtime нет доступа к базе. Такой вызов идёт
+    // от сервера к серверу и заголовка Sec-Fetch-Site НЕ НЕСЁТ — его ставит
+    // браузер. Проверка ниже видела запрос без заголовка и отвечала 403.
+    //
+    // То есть защита от CSRF глушила запись собственных событий безопасности.
+    // Обнаружено живой проверкой 2026-09-14: 20 обращений к ловушке дали
+    // ноль строк в базе, а прямой вызов обработчика вернул 403 вместо 404.
+    //
+    // Почему исключение не открывает дверь: эти адреса закрыты общим секретом
+    // (src/lib/security/internal-auth.ts). Секрет живёт только на сервере,
+    // браузер его не знает и подставить не может — значит подделать такой
+    // запрос со стороны чужого сайта невозможно. Здесь заменяется ОДНА
+    // проверка на ДРУГУЮ, а не снимается защита.
+    const isInternalApi = pathname.startsWith('/api/internal/');
+
+    if (!isInternalApi && (!originOk || !sameSite)) {
+      const csrfDecision = eventThrottle.register(
+        throttleKey(clientIp(request), 'CSRF_FAIL'),
+        Date.now(),
+        0
+      );
+
+      if (csrfDecision.report) {
+        void reportSecurityEvent(request, 'CSRF_FAIL', 'HIGH', csrfDecision.count, {
+          origin,
+          fetchSite,
+          path: pathname,
+        });
+      }
       return withPrivateHeaders(new NextResponse('Forbidden', { status: 403 }));
     }
   }
@@ -185,19 +248,21 @@ function withPrivateHeaders(response: NextResponse): NextResponse {
  */
 async function reportHoneypotHit(
   request: NextRequest,
-  trapId: string,
-  trapType: string,
-  scoreDelta: number
+  hit: { trapId: string; trapType: string; scoreDelta: number },
+  count: number
 ): Promise<void> {
   await postInternal(request, '/api/internal/security/honeypot', {
-    trapId,
-    trapType,
-    scoreDelta,
+    trapId: hit.trapId,
+    trapType: hit.trapType,
+    scoreDelta: hit.scoreDelta,
     ip: clientIp(request),
     country: request.headers.get('cf-ipcountry'),
     userAgent: request.headers.get('user-agent'),
     path: request.nextUrl.pathname,
     method: request.method,
+    // Сколько попаданий склеил ограничитель с прошлой отправки.
+    // Пропущенные не теряются — они складываются здесь.
+    count,
   });
 }
 
@@ -205,6 +270,7 @@ async function reportSecurityEvent(
   request: NextRequest,
   kind: string,
   severity: string,
+  count: number,
   details: Record<string, unknown>
 ): Promise<void> {
   await postInternal(request, '/api/internal/security/event', {
@@ -212,7 +278,9 @@ async function reportSecurityEvent(
     severity,
     ip: clientIp(request),
     country: request.headers.get('cf-ipcountry'),
+    path: request.nextUrl.pathname,
     details,
+    count,
   });
 }
 

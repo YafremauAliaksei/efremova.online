@@ -300,12 +300,19 @@ enum Severity {
   CRITICAL
 }
 
+/// События безопасности, склеенные так же, как попадания в ловушки,
+/// и по той же причине (см. комментарий к HoneypotHit).
 model SecurityEvent {
   id String @id @default(uuid()) @db.Uuid
 
-  kind     SecurityEventKind
-  severity Severity          @default(LOW)
+  ipKey       String
+  kind        SecurityEventKind
+  bucketStart DateTime          @db.Timestamptz
 
+  eventCount Int      @default(1)
+  severity   Severity @default(LOW)
+
+  // ─── Снимок первого события в этом часе ───
   ip      String? @db.Inet
   country String?
   path    String?
@@ -314,13 +321,15 @@ model SecurityEvent {
   honeypotHitId String? @db.Uuid
   blocklistId   String? @db.Uuid
 
-  createdAt DateTime @default(now()) @db.Timestamptz
+  firstSeenAt DateTime @default(now()) @db.Timestamptz
+  lastSeenAt  DateTime @default(now()) @db.Timestamptz
 
   honeypotHit HoneypotHit? @relation(fields: [honeypotHitId], references: [id])
   blocklist   IpBlocklist? @relation(fields: [blocklistId], references: [id])
 
-  @@index([ip, createdAt])
-  @@index([kind, severity, createdAt])
+  @@unique([ipKey, kind, bucketStart])
+  @@index([bucketStart])
+  @@index([kind, severity, bucketStart])
   @@map("security_events")
 }
 
@@ -333,26 +342,63 @@ enum TrapType {
   TIMING
 }
 
+/// Попадания в ловушку, СКЛЕЕННЫЕ по связке «адрес + тип ловушки + час».
+///
+/// ── ПОЧЕМУ НЕ СТРОКА НА КАЖДОЕ ПОПАДАНИЕ ──────────────────────────────────
+///
+/// Объём записей задавал бы атакующий, а не мы. Сканер на 1000 запросов
+/// в секунду за час создал бы 3,6 миллиона строк — и защита от атаки стала бы
+/// способом забить диск. Классическая ошибка: механизм безопасности сам
+/// оказывается уязвимым местом.
+///
+/// Здесь первое попадание в часе создаёт строку и сохраняет в ней СНИМОК
+/// запроса: путь, заголовки, агент. Все последующие только увеличивают
+/// счётчик. Миллион запросов = одна строка.
+///
+/// Побочная выгода важнее экономии места: **начало атаки не вытесняется
+/// никогда**. Ротация логов по размеру теряет именно начало — самое ценное
+/// при разборе. Здесь начало записано первым и не перезаписывается.
+///
+/// Подробно: docs/03-security-policy.md, п.4.
 model HoneypotHit {
-  id       String   @id @default(uuid()) @db.Uuid
-  trapId   String
-  trapType TrapType
+  id String @id @default(uuid()) @db.Uuid
 
+  /// Ключ склейки: адрес или 'unknown'.
+  ///
+  /// ⚠️ Отдельное поле NOT NULL, а не ip, — намеренно. В PostgreSQL два NULL
+  /// в уникальном индексе считаются разными значениями, поэтому склейка
+  /// по неизвестному адресу молча перестала бы работать, и каждый запрос
+  /// без адреса снова создавал бы свою строку.
+  ipKey       String
+  trapType    TrapType
+  /// Начало часа в UTC — граница склейки
+  bucketStart DateTime @db.Timestamptz
+
+  /// Сколько раз за этот час. Растёт вместо создания новых строк.
+  hitCount Int @default(1)
+
+  // ─── Снимок ПЕРВОГО попадания в этом часе ───
+  trapId         String
+  /// Полный адрес. Основание — законный интерес (защита сервиса),
+  /// срок хранения 60 дней, объявлен в политике конфиденциальности.
   ip             String? @db.Inet
   country        String?
   userAgent      String?
+  path           String?
   requestHeaders Json    @default("{}")
   /// Тело запроса обрезается до 4 КБ: этого хватает для анализа,
   /// а хранить больше — риск сохранить чужие вредоносные данные целиком
   requestBody    String?
   scoreDelta     Int     @default(0)
 
-  createdAt DateTime @default(now()) @db.Timestamptz
+  firstSeenAt DateTime @default(now()) @db.Timestamptz
+  lastSeenAt  DateTime @default(now()) @db.Timestamptz
 
   securityEvents SecurityEvent[]
 
-  @@index([ip, createdAt])
-  @@index([trapType, createdAt])
+  @@unique([ipKey, trapType, bucketStart])
+  @@index([bucketStart])
+  @@index([ipKey, bucketStart])
   @@map("honeypot_hits")
 }
 
@@ -384,6 +430,51 @@ model IpBlocklist {
   @@unique([ip])
   @@index([expiresAt])
   @@map("ip_blocklist")
+}
+
+/// Инцидент — «чёрный ящик» массовой атаки.
+///
+/// ── ЗАЧЕМ ОТДЕЛЬНАЯ ЗАПИСЬ, ЕСЛИ ЕСТЬ СКЛЕЕННЫЕ ПОПАДАНИЯ ──────────────────
+///
+/// Склейка отвечает на вопрос «кто и сколько раз». Инцидент отвечает на другой:
+/// «когда это началось и что творилось в тот момент». Он создаётся ОДИН РАЗ
+/// при переходе порога, а не на каждое событие, поэтому его объём — килобайты
+/// независимо от силы атаки. Атакующий не может заставить нас писать больше.
+///
+/// По открытию инцидента запрашивается внеплановый бэкап: ждать планового
+/// в 03:00 нельзя, разбираться будет уже не с чем.
+model SecurityIncident {
+  id String @id @default(uuid()) @db.Uuid
+
+  openedAt DateTime  @default(now()) @db.Timestamptz
+  /// Закрывается, когда активность вернулась к норме
+  closedAt DateTime? @db.Timestamptz
+
+  /// Что сработало, например HONEYPOT_RATE
+  trigger       String
+  /// Сколько попаданий было в окне в момент перехода порога
+  triggerCount  Int
+  windowMinutes Int
+
+  /// Снимок на момент открытия: первые уникальные сигнатуры.
+  /// Объём ограничен кодом — см. src/lib/security/recorder.ts
+  snapshot Json @default("{}")
+
+  /// Накопленный итог за инцидент
+  totalHits   Int @default(0)
+  /// Сколько записей отброшено потолком. Честная отметка «мы видели не всё»:
+  /// без неё счётчик молча занижал бы масштаб атаки.
+  droppedHits Int @default(0)
+
+  lastActivityAt DateTime @default(now()) @db.Timestamptz
+
+  /// Когда по этому инциденту запросили внеплановый бэкап.
+  /// Заполняется здесь, читается контейнером бэкапа (ветка ops/log-rotation).
+  backupRequestedAt DateTime? @db.Timestamptz
+
+  @@index([openedAt])
+  @@index([closedAt, lastActivityAt])
+  @@map("security_incidents")
 }
 
 // ───────────────────────── GDPR И УВЕДОМЛЕНИЯ ─────────────────────────

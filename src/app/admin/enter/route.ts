@@ -1,7 +1,7 @@
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { consumeLoginToken, createAdminSession } from '@/lib/auth/admin';
-import { db } from '@/lib/db';
+import { recordSecurityEvent } from '@/lib/security/recorder';
 
 /**
  * Обмен одноразовой ссылки на сессию администратора.
@@ -39,7 +39,15 @@ export async function GET(request: Request): Promise<NextResponse> {
 
   await createAdminSession();
 
-  await recordSecurityEvent('ADMIN_LOGIN', 'MEDIUM', ip, { outcome: 'success' });
+  await recordSecurityEvent({
+    kind: 'ANOMALY',
+    severity: 'MEDIUM',
+    ip,
+    country: null,
+    path: '/admin/enter',
+    details: { event: 'ADMIN_LOGIN', outcome: 'success' },
+    count: 1,
+  });
 
   return NextResponse.redirect(new URL('/admin', request.url), {
     headers: { 'Cache-Control': 'no-store' },
@@ -48,30 +56,21 @@ export async function GET(request: Request): Promise<NextResponse> {
 
 async function deny(request: Request, ip: string | null, reason: string): Promise<NextResponse> {
   // Неудачная попытка входа в админку — событие безопасности, а не мелочь:
-  // это либо ошибка владельца, либо чужая попытка подобрать ссылку
-  await recordSecurityEvent('ADMIN_LOGIN_FAILED', 'HIGH', ip, { reason });
+  // это либо ошибка владельца, либо чужая попытка подобрать ссылку.
+  //
+  // Запись идёт через общий recorder, а не прямой записью в базу: там живут
+  // склейка по часу и потолок записей. Перебор ссылок — это тоже поток,
+  // и он не должен создавать строку на каждую попытку.
+  await recordSecurityEvent({
+    kind: 'ANOMALY', // отдельного типа для админки в перечислении пока нет
+    severity: 'HIGH',
+    ip,
+    country: null,
+    path: '/admin/enter',
+    details: { event: 'ADMIN_LOGIN_FAILED', reason },
+    count: 1,
+  });
 
   const url = new URL('/admin/denied', request.url);
   return NextResponse.redirect(url, { headers: { 'Cache-Control': 'no-store' } });
-}
-
-async function recordSecurityEvent(
-  kind: string,
-  severity: string,
-  ip: string | null,
-  details: Record<string, unknown>
-): Promise<void> {
-  try {
-    await db.securityEvent.create({
-      data: {
-        kind: 'ANOMALY', // отдельного типа для админки в перечислении пока нет
-        severity: severity === 'HIGH' ? 'HIGH' : 'MEDIUM',
-        ip,
-        path: '/admin/enter',
-        details: { event: kind, ...details },
-      },
-    });
-  } catch {
-    // Сбой журналирования не должен мешать входу владельца
-  }
 }
