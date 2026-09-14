@@ -6,8 +6,8 @@
 #  Логи:      docker compose logs -f app
 #
 #  Ключевое решение по безопасности: наружу торчит ТОЛЬКО nginx.
-#  База и Redis доступны исключительно внутри закрытой сети Docker —
-#  из интернета к ним не подключиться в принципе.
+#  База доступна исключительно внутри закрытой сети Docker —
+#  из интернета к ней не подключиться в принципе.
 # ═══════════════════════════════════════════════════════════════════════════
 
 services:
@@ -22,11 +22,8 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
-      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     networks: [backend]
     # Порт НЕ публикуется наружу: доступ только через nginx
@@ -51,31 +48,6 @@ services:
     deploy:
       resources:
         limits: { cpus: '2.0', memory: 1G }
-
-  # ─────────────────────────── ВОРКЕР ФОНОВЫХ ЗАДАЧ ───────────────────────────
-  # Отдельный процесс: напоминания, синхронизация календаря,
-  # проверка поступления крипто-платежей
-  worker:
-    build:
-      context: .
-      dockerfile: infra/docker/Dockerfile
-      target: runner
-    command: ['node', 'dist/worker.js']
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      NODE_ENV: production
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
-      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
-    depends_on:
-      postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
-    networks: [backend]
-    security_opt: [no-new-privileges:true]
-    cap_drop: [ALL]
-    deploy:
-      resources:
-        limits: { cpus: '1.0', memory: 512M }
 
   # ─────────────────────────── БАЗА ДАННЫХ ───────────────────────────
   postgres:
@@ -113,46 +85,6 @@ services:
       - shared_buffers=512MB
       - -c
       - max_connections=100
-    security_opt: [no-new-privileges:true]
-
-  # ─────────────────────────── REDIS ───────────────────────────
-  # Сессии, одноразовые коды, счётчики лимитов, очереди задач
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    command:
-      - redis-server
-      - --requirepass
-      - ${REDIS_PASSWORD}
-      - --maxmemory
-      - 256mb
-      - --maxmemory-policy
-      - allkeys-lru
-      - --appendonly
-      - 'yes'
-      # Отключаем опасные команды: даже получив доступ изнутри сети,
-      # нельзя стереть все данные или прочитать конфигурацию.
-      # Пустое новое имя = команда становится недоступна совсем.
-      # ⚠️ Каждый аргумент — отдельным элементом списка: Redis ждёт
-      # именно три параметра, а не одну строку.
-      - --rename-command
-      - FLUSHALL
-      - ''
-      - --rename-command
-      - FLUSHDB
-      - ''
-      - --rename-command
-      - CONFIG
-      - ''
-    volumes:
-      - redis-data:/data
-    networks: [backend]
-    expose: ['6379']
-    healthcheck:
-      test: ['CMD', 'redis-cli', '--no-auth-warning', '-a', '${REDIS_PASSWORD}', 'ping']
-      interval: 10s
-      timeout: 3s
-      retries: 5
     security_opt: [no-new-privileges:true]
 
   # ─────────────────────────── NGINX ───────────────────────────
@@ -218,7 +150,6 @@ networks:
 
 volumes:
   postgres-data:
-  redis-data:
   certbot-certs:
   certbot-www:
   nginx-logs:

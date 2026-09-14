@@ -5,8 +5,8 @@
       "startServerReadyPattern": "Ready in",
       "url": [
         "http://localhost:3000/",
-        "http://localhost:3000/uslugi",
-        "http://localhost:3000/o-mne"
+        "http://localhost:3000/services",
+        "http://localhost:3000/about"
       ],
       "numberOfRuns": 3,
       "settings": {

@@ -51,7 +51,7 @@ export default async function AdminPage() {
     // Страницы читают тексты из базы и кэшируются — после правки кэш
     // нужно сбросить, иначе изменения «не видно»
     revalidatePath('/');
-    revalidatePath('/o-mne');
+    revalidatePath('/about');
     revalidatePath('/admin');
   }
 

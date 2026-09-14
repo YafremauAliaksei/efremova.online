@@ -35,10 +35,9 @@ describe('ловушки по пути запроса', () => {
   it('НЕ трогает обычные страницы сайта', () => {
     const realPaths = [
       '/',
-      '/login',
-      '/uslugi',
-      '/o-mne',
-      '/cabinet/appointments',
+      '/services',
+      '/about',
+      '/admin',
       '/api/health',
       '/lekcii/trevoga',
       '/privacy',

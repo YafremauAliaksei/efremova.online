@@ -26,21 +26,26 @@ export function generateNonce(): string {
  *
  * @param nonce      одноразовый код для этого запроса
  * @param isDev      в режиме разработки Next.js требует 'unsafe-eval' для hot reload
- * @param isCabinet  кабинет клиента — политика ещё строже: ни одного внешнего домена
+ *
+ * ── НИ ОДНОГО ВНЕШНЕГО ДОМЕНА ─────────────────────────────────────────────
+ *
+ * Сайт самодостаточен: ни скриптов, ни шрифтов, ни картинок, ни кадров
+ * с чужих серверов. Это не строгость ради строгости, а три выгоды сразу:
+ *
+ *   • приватность: браузер посетителя не обращается ни к кому, кроме нас,
+ *     значит его IP не уходит третьим лицам и согласия на это не требуется;
+ *   • безопасность: взлом чужого сервера не превращается во взлом нашего сайта —
+ *     именно так ломают через рекламные сети и виджеты;
+ *   • скорость: ни одного лишнего DNS-запроса и TLS-рукопожатия.
+ *
+ * Политика поэтому одна на весь сайт: у админки отличаются не источники,
+ * а заголовки кэширования и индексации — см. getPrivateAreaHeaders().
+ *
+ * Раньше здесь были разрешены youtube-nocookie, player.vimeo и plausible.io.
+ * Ни один из них не использовался ни строкой кода. Обложки роликов теперь
+ * скачиваются к себе и отдаются со своего домена (docs/13-site-architecture.md).
  */
-export function buildContentSecurityPolicy(
-  nonce: string,
-  isDev: boolean,
-  isCabinet: boolean
-): string {
-  // Внешние домены разрешаем только там, где это действительно нужно,
-  // и только на публичных страницах. В кабинете — ничего внешнего.
-  const frameSrc = isCabinet
-    ? ["'none'"]
-    : ["'self'", 'https://www.youtube-nocookie.com', 'https://player.vimeo.com'];
-
-  const connectSrc = isCabinet ? ["'self'"] : ["'self'", 'https://plausible.io'];
-
+export function buildContentSecurityPolicy(nonce: string, isDev: boolean): string {
   const directives: Record<string, string[]> = {
     'default-src': ["'self'"],
 
@@ -60,10 +65,10 @@ export function buildContentSecurityPolicy(
     // Отраслевая практика допускает это. Убрать можно — ценой заметного усложнения.
     'style-src': ["'self'", "'unsafe-inline'"],
 
-    'img-src': ["'self'", 'data:', 'blob:', 'https://i.ytimg.com'],
+    'img-src': ["'self'", 'data:', 'blob:'],
     'font-src': ["'self'"], // шрифты только со своего домена (GDPR, docs/04 п.2.3)
-    'connect-src': connectSrc,
-    'frame-src': frameSrc,
+    'connect-src': ["'self'"],
+    'frame-src': ["'none'"], // ни одного кадра: ни чужого, ни своего
 
     'object-src': ["'none'"], // Flash/Java-плагины: только источник проблем
     'base-uri': ["'none'"], // запрет подмены <base href> — защита от угона относительных путей

@@ -225,9 +225,6 @@ jobs:
           --health-cmd pg_isready --health-interval 10s
           --health-timeout 5s --health-retries 5
         ports: ['5432:5432']
-      redis:
-        image: redis:7-alpine
-        ports: ['6379:6379']
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -246,15 +243,12 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:ci_only_password@localhost:5432/efremova_test
           AUTH_SECRET: ci_only_not_a_real_secret_value_32ch
-          FIELD_ENCRYPTION_KEY: ci_only_not_a_real_secret_value_32ch
 
       - name: Запуск приложения
         run: npm start &
         env:
           DATABASE_URL: postgresql://postgres:ci_only_password@localhost:5432/efremova_test
-          REDIS_URL: redis://localhost:6379
           AUTH_SECRET: ci_only_not_a_real_secret_value_32ch
-          FIELD_ENCRYPTION_KEY: ci_only_not_a_real_secret_value_32ch
 
       - name: Ожидание готовности
         run: npx wait-on http://localhost:3000 --timeout 60000
@@ -299,7 +293,6 @@ jobs:
       - run: npm run build
         env:
           AUTH_SECRET: ci_only_not_a_real_secret_value_32ch
-          FIELD_ENCRYPTION_KEY: ci_only_not_a_real_secret_value_32ch
 
       - name: Lighthouse CI
         run: npx lhci autorun

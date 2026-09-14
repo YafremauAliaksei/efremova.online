@@ -172,38 +172,25 @@ resource "cloudflare_ruleset" "waf_custom" {
     enabled     = true
   }
 
-  # ─── Правило 3: защита формы входа ───
-  # Вход — самая атакуемая точка. Требуем прохождения проверки на бота.
+  # ─── Правило 3: админка — только для людей ───
+  # Единственная закрытая зона основного домена. Формы входа тут нет:
+  # войти можно лишь по одноразовой ссылке из терминала сервера. Проверка
+  # на бота отсекает сканеры, которые перебирают /admin по словарю.
   rules {
     action      = "managed_challenge"
-    description = "Усиленная проверка на страницах авторизации"
-    expression  = <<-EOT
-      (http.request.uri.path contains "/api/auth" and cf.threat_score > 10) or
-      (http.request.uri.path contains "/api/otp" and cf.threat_score > 5)
-    EOT
+    description = "Админка: боты не допускаются"
+    expression  = "(http.request.uri.path contains \"/admin\") and (cf.client.bot) and not (cf.verified_bot_category eq \"Search Engine Crawler\")"
     enabled     = true
   }
 
-  # ─── Правило 4: кабинет — только для людей ───
-  rules {
-    action      = "managed_challenge"
-    description = "Личный кабинет: боты не допускаются"
-    expression  = "(http.request.uri.path contains \"/cabinet\") and (cf.client.bot) and not (cf.verified_bot_category eq \"Search Engine Crawler\")"
-    enabled     = true
-  }
-
-  # ─── Правило 5: webhooks только от известных источников ───
-  # Webhook меняет статус платежа — доступ к нему должен быть максимально узким.
-  # Подпись проверяется в приложении, но лишний фильтр здесь не помешает.
-  rules {
-    action      = "skip"
-    description = "Пропускать webhooks платёжных систем без проверок"
-    expression  = "(http.request.uri.path contains \"/api/webhooks/stripe\") and (ip.src in $stripe_ips)"
-    enabled     = false # включить после заполнения списка IP-адресов Stripe
-    action_parameters {
-      ruleset = "current"
-    }
-  }
+  # ⚠️ Здесь были ещё два правила: проверка на страницах авторизации
+  # (/api/auth, /api/otp) и пропуск webhooks Stripe мимо всех проверок.
+  # Убраны вместе с кабинетом и платежами (docs/13-site-architecture.md).
+  #
+  # Особенно второе: правило с action = "skip" открывает путь в обход WAF.
+  # Правило, которое ничего не сторожит, но умеет пропускать, — это дверь,
+  # оставленная в стене снесённого здания. Вернётся вместе с платежами,
+  # в конфигурации того поддомена, где они будут.
 }
 
 # ─────────────────── ОГРАНИЧЕНИЕ ЧАСТОТЫ ЗАПРОСОВ ───────────────────
@@ -219,8 +206,8 @@ resource "cloudflare_ruleset" "rate_limit" {
 
   rules {
     action      = "block"
-    description = "Вход: не более 5 попыток в минуту с одного IP"
-    expression  = "(http.request.uri.path contains \"/api/auth\" or http.request.uri.path contains \"/api/otp\")"
+    description = "Админка: не более 5 обращений в минуту с одного IP"
+    expression  = "(http.request.uri.path contains \"/admin\")"
     enabled     = true
     ratelimit {
       characteristics     = ["ip.src", "cf.colo.id"]
@@ -243,18 +230,8 @@ resource "cloudflare_ruleset" "rate_limit" {
     }
   }
 
-  rules {
-    action      = "block"
-    description = "Платежи: не более 10 запросов в минуту"
-    expression  = "(http.request.uri.path contains \"/api/payments\")"
-    enabled     = true
-    ratelimit {
-      characteristics     = ["ip.src"]
-      period              = 60
-      requests_per_period = 10
-      mitigation_timeout  = 300
-    }
-  }
+  # ⚠️ Здесь было правило для /api/payments. Платежей на основном домене нет —
+  # правило вернётся в конфигурацию поддомена с кабинетом.
 }
 
 # ─────────────────── ПРАВИЛА КЭШИРОВАНИЯ ───────────────────
@@ -271,11 +248,10 @@ resource "cloudflare_ruleset" "cache" {
   # Правило идёт ПЕРВЫМ: запрет кэша важнее любых оптимизаций
   rules {
     action      = "set_cache_settings"
-    description = "НИКОГДА не кэшировать кабинет, API и авторизацию"
+    description = "НИКОГДА не кэшировать админку и API"
     expression  = <<-EOT
-      (http.request.uri.path contains "/cabinet") or
-      (http.request.uri.path contains "/api/") or
-      (http.request.uri.path contains "/login")
+      (http.request.uri.path contains "/admin") or
+      (http.request.uri.path contains "/api/")
     EOT
     enabled     = true
     action_parameters {

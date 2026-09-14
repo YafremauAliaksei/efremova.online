@@ -82,19 +82,40 @@ const RULES = [
   },
 ];
 
-/** Кабинет не должен кэшироваться и индексироваться — отдельная проверка */
+/**
+ * Закрытая зона не должна кэшироваться и индексироваться.
+ *
+ * ⚠️ ИСТОРИЯ ЭТОЙ ФУНКЦИИ — ПОУЧИТЕЛЬНАЯ.
+ *
+ * Раньше здесь проверялся /cabinet. После того как кабинет вырезали, такого
+ * адреса не стало, и Next.js начал отдавать на него обычную страницу 404.
+ * А страница 404 в Next.js по умолчанию несёт Cache-Control: no-store —
+ * и проверка продолжила проходить, НИЧЕГО НЕ ПРОВЕРЯЯ. Зелёная галочка
+ * утверждала, что закрытая зона защищена, хотя проверяла отсутствие страницы.
+ *
+ * Отсюда правило: проверка обязана падать, если проверяемого больше нет.
+ * Ниже статус ответа проверяется явно — 404 теперь считается провалом.
+ */
 async function checkPrivateArea(baseUrl) {
-  const response = await fetch(new URL('/cabinet', baseUrl), { redirect: 'manual' });
+  const path = '/admin';
+  const response = await fetch(new URL(path, baseUrl), { redirect: 'manual' });
   const problems = [];
+
+  // Без cookie middleware обязан увести на /admin/denied. Ответ 404 означает,
+  // что маршрут исчез, а проверка смотрит в пустоту.
+  if (response.status === 404) {
+    problems.push(`${path}: адрес не существует (404) — проверять нечего, почините проверку`);
+    return problems;
+  }
 
   const cacheControl = response.headers.get('cache-control');
   if (cacheControl === null || !cacheControl.includes('no-store')) {
-    problems.push(`/cabinet: Cache-Control="${String(cacheControl)}" — обязателен no-store`);
+    problems.push(`${path}: Cache-Control="${String(cacheControl)}" — обязателен no-store`);
   }
 
   const robots = response.headers.get('x-robots-tag');
-  if (response.status === 200 && (robots === null || !robots.includes('noindex'))) {
-    problems.push('/cabinet: нет X-Robots-Tag: noindex — страница может попасть в Google');
+  if (robots === null || !robots.includes('noindex')) {
+    problems.push(`${path}: нет X-Robots-Tag: noindex — страница может попасть в Google`);
   }
 
   return problems;

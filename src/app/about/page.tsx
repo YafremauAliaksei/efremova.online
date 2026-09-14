@@ -45,7 +45,7 @@ export default async function AboutPage() {
         </section>
 
         <Link
-          href="/uslugi"
+          href="/services"
           className="mt-10 inline-block rounded-lg bg-[var(--color-accent)] px-8 py-4 font-medium text-white transition-colors hover:bg-[#3d594d]"
         >
           Услуги и цены

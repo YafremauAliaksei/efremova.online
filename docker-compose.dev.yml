@@ -2,10 +2,10 @@
 #  ДОБАВКА ДЛЯ ЛОКАЛЬНОЙ РАЗРАБОТКИ
 #
 #  Применяется ПОВЕРХ docker-compose.yml и делает ровно одно:
-#  открывает порты базы и Redis для программ, запущенных на вашем компьютере.
+#  открывает порт базы для программ, запущенных на вашем компьютере.
 #
 #  Запуск:
-#    docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres redis
+#    docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres
 #  (то же самое короче:  npm run dev:db)
 #
 #  ⚠️ ПОЧЕМУ ЭТО ОТДЕЛЬНЫЙ ФАЙЛ, А НЕ ПРАВКА ОСНОВНОГО
@@ -26,10 +26,6 @@ services:
       # к порту не подключиться, даже зная пароль.
       - '127.0.0.1:5432:5432'
 
-  redis:
-    ports:
-      - '127.0.0.1:6379:6379'
-
   # Приложение в контейнере — «как на сервере».
   #
   # В повседневной разработке оно НЕ нужно: `npm run dev` на самой машине
@@ -46,5 +42,4 @@ services:
       # Внутри сети Docker база доступна по имени сервиса, а не по localhost:
       # localhost в контейнере — это сам контейнер.
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
-      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       APP_URL: http://localhost:3000
