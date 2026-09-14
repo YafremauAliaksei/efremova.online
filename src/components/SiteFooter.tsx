@@ -20,12 +20,12 @@ export function SiteFooter() {
               </Link>
             </li>
             <li>
-              <Link href="/o-mne" className="underline underline-offset-4">
+              <Link href="/about" className="underline underline-offset-4">
                 Обо мне
               </Link>
             </li>
             <li>
-              <Link href="/uslugi" className="underline underline-offset-4">
+              <Link href="/services" className="underline underline-offset-4">
                 Услуги
               </Link>
             </li>

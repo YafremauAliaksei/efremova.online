@@ -25,8 +25,13 @@ const nextConfig = {
   images: {
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 31536000,
-    remotePatterns: [{ protocol: 'https', hostname: 'i.ytimg.com', pathname: '/**' }],
-    // SVG из внешних источников — вектор XSS (внутри может быть <script>)
+    // remotePatterns намеренно пуст: картинки бывают только со своего домена.
+    // Обложки роликов скачиваются к себе при добавлении видео, а не подгружаются
+    // у посетителя из i.ytimg.com — иначе Google узнавал бы его IP
+    // (docs/13-site-architecture.md, п.1.1).
+    remotePatterns: [],
+    // SVG — не картинка, а программа для рисовальщика: внутри может быть <script>
+    // и геометрия, которая вешает отрисовку. Не принимаем ни в каком виде.
     dangerouslyAllowSVG: false,
   },
 

@@ -69,12 +69,10 @@ export default async function ServicesPage() {
           </ul>
         )}
 
-        <Link
-          href="/login"
-          className="mt-10 inline-block rounded-lg bg-[var(--color-accent)] px-8 py-4 font-medium text-white transition-colors hover:bg-[#3d594d]"
-        >
-          Выбрать время
-        </Link>
+        {/* Здесь была кнопка «Выбрать время», которая вела в личный кабинет.
+            Кабинет переехал на отдельный поддомен и пока не существует, а ссылка
+            в никуда хуже её отсутствия. Кнопка вернётся в ветке feat/contacts
+            и поведёт на страницу контактов. */}
       </main>
       <SiteFooter />
     </>

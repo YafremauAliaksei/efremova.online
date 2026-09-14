@@ -2,7 +2,7 @@
   "name": "efremova-online",
   "version": "0.1.0",
   "private": true,
-  "description": "Платформа частного психолога: публичный сайт + защищённый кабинет клиента",
+  "description": "Сайт частного психолога: публичная часть основного домена",
   "engines": {
     "node": ">=22.0.0",
     "npm": ">=10.0.0"
@@ -34,11 +34,11 @@
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f app",
     "env:init": "node scripts/bootstrap-env.mjs",
-    "dev:db": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres redis",
+    "dev:db": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres",
     "dev:db:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml down",
     "hooks:install": "git config core.hooksPath .githooks && node -e \"console.log('Хуки git установлены: проверка секретов перед каждым коммитом')\"",
     "setup": "npm run env:init && npm run dev:db && npm run db:migrate && npm run db:seed && npm run hooks:install",
-    "stack:up": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build postgres redis app",
+    "stack:up": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build postgres app",
     "stack:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml down",
     "stack:logs": "docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f app",
     "ci": "node scripts/ci-local.mjs",

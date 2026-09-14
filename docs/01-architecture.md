@@ -32,7 +32,7 @@
 | Стили | **Tailwind CSS v4** + CSS-переменные | 4.x |
 | База данных | **PostgreSQL** + расширение `pgcrypto` | 17 |
 | ORM (слой доступа к БД) | **Prisma** | 6.x |
-| Кэш, сессии, очереди | **Redis** + BullMQ | 7.x |
+| Кэш, сессии, очереди | **Redis** + BullMQ | ⬜ не подключено — вернётся с кабинетом |
 | Авторизация | **Auth.js (NextAuth v5)** + свой OTP-провайдер | 5.x |
 | Валидация данных | **Zod** | 4.x |
 | Привратник | **nginx** | 1.27 |
@@ -193,7 +193,7 @@ flowchart TB
     NG --> APP[Next.js]
 
     APP -->|Prisma| PG[(PostgreSQL<br/>шифрованные поля)]
-    APP -->|сессии, OTP, лимиты| RD[(Redis)]
+    APP -.->|сессии, OTP, лимиты — пока не подключено| RD[(Redis)]
     APP -->|очереди| WK[Worker BullMQ]
 
     WK -->|мониторинг оплат| TRON[TronGrid API]

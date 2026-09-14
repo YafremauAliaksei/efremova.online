@@ -24,7 +24,6 @@ const ENV_PATH = resolve(process.cwd(), '.env');
 const secret = (bytes = 32) => randomBytes(bytes).toString('hex');
 
 const dbPassword = secret(16);
-const redisPassword = secret(16);
 
 const content = `# ═══════════════════════════════════════════════════════════════════
 #  ЛОКАЛЬНАЯ РАЗРАБОТКА — создан автоматически ${new Date().toISOString().slice(0, 10)}
@@ -33,9 +32,10 @@ const content = `# ════════════════════�
 #  ⚠️ Значения ниже пригодны только для локальной машины.
 #     Для сервера секреты генерируются заново.
 #
-#  Внешние ключи (Google, Telegram, платежи) намеренно оставлены пустыми:
-#  сайт обязан работать без них и честно показывать, что метод входа
-#  не подключён. Полный список переменных — в .env.example
+#  Переменных мало, и это не упущение: основной домен — сайт-визитка,
+#  он не обращается ни к одному внешнему сервису. Ключи OAuth, платежей
+#  и шифрования медицинских данных вернутся вместе с личным кабинетом,
+#  на отдельном поддомене и в отдельном окружении.
 # ═══════════════════════════════════════════════════════════════════
 
 NODE_ENV=development
@@ -48,40 +48,12 @@ POSTGRES_PASSWORD=${dbPassword}
 POSTGRES_DB=efremova
 DATABASE_URL=postgresql://app:${dbPassword}@localhost:5432/efremova?schema=public
 
-# ─── Redis ───
-REDIS_PASSWORD=${redisPassword}
-REDIS_URL=redis://:${redisPassword}@localhost:6379
-
-# ─── Подпись сессий ───
+# ─── Подпись сессии администратора ───
+# Тем же значением солится хеш IP в квитанции о согласии на cookie.
 AUTH_SECRET=${secret(32)}
-AUTH_URL=http://localhost:3000
 
-# ─── Ключ шифрования медицинских данных ───
-# ⚠️ В проде его место — в хранилище секретов, а не в файле на диске.
-FIELD_ENCRYPTION_KEY=${secret(32)}
-FIELD_ENCRYPTION_KEY_VERSION=v1
-
-# ─── Безопасность ───
+# ─── Ловушки для сканеров ───
 HONEYPOT_ENABLED=true
-HONEYPOT_BAN_THRESHOLD=100
-HONEYPOT_CHALLENGE_THRESHOLD=50
-
-# ─── Способы входа: пусто = «не подключено», и сайт это покажет ───
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-APPLE_CLIENT_ID=
-APPLE_TEAM_ID=
-APPLE_KEY_ID=
-APPLE_PRIVATE_KEY=
-TELEGRAM_BOT_TOKEN=
-WHATSAPP_PHONE_NUMBER_ID=
-WHATSAPP_ACCESS_TOKEN=
-
-# ─── Прочие интеграции (подключаются в своих спринтах) ───
-VIDEO_PROVIDER=google_meet
-PAYMENT_PROVIDERS_ENABLED=
-CRYPTO_ENABLED=false
-DEFAULT_CURRENCY=EUR
 `;
 
 // ⚠️ ЕДИНСТВЕННАЯ проверка существования .env — вот эта запись, и она же создание.
@@ -113,5 +85,5 @@ try {
 }
 
 console.log('✓ Создан .env со случайными локальными секретами');
-console.log('  Внешние ключи оставлены пустыми — так и задумано.');
+console.log('  Внешних ключей здесь нет и не нужно.');
 console.log('  Дальше: npm run dev:db && npm run db:migrate && npm run db:seed');

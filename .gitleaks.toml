@@ -26,7 +26,7 @@ regexes = [
   '''CHANGE_ME[A-Za-z0-9_]*''',
 
   # Заведомо недействительные значения в пробах доступности провайдеров
-  # (src/lib/auth/providers.ts) и в тестовых окружениях CI
+  # (например, в тестовых окружениях CI)
   '''availability-probe-not-a-real-[a-z]+''',
   '''ci_only_not_a_real_secret_value_32ch''',
   '''ci_only_password''',

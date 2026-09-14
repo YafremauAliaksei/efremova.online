@@ -6,11 +6,15 @@
  *
  *   1. Ловушки (honeypot)     — сканер отсекается сразу, дальше не идёт
  *   2. Защита от CSRF         — проверка источника для изменяющих запросов
- *   3. Гейт кабинета          — нет сессии → редирект на вход
+ *   3. Гейт админки           — нет cookie → отказ
  *   4. Заголовки безопасности — CSP с nonce на каждый ответ
  *
- * ⚠️ Middleware работает в Edge Runtime: здесь НЕТ доступа к Node.js API,
- * к Prisma и к Redis. Поэтому запись событий делается «выстрелил и забыл» —
+ * Личного кабинета на этом домене нет: он уезжает на отдельный поддомен
+ * и отдельный сервер (docs/13-site-architecture.md). Поэтому закрытая зона
+ * здесь ровно одна — админка.
+ *
+ * ⚠️ Middleware работает в Edge Runtime: здесь НЕТ доступа к Node.js API
+ * и к Prisma. Поэтому запись событий делается «выстрелил и забыл» —
  * через внутренний обработчик, который уже работает в обычной Node-среде.
  */
 
@@ -22,9 +26,6 @@ import {
   getPrivateAreaHeaders,
 } from '@/lib/security/headers';
 import { buildCanaryPayload, checkPathTrap, looksLikeLegitimateBot } from '@/lib/security/honeypot';
-
-const SESSION_COOKIE = '__Host-session';
-const PRIVATE_PREFIXES = ['/cabinet', '/api/private'] as const;
 
 /**
  * Админка закрыта целиком, кроме двух адресов: обмена одноразовой ссылки
@@ -44,9 +45,8 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     (pathname === ADMIN_PREFIX || pathname.startsWith(`${ADMIN_PREFIX}/`)) &&
     !ADMIN_PUBLIC_PATHS.some((allowed) => pathname === allowed);
 
-  const isPrivate =
-    isAdminArea ||
-    PRIVATE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  // Единственная закрытая зона на этом домене
+  const isPrivate = isAdminArea;
 
   // ────────────────────────────────────────────────────────────────
   // 1. ЛОВУШКИ
@@ -102,11 +102,11 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     const sameSite = fetchSite === 'same-origin' || fetchSite === 'none';
     const originOk = origin === null || origin === selfOrigin;
 
-    // Webhooks платёжных систем приходят с чужих доменов — для них
-    // работает своя проверка HMAC-подписи, эта проверка их не касается.
-    const isWebhook = pathname.startsWith('/api/webhooks/');
-
-    if (!isWebhook && (!originOk || !sameSite)) {
+    // Исключений нет ни одного. Раньше здесь было исключение для платёжных
+    // webhook — они приходят с чужих доменов и проверяются подписью. Платежей
+    // на основном домене не будет, а мёртвое исключение в проверке источника —
+    // это дверь, которую однажды кто-нибудь найдёт.
+    if (!originOk || !sameSite) {
       void reportSecurityEvent(request, 'CSRF_FAIL', 'HIGH', {
         origin,
         fetchSite,
@@ -117,36 +117,16 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   }
 
   // ────────────────────────────────────────────────────────────────
-  // 3. ГЕЙТ ЛИЧНОГО КАБИНЕТА
+  // 3. ГЕЙТ АДМИНКИ
   //
   // Здесь проверяется только НАЛИЧИЕ куки — это дешёвый фильтр.
-  // Настоящая проверка подписи JWT и прав доступа делается в самой
-  // странице/обработчике: middleware не должен быть единственной
-  // преградой (принцип «не доверяй одному рубежу»).
+  // Настоящая проверка подписи делается в самой странице: middleware
+  // не должен быть единственной преградой (принцип «не доверяй одному рубежу»).
   // ────────────────────────────────────────────────────────────────
   if (isAdminArea && !request.cookies.has(ADMIN_COOKIE)) {
     // Без объяснений и без редиректа на форму входа: формы входа в админку
     // не существует, войти можно только по ссылке из терминала сервера
     return withPrivateHeaders(NextResponse.redirect(new URL('/admin/denied', request.url)));
-  }
-
-  if (isPrivate && !isAdminArea) {
-    const hasSession = request.cookies.has(SESSION_COOKIE);
-
-    if (!hasSession) {
-      if (pathname.startsWith('/api/')) {
-        return withPrivateHeaders(NextResponse.json({ error: 'unauthorized' }, { status: 401 }));
-      }
-      const loginUrl = new URL('/login', request.url);
-      // Запоминаем, куда человек шёл, чтобы вернуть его туда после входа.
-      // Сохраняем только путь — открытый редирект на чужой домен невозможен.
-      loginUrl.searchParams.set('next', pathname);
-
-      // ⚠️ Заголовки обязательны и на редиректе.
-      // Сам факт «этот адрес существует и требует входа» — тоже информация,
-      // и промежуточный прокси не должен её кэшировать или отдать поисковику.
-      return withPrivateHeaders(NextResponse.redirect(loginUrl));
-    }
   }
 
   // ────────────────────────────────────────────────────────────────
@@ -161,10 +141,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
 
-  response.headers.set(
-    'Content-Security-Policy',
-    buildContentSecurityPolicy(nonce, isDev, isPrivate)
-  );
+  response.headers.set('Content-Security-Policy', buildContentSecurityPolicy(nonce, isDev));
 
   for (const [key, value] of Object.entries(getBaseSecurityHeaders())) {
     if (value === '') {
@@ -174,7 +151,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     }
   }
 
-  // 🔒 Кабинет: запрет кэширования и индексации. Нарушение = утечка данных.
+  // 🔒 Админка: запрет кэширования и индексации.
   if (isPrivate) {
     for (const [key, value] of Object.entries(getPrivateAreaHeaders())) {
       response.headers.set(key, value);

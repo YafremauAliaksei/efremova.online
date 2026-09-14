@@ -3,15 +3,24 @@ import { z } from 'zod';
 /**
  * Единая точка правды о переменных окружения.
  *
- * Зачем это нужно:
- *   1. Опечатка в имени переменной обнаруживается при старте, а не через неделю
- *      в проде в момент, когда клиент пытается оплатить.
- *   2. Отсюда же берётся ответ на вопрос «настроен ли способ входа» —
- *      см. src/lib/auth/providers.ts.
+ * Зачем это нужно: опечатка в имени переменной обнаруживается при старте,
+ * а не через неделю в проде в момент, когда что-то перестало работать.
  *
  * ⚠️ Файл только серверный. Импорт из клиентского компонента недопустим:
  *    это утащило бы секреты в браузер. Всё, что должно быть видно браузеру,
- *    начинается с NEXT_PUBLIC_ и лежит в отдельной схеме ниже.
+ *    начинается с NEXT_PUBLIC_ и описывается отдельно.
+ *
+ * ── ПОЧЕМУ СПИСОК ТАКОЙ КОРОТКИЙ ──────────────────────────────────────────
+ *
+ * Основной домен — это сайт-визитка. Он не ходит ни в один внешний сервис:
+ * ни OAuth, ни платежей, ни аналитики, ни очередей. Переменных окружения
+ * ровно столько, сколько нужно, чтобы поднять сайт и подписать сессию
+ * администратора. Каждая лишняя строка здесь — это ключ, который можно
+ * потерять, и дверь, которую нужно сторожить.
+ *
+ * Ключи для входа через Google, Apple и Telegram вернутся вместе с личным
+ * кабинетом — на отдельном поддомене, в отдельном окружении
+ * (docs/13-site-architecture.md, docs/08-auth-availability-and-privacy.md).
  */
 
 /** Пустая строка в .env — это «не настроено», а не «настроено пустотой» */
@@ -29,28 +38,17 @@ const serverSchema = z.object({
   APP_ENV: z.enum(['development', 'staging', 'production']).default('development'),
 
   DATABASE_URL: z.string().url().optional(),
-  REDIS_URL: z.string().optional(),
 
-  // ─── Авторизация. Всё опционально: без этих значений сайт обязан
-  //     работать и честно показывать, что метод входа недоступен. ───
+  /**
+   * Подписывает сессию администратора и служит солью для хеша IP в квитанции
+   * о согласии. Без него админка не работает, сайт — работает.
+   */
   AUTH_SECRET: optionalSecret,
-  GOOGLE_CLIENT_ID: optionalSecret,
-  GOOGLE_CLIENT_SECRET: optionalSecret,
-  APPLE_CLIENT_ID: optionalSecret,
-  APPLE_TEAM_ID: optionalSecret,
-  APPLE_KEY_ID: optionalSecret,
-  APPLE_PRIVATE_KEY: optionalSecret,
-  TELEGRAM_BOT_TOKEN: optionalSecret,
-  WHATSAPP_PHONE_NUMBER_ID: optionalSecret,
-  WHATSAPP_ACCESS_TOKEN: optionalSecret,
 
-  // ─── Прочее ───
-  FIELD_ENCRYPTION_KEY: optionalSecret,
+  /** 'false' выключает ловушки — нужно только при отладке */
   HONEYPOT_ENABLED: z.string().optional(),
+  /** Чтобы легальный пентест по договору не спотыкался о ловушки */
   PENTEST_BYPASS_TOKEN: optionalSecret,
-  AUTH_PROBE_TIMEOUT_MS: z.coerce.number().int().positive().default(4000),
-  AUTH_PROBE_TTL_OK_MS: z.coerce.number().int().positive().default(600_000), // 10 минут
-  AUTH_PROBE_TTL_FAIL_MS: z.coerce.number().int().positive().default(60_000), // 1 минута
 });
 
 export type ServerEnv = z.infer<typeof serverSchema>;
@@ -71,22 +69,4 @@ export function env(): ServerEnv {
 
   cached = parsed.data;
   return cached;
-}
-
-/** Настроен ли набор переменных целиком (все непустые) */
-export function hasAll(keys: readonly (keyof ServerEnv)[]): boolean {
-  const config = env();
-  return keys.every((key) => {
-    const value = config[key];
-    return typeof value === 'string' && value.trim().length > 0;
-  });
-}
-
-/** Какие именно переменные из набора отсутствуют — для понятного сообщения */
-export function missingKeys(keys: readonly (keyof ServerEnv)[]): string[] {
-  const config = env();
-  return keys.filter((key) => {
-    const value = config[key];
-    return !(typeof value === 'string' && value.trim().length > 0);
-  });
 }

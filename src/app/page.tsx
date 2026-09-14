@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { headers } from 'next/headers';
 import { formatPrice, getContentBlock, getServices } from '@/lib/content';
 import { SiteFooter } from '@/components/SiteFooter';
@@ -9,9 +8,12 @@ import { SiteFooter } from '@/components/SiteFooter';
  * Все тексты и цены приходят из базы (docs/06): в этом файле нет
  * ни одного личного слова владельца — только разметка.
  *
- * ⚠️ Пока страница читает регион из заголовка, она динамическая.
- * В Sprint 1 её переведут на статическую сборку с отдельным
- * клиентским переключателем валюты — это даст LCP около 30 мс (docs/04).
+ * ⚠️ ЧЕСТНО О КЭШИРОВАНИИ: страница помечена force-dynamic, то есть собирается
+ * заново на КАЖДОГО посетителя и на каждого ходит в базу. Причина — чтение
+ * страны из заголовка ради валюты. Это дорого и мешает Cloudflare кэшировать
+ * ответ. Переход на заранее собранную страницу запланирован отдельной веткой
+ * (docs/13-site-architecture.md, раздел «Кэширование»); там же переключатель
+ * валюты уезжает на сторону браузера.
  */
 
 export const dynamic = 'force-dynamic';
@@ -19,7 +21,7 @@ export const dynamic = 'force-dynamic';
 export default async function HomePage() {
   const headerList = await headers();
   // Страну сообщает Cloudflare. Никаких сторонних geo-IP сервисов:
-  // иначе IP посетителя утекал бы третьей стороне (docs/08).
+  // иначе IP посетителя утекал бы третьей стороне (docs/03).
   const region = headerList.get('cf-ipcountry') ?? 'DEFAULT';
 
   const [hero, about, approach, cta, services] = await Promise.all([
@@ -38,12 +40,8 @@ export default async function HomePage() {
         {hero.body !== null && (
           <p className="mx-auto mt-6 max-w-2xl text-lg text-[var(--color-ink-soft)]">{hero.body}</p>
         )}
-        <Link
-          href="/login"
-          className="mt-10 inline-block rounded-lg bg-[var(--color-accent)] px-8 py-4 font-medium text-white transition-colors hover:bg-[#3d594d]"
-        >
-          Записаться на консультацию
-        </Link>
+        {/* Кнопка вела в личный кабинет. Кабинет уехал на отдельный поддомен,
+            здесь на её месте появится кнопка к контактам (ветка feat/contacts). */}
       </section>
 
       {/* ЭКРАН 2 — Обо мне */}
@@ -105,12 +103,6 @@ export default async function HomePage() {
       <section className="mx-auto max-w-3xl px-6 py-24 text-center">
         <h2 className="text-3xl font-semibold">{cta.title}</h2>
         {cta.body !== null && <p className="mt-4 text-[var(--color-ink-soft)]">{cta.body}</p>}
-        <Link
-          href="/login"
-          className="mt-8 inline-block rounded-lg bg-[var(--color-accent)] px-8 py-4 font-medium text-white transition-colors hover:bg-[#3d594d]"
-        >
-          Войти в личный кабинет
-        </Link>
       </section>
 
       <SiteFooter />
