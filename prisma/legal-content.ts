@@ -31,7 +31,7 @@ export interface LegalDocumentSeed {
   sections: LegalSection[];
 }
 
-const PRIVACY_VERSION = 'privacy-2026-09-13';
+const PRIVACY_VERSION = 'privacy-2026-09-14';
 const TERMS_VERSION = 'terms-2026-09-13';
 
 export const LEGAL_DOCUMENTS: LegalDocumentSeed[] = [
@@ -89,7 +89,8 @@ export const LEGAL_DOCUMENTS: LegalDocumentSeed[] = [
       {
         heading: '6. Okres przechowywania',
         paragraphs: [
-          'Dokładne okresy zostaną wskazane po weryfikacji prawnej. Orientacyjnie: dokumentacja konsultacji — przez okres wymagany przepisami, dokumenty księgowe — 5 lat, techniczne dzienniki bezpieczeństwa — do 12 miesięcy.',
+          'Dzienniki bezpieczeństwa — w tym adresy IP zarejestrowane przy próbach skanowania serwisu — przechowujemy przez 60 dni, po czym są automatycznie usuwane. Podstawą jest prawnie uzasadniony interes: ochrona serwisu przed atakami (art. 6 ust. 1 lit. f RODO).',
+          'Pozostałe okresy zostaną wskazane po weryfikacji prawnej. Orientacyjnie: dokumentacja konsultacji — przez okres wymagany przepisami, dokumenty księgowe — 5 lat.',
         ],
       },
       {
@@ -164,7 +165,8 @@ export const LEGAL_DOCUMENTS: LegalDocumentSeed[] = [
       {
         heading: '6. Сколько данные хранятся',
         paragraphs: [
-          'Точные сроки будут указаны после юридической проверки. Ориентир: документация консультаций — в течение срока, установленного законом; бухгалтерские документы — 5 лет; технические журналы безопасности — до 12 месяцев.',
+          'Журналы безопасности — включая IP-адреса, записанные при попытках сканирования сайта, — хранятся 60 дней, после чего удаляются автоматически. Основание: законный интерес — защита сайта от атак (ст. 6 ч. 1 п. f GDPR).',
+          'Остальные сроки будут указаны после юридической проверки. Ориентир: документация консультаций — в течение срока, установленного законом; бухгалтерские документы — 5 лет.',
         ],
       },
       {

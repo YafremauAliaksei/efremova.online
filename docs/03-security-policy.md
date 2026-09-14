@@ -131,7 +131,7 @@
 │ /wp-admin/, /wp-login.php, /.env, /.git/config,                  │
 │ /phpmyadmin/, /admin.php, /config.json, /backup.sql,             │
 │ /.aws/credentials, /api/v1/debug                                 │
-│ → Отвечаем 404 с задержкой 2-5 сек (тратим время сканера)        │
+│ → Отвечаем 404; первое попадание с адреса — с задержкой 2-5 сек  │
 ├──────────────────────────────────────────────────────────────────┤
 │ ТИП 2 — НЕВИДИМЫЕ ПОЛЯ ФОРМ                   балл: +80          │
 │ <input name="website_url" tabindex="-1" aria-hidden="true">      │
@@ -168,7 +168,7 @@ flowchart TD
     D -->|>= 100| G[Cloudflare API: блокировать IP на 24 часа]
     G --> H[SECURITY_EVENT severity=HIGH]
     H --> I[Алерт в Telegram владельцу]
-    F --> J[Ответ с задержкой 2-5 сек — тормозим сканер]
+    F --> J[404; задержка 2-5 сек только на первом попадании с адреса]
     E --> J
 ```
 
