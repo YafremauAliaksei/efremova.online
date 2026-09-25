@@ -85,7 +85,7 @@ export interface PublicService {
  *
  * Регион определяется по заголовку CF-IPCountry от Cloudflare — то есть
  * никакие сторонние сервисы геолокации не вызываются и IP посетителя
- * никуда не уходит (docs/08, п.3).
+ * никуда не уходит (docs/13, п.1.1).
  */
 export async function getServices(region: string, locale = 'ru'): Promise<PublicService[]> {
   try {

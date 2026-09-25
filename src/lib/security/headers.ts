@@ -66,7 +66,7 @@ export function buildContentSecurityPolicy(nonce: string, isDev: boolean): strin
     'style-src': ["'self'", "'unsafe-inline'"],
 
     'img-src': ["'self'", 'data:', 'blob:'],
-    'font-src': ["'self'"], // шрифты только со своего домена (GDPR, docs/04 п.2.3)
+    'font-src': ["'self'"], // шрифты только со своего домена (GDPR, docs/13 п.1.1)
     'connect-src': ["'self'"],
     'frame-src': ["'none'"], // ни одного кадра: ни чужого, ни своего
 
@@ -133,7 +133,7 @@ export function getBaseSecurityHeaders(): Record<string, string> {
 /**
  * Дополнительные заголовки для личного кабинета.
  *
- * 🔒 ЖЁСТКОЕ ПРАВИЛО (docs/01 п.1): ни один байт данных клиента
+ * 🔒 ЖЁСТКОЕ ПРАВИЛО (CLAUDE.md, закрытая зона): ни один байт данных клиента
  * не должен осесть в кэше браузера, прокси или CDN.
  */
 export function getPrivateAreaHeaders(): Record<string, string> {

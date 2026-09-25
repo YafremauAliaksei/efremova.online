@@ -20,7 +20,7 @@ import { z } from 'zod';
  *
  * Ключи для входа через Google, Apple и Telegram вернутся вместе с личным
  * кабинетом — на отдельном поддомене, в отдельном окружении
- * (docs/13-site-architecture.md, docs/08-auth-availability-and-privacy.md).
+ * (docs/13-site-architecture.md, раздел 10).
  */
 
 /** Пустая строка в .env — это «не настроено», а не «настроено пустотой» */

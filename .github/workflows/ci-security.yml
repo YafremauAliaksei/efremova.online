@@ -296,7 +296,7 @@ jobs:
 
       - name: Lighthouse CI
         run: npx lhci autorun
-        # Пороги заданы в .lighthouserc.json (docs/04, п.6).
+        # Пороги заданы в .lighthouserc.json.
         # Accessibility, Best Practices и SEO — строго 100.
 
   # ─────────────────── ИТОГ ───────────────────

@@ -62,7 +62,7 @@ export function CookieConsent() {
   const [choice, setChoice] = useState<Choice>({ analytics: false, marketing: false });
   // Язык определяется в браузере, а не на сервере: иначе каждая страница
   // стала бы динамической ради одного баннера и потеряла бы статическую
-  // отдачу (docs/04, п.1). Польский — значение по умолчанию.
+  // отдачу (docs/13, раздел 6). Польский — значение по умолчанию.
   const [locale, setLocale] = useState<'pl' | 'ru'>('pl');
   const t = TEXT[locale];
 
