@@ -101,13 +101,6 @@ export async function SiteFooter() {
             text="Usługodawca: {{owner.fullName}}, {{owner.address}} · NIP {{owner.nip}} · {{owner.email}} · {{owner.professionalTitle}}, nr prawa wykonywania zawodu {{owner.licenseNumber}}"
           />
         </p>
-
-        <p lang="pl-PL" className="mt-4 text-xs">
-          <Filled
-            values={values}
-            text="Usługodawca: {{owner.fullName}}, {{owner.address}} · NIP {{owner.nip}} · {{owner.email}} · {{owner.professionalTitle}}, nr prawa wykonywania zawodu {{owner.licenseNumber}}"
-          />
-        </p>
       </div>
     </footer>
   );

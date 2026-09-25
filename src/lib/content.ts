@@ -45,7 +45,7 @@ const FALLBACK: Record<string, ContentBlockData> = {
   'cta.main': {
     key: 'cta.main',
     title: 'Записаться на консультацию',
-    body: 'Выберите удобное время в личном кабинете.',
+    body: 'Напишите на e-mail, указанный внизу страницы.',
     data: {},
   },
 };
