@@ -121,9 +121,6 @@ export default async function AdminPage({ searchParams }: PageProps) {
         <span className="rounded border border-dashed border-[var(--color-line)] px-3 py-1 text-[var(--color-ink-soft)]">
           Правовые документы — далее
         </span>
-        <span className="rounded border border-dashed border-[var(--color-line)] px-3 py-1 text-[var(--color-ink-soft)]">
-          Журнал согласий — далее
-        </span>
       </nav>
 
       {status !== null && (
