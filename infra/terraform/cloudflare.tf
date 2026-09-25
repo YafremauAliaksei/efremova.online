@@ -1,5 +1,5 @@
 # ═══════════════════════════════════════════════════════════════════════════
-#  CLOUDFLARE — щит перед сервером (docs/00, п.5; docs/03, рубеж №1)
+#  CLOUDFLARE — щит перед сервером (docs/03, рубеж №1)
 #
 #  «Инфраструктура как код»: вместо кликанья в веб-панели настройки описаны
 #  файлом в git. Плюсы: видно историю изменений, можно откатиться, можно
@@ -108,7 +108,7 @@ resource "cloudflare_zone_settings_override" "security" {
     challenge_ttl  = 1800
     browser_check  = "on"
 
-    # Производительность (docs/04)
+    # Производительность
     brotli           = "on"
     early_hints      = "on"  # браузер начинает грузить CSS до ответа сервера
     http3            = "on"
@@ -241,7 +241,7 @@ resource "cloudflare_ruleset" "rate_limit" {
 resource "cloudflare_ruleset" "cache" {
   zone_id     = var.cloudflare_zone_id
   name        = "efremova-cache"
-  description = "Правила кэширования (docs/04, п.3.3)"
+  description = "Правила кэширования (docs/13, раздел 6)"
   kind        = "zone"
   phase       = "http_request_cache_settings"
 

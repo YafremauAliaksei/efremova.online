@@ -2,7 +2,7 @@
  * Конфигурация Next.js.
  *
  * Здесь две группы настроек:
- *   • те, что дают баллы Lighthouse (docs/04-seo-performance.md)
+ *   • те, что дают баллы Lighthouse (гейт CI, пороги в .lighthouserc.json)
  *   • те, что закрывают дыры (docs/03-security-policy.md)
  *
  * Заголовки безопасности задаются в src/middleware.ts — там они динамические

@@ -58,8 +58,6 @@ console.log(`[run-next] ${command}, лимит памяти Node.js: ${memoryLim
  * Это та же ошибка, что с порогом Hadolint: проверяем не то, что везём.
  * Правило проекта — локальный прогон, CI и продакшен обязаны работать
  * с одним и тем же артефактом.
- *
- * Подробнее о цикле проверок: docs/10-how-we-work.md.
  */
 const standaloneServer = '.next/standalone/server.js';
 const useStandalone = command === 'start' && existsSync(standaloneServer);

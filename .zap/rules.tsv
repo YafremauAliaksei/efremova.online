@@ -16,7 +16,7 @@
 # русскоязычные комментарии в HTML-разметке
 10027	IGNORE	(Information Disclosure - Suspicious Comments)
 
-# Кэширование статики с хешем в имени файла — сознательное решение (docs/04).
+# Кэширование статики с хешем в имени файла — сознательное решение (docs/13, раздел 6).
 # Персональные страницы отдаются с no-store, это проверяется отдельно
 # скриптом scripts/check-security-headers.mjs
 10015	IGNORE	(Re-examine Cache-control Directives)

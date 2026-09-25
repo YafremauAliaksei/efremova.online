@@ -105,7 +105,7 @@ export default tseslint.config(
       eqeqeq: ['error', 'always'],
 
       // ─────────────────────────────────────────────────────────────
-      // ПРОИЗВОДИТЕЛЬНОСТЬ — защита баллов Lighthouse (docs/04)
+      // ПРОИЗВОДИТЕЛЬНОСТЬ — защита баллов Lighthouse (.lighthouserc.json)
       // ─────────────────────────────────────────────────────────────
       '@next/next/no-img-element': 'error', // только next/image: AVIF/WebP + размеры
       '@next/next/no-sync-scripts': 'error', // блокирует отрисовку
@@ -135,11 +135,11 @@ export default tseslint.config(
     },
   },
 
-  // Скрипты и сид-файл — обычные утилиты командной строки.
+  // Скрипты, сторож команд агента и тесты — утилиты командной строки.
   // Они не входят в tsconfig приложения, поэтому типизированные правила
   // для них отключаются: иначе ESLint не находит для них проект.
   {
-    files: ['scripts/**/*.mjs', '**/*.test.ts', '**/*.test.tsx'],
+    files: ['scripts/**/*.mjs', '.claude/hooks/**/*.mjs', '**/*.test.ts', '**/*.test.tsx'],
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: {
       // Глобальные объекты Node.js: без этого линтер считает console и process
