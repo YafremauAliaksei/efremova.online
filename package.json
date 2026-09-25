@@ -60,20 +60,20 @@
     "@lhci/cli": "^0.15.1",
     "@next/eslint-plugin-next": "^15.1.6",
     "@tailwindcss/postcss": "^4.0.0",
-    "@types/node": "^22.10.7",
+    "@types/node": "^22.20.3",
     "@types/react": "^19.0.7",
     "@types/react-dom": "^19.0.3",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-security": "^3.0.1",
     "postcss": "^8.5.28",
-    "prettier": "^3.4.2",
+    "prettier": "^3.9.8",
     "prisma": "^7.10.0",
     "tailwindcss": "^4.0.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.21.0",
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.1"
   },
   "overrides": {
     "postcss": "$postcss",
