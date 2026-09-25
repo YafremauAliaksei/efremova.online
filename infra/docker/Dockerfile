@@ -95,6 +95,17 @@ COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 
+# Вход в админку выписывается из терминала сервера:
+#   docker compose exec app node scripts/admin-link.mjs
+# Копируется один этот скрипт, а не вся папка scripts/: остальное — инструменты
+# разработки. Владелец — root: процесс приложения не может его подменить.
+COPY --from=builder /app/scripts/admin-link.mjs ./scripts/admin-link.mjs
+
+# Скрипт живёт на модулях урезанной сборки. Если Next.js перестанет класть их
+# в node_modules (так было с @prisma/adapter-pg), сборка образа упадёт здесь,
+# а не владелец на сервере в момент, когда ему нужно войти.
+RUN node --input-type=module -e "await import('@prisma/adapter-pg'); await import('@prisma/client');"
+
 USER nextjs
 EXPOSE 3000
 

@@ -21,6 +21,12 @@ const nextConfig = {
   // Меньше образ → меньше поверхность атаки и быстрее деплой.
   output: 'standalone',
 
+  // Адаптер базы — внешний модуль, а не часть серверного бандла. Иначе Next.js
+  // встраивает его в свои файлы, в node_modules образа его нет, и скрипт входа
+  // в админку (scripts/admin-link.mjs) на сервере падает с «Cannot find package».
+  // @prisma/client и pg Next.js и так держит внешними.
+  serverExternalPackages: ['@prisma/adapter-pg'],
+
   // Автоматический AVIF/WebP. Экономия 60-80 % веса картинок — главный вклад в LCP.
   images: {
     formats: ['image/avif', 'image/webp'],
