@@ -32,9 +32,22 @@ import { pathToFileURL } from 'node:url';
 // До 2026-09-25 здесь жил extract-zip (GHSA-7pqw-9j4j-h8q3, GHSA-jmr9-qjv8-65gv):
 // патча нет, пакет заброшен с 2020 года. Его тянул @puppeteer/browsers 2.x
 // через цепочку @lhci/cli → lighthouse → puppeteer-core. Версия 3 распаковывает
-// архивы без него, и package.json → overrides поднимает её внутри puppeteer-core.
-// Совместимость проверена полным прогоном Lighthouse CI. Переопределение убрать,
-// когда @lhci/cli перейдёт на lighthouse с puppeteer-core 25 и новее.
+// архивы без него, и package.json → overrides ставит её вместо 2.x (её
+// использует только puppeteer-core). Совместимость проверена полным
+// прогоном Lighthouse CI.
+//
+// Там же proxy-agent поднят до 8: у @puppeteer/browsers 3 это необязательная
+// peer-зависимость (>=8), а @lhci/cli просит ^6. На таком конфликте npm 10 и
+// npm 11 собирают разные lock-файлы, и файл от одного не проходит `npm ci`
+// у другого — так сломался PR Dependabot #52. С одной версией конфликта нет.
+// @lhci/cli берёт из пакета только класс ProxyAgent, в 8 он тот же.
+//
+// postcss в overrides записан версией, а не ссылкой "$postcss": на ссылке
+// npm 10 падает при любом изменении зависимостей («Unable to resolve reference»).
+// Версия обязана совпадать с devDependencies.postcss — это проверяет тест.
+//
+// Переопределения @puppeteer/browsers и proxy-agent убрать, когда @lhci/cli перейдёт на lighthouse
+// с puppeteer-core 25 и новее.
 /** @type {{id: string, package: string, until: string, reason: string}[]} */
 const ACCEPTED = [];
 

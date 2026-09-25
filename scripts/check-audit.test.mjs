@@ -5,6 +5,8 @@
  * раньше своего источника extract-zip. Прежняя проверка шла по алфавиту
  * и считала @lhci/cli неучтённой уязвимостью, хотя риск принят.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { classify } from './check-audit.mjs';
@@ -79,5 +81,15 @@ describe('принятые риски и их следствия', () => {
       ACCEPTED
     );
     expect(result.blocking).toHaveLength(2);
+  });
+});
+
+describe('переопределения в package.json', () => {
+  const pkg = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8'));
+
+  it('postcss переопределён той же версией, что стоит в devDependencies', () => {
+    // Ссылку "$postcss" npm 10 не разрешает, поэтому версия записана дважды
+    // и может разойтись. Разошлась — поправить обе строки вместе
+    expect(pkg.overrides.postcss).toBe(pkg.devDependencies.postcss);
   });
 });
