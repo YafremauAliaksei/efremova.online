@@ -48,7 +48,6 @@ POSTGRES_DB=efremova
 DATABASE_URL=postgresql://app:${dbPassword}@localhost:5432/efremova?schema=public
 
 # ─── Подпись сессии администратора ───
-# Тем же значением солится хеш IP в квитанции о согласии на cookie.
 AUTH_SECRET=${secret(32)}
 
 # ─── Ловушки для сканеров ───

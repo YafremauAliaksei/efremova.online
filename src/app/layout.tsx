@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from 'next';
-import { CookieConsent } from '@/components/CookieConsent';
 import './globals.css';
 
 /**
@@ -49,11 +48,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           Перейти к содержимому
         </a>
         {children}
-
-        {/* Баннер согласия. Появляется, только пока выбор не сделан.
-            Сам по себе он никаких cookie не ставит и никуда не ходит:
-            пока человек не нажал кнопку, ничего не происходит. */}
-        <CookieConsent />
       </body>
     </html>
   );

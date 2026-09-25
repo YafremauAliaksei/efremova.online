@@ -115,12 +115,3 @@ export async function getLegalDocument(
     return null;
   }
 }
-
-/** Версия действующей редакции — попадает в запись о согласии */
-export async function getCurrentVersion(
-  slug: 'privacy' | 'terms',
-  locale: Locale
-): Promise<string> {
-  const doc = await getLegalDocument(slug, locale);
-  return doc?.version ?? 'unknown';
-}
