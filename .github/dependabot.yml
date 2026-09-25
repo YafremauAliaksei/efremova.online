@@ -11,6 +11,10 @@
 # Всё остальное приезжает одним PR в неделю, и мажорные версии не приезжают
 # вообще: переход на новую мажорную версию фреймворка — это осознанное
 # решение с проверкой, а не то, что стоит делать по уведомлению робота.
+#
+# Меток (labels) нет намеренно: тип обновления виден по префиксу заголовка
+# (deps:, ci:, docker:), а метку, которой нет в репозитории, Dependabot
+# не ставит и оставляет в каждом PR напоминание о ней.
 
 version: 2
 updates:
@@ -45,7 +49,6 @@ updates:
       - dependency-name: '*'
         update-types: ['version-update:semver-major']
 
-    labels: ['dependencies']
     commit-message:
       prefix: deps
 
@@ -60,7 +63,6 @@ updates:
     groups:
       all-actions:
         patterns: ['*']
-    labels: ['dependencies', 'ci']
     commit-message:
       prefix: ci
 
@@ -80,7 +82,6 @@ updates:
     ignore:
       - dependency-name: '*'
         update-types: ['version-update:semver-major']
-    labels: ['dependencies', 'docker']
     commit-message:
       prefix: docker
 
@@ -101,6 +102,5 @@ updates:
     ignore:
       - dependency-name: '*'
         update-types: ['version-update:semver-major']
-    labels: ['dependencies', 'docker']
     commit-message:
       prefix: docker
