@@ -35,7 +35,7 @@ jobs:
     name: 🔑 Поиск секретов в коде
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # нужна вся история: секрет мог попасть в старый коммит
 
@@ -52,7 +52,7 @@ jobs:
       - name: Gitleaks (вся история репозитория)
         run: |
           docker run --rm -v "${{ github.workspace }}:/repo" \
-            zricethezav/gitleaks:latest \
+            zricethezav/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f \
             detect --source /repo --redact -v \
             --config /repo/.gitleaks.toml
 
@@ -61,9 +61,8 @@ jobs:
     name: 🧹 Типы, линтер, формат, тесты
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '22'
           cache: 'npm'
@@ -104,8 +103,7 @@ jobs:
       contents: read
       security-events: write # для загрузки отчёта в Security-вкладку GitHub
     steps:
-      - uses: actions/checkout@v7
-
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Semgrep запускается официальным образом напрямую и без токена.
       #
       # Почему так: workflow из PR выполняется ещё до слияния, и секрет, который
@@ -132,21 +130,20 @@ jobs:
             --config p/jwt
 
       - name: CodeQL · инициализация
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           languages: javascript-typescript
           queries: security-extended,security-and-quality
 
       - name: CodeQL · анализ
-        uses: github/codeql-action/analyze@v4
-
+        uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
   # ─────────────────── ВОРОТА 4: ЗАВИСИМОСТИ ───────────────────
   dependencies:
     name: 📦 Уязвимости в библиотеках
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '22'
           cache: 'npm'
@@ -180,13 +177,12 @@ jobs:
     name: 🐳 Docker и Terraform
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Сборка образа
         run: docker build -f infra/docker/Dockerfile -t efremova:ci .
 
       - name: Trivy · уязвимости в образе
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: efremova:ci
           format: table
@@ -195,14 +191,14 @@ jobs:
           ignore-unfixed: true # то, для чего ещё нет патча, только предупреждение
 
       - name: Checkov · ошибки в Terraform
-        uses: bridgecrewio/checkov-action@v12.3123.0
+        uses: bridgecrewio/checkov-action@a8664e3a0549367977f0cda990a34311835c87c0 # v12.3123.0
         with:
           directory: infra/terraform
           framework: terraform
           soft_fail: false
 
       - name: Hadolint · качество Dockerfile
-        uses: hadolint/hadolint-action@v3.5.0
+        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
         with:
           dockerfile: infra/docker/Dockerfile
           # ⚠️ Порог должен совпадать с локальным прогоном (scripts/ci-local.mjs),
@@ -235,8 +231,8 @@ jobs:
           --health-timeout 5s --health-retries 5
         ports: ['5432:5432']
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '22'
           cache: 'npm'
@@ -263,7 +259,7 @@ jobs:
         run: npx wait-on http://localhost:3000 --timeout 60000
 
       - name: ZAP Baseline Scan
-        uses: zaproxy/action-baseline@v0.15.0
+        uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
         with:
           target: 'http://localhost:3000'
           rules_file_name: '.zap/rules.tsv'
@@ -290,8 +286,8 @@ jobs:
     needs: [quality]
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '22'
           cache: 'npm'
