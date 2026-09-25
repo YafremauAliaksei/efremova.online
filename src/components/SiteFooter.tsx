@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { Filled } from '@/components/Filled';
+import { getSiteProfile } from '@/lib/site-profile';
 
 /**
  * Общий подвал сайта.
@@ -6,8 +8,14 @@ import Link from 'next/link';
  * Вынесен в отдельный компонент, потому что ссылки на правовые документы
  * обязаны быть на каждой странице: это требование GDPR (ст. 12 — информация
  * должна быть «легко доступна»), а не вопрос вкуса.
+ *
+ * Здесь же — данные владельца: закон об электронных услугах (ст. 5) и
+ * директива 2000/31/ЕС (ст. 5) требуют, чтобы они были доступны постоянно
+ * и прямо. Значения — из профиля в базе (docs/03 п.11.3).
  */
-export function SiteFooter() {
+export async function SiteFooter() {
+  const { values } = await getSiteProfile();
+
   return (
     <footer className="border-t border-[var(--color-line)]">
       <div className="mx-auto max-w-3xl px-6 py-10 text-sm text-[var(--color-ink-soft)]">
@@ -53,6 +61,13 @@ export function SiteFooter() {
           <Link href="/terms?lang=pl" hrefLang="pl-PL" className="underline underline-offset-4">
             Regulamin (PL)
           </Link>
+        </p>
+
+        <p lang="pl-PL" className="mt-4 text-xs">
+          <Filled
+            values={values}
+            text="Usługodawca: {{owner.fullName}}, {{owner.address}} · NIP {{owner.nip}} · {{owner.email}} · {{owner.professionalTitle}}, nr prawa wykonywania zawodu {{owner.licenseNumber}}"
+          />
         </p>
       </div>
     </footer>

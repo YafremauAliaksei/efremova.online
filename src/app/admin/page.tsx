@@ -115,6 +115,12 @@ export default async function AdminPage({ searchParams }: PageProps) {
         <span className="rounded border border-[var(--color-accent)] px-3 py-1 text-[var(--color-accent)]">
           Тексты
         </span>
+        <Link
+          href="/admin/profile"
+          className="rounded border border-[var(--color-line)] px-3 py-1 underline-offset-4 hover:underline"
+        >
+          Данные владельца
+        </Link>
         <span className="rounded border border-dashed border-[var(--color-line)] px-3 py-1 text-[var(--color-ink-soft)]">
           Услуги и цены — далее
         </span>

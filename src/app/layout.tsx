@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import { DevelopmentNotice } from '@/components/DevelopmentNotice';
 
 /**
  * Корневой макет. Всё, что здесь, попадает на каждую страницу.
@@ -47,6 +48,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           Перейти к содержимому
         </a>
+        <DevelopmentNotice />
         {children}
       </body>
     </html>
