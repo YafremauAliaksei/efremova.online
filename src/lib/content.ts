@@ -1,5 +1,6 @@
 import 'server-only';
 import { db } from '@/lib/db';
+import { contentBlockDataSchema, i18nTextSchema } from '@/lib/content-schema';
 
 /**
  * Чтение текстов сайта из базы.
@@ -63,7 +64,7 @@ export async function getContentBlock(key: string, locale = 'ru'): Promise<Conte
       key: block.key,
       title: block.title,
       body: block.body,
-      data: (block.data ?? {}) as Record<string, unknown>,
+      data: contentBlockDataSchema.parse(block.data),
     };
   } catch {
     // База недоступна — отдаём заглушку, а не падаем.
@@ -101,8 +102,9 @@ export async function getServices(region: string, locale = 'ru'): Promise<Public
     });
 
     return services.map((service) => {
-      const titles = service.titleI18n as Record<string, string>;
-      const descriptions = service.descriptionI18n as Record<string, string>;
+      // JSON из базы — не обещание типа: испорченная запись даёт пустой перевод, а не 500
+      const titles = i18nTextSchema.parse(service.titleI18n);
+      const descriptions = i18nTextSchema.parse(service.descriptionI18n);
       // Цена для конкретного региона приоритетнее общей
       const price = service.prices.find((p) => p.region === region) ?? service.prices[0] ?? null;
 
