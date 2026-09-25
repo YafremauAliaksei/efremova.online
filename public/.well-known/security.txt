@@ -1,0 +1,7 @@
+# Сообщить об уязвимости сайта efremova.online — порядок в SECURITY.md.
+# Срок Expires продлевается заранее: тест падает за 30 дней до него.
+Contact: https://github.com/YafremauAliaksei/efremova.online/security/advisories/new
+Expires: 2027-06-30T00:00:00.000Z
+Policy: https://github.com/YafremauAliaksei/efremova.online/blob/main/SECURITY.md
+Preferred-Languages: pl, en, ru
+Canonical: https://efremova.online/.well-known/security.txt
