@@ -16,8 +16,14 @@
  * правила агента: workflow из PR выполняется с секретами репозитория ещё
  * до слияния, поэтому проверка на слиянии там опаздывает.
  *
- * Настоящий замок на main — ruleset на GitHub (без обходов, без force-push).
- * Сторож ловит ошибки и подброшенные инструкции до того, как они уйдут в сеть.
+ * Кроме терминала сторож смотрит на инструменты GitHub-коннектора (mcp__…github…):
+ * в облаке через них идёт вся работа с GitHub, и среди них есть слияние PR
+ * и запись файлов мимо git. И на токены в переменных окружения: в облачном
+ * контейнере там лежит ключ GitHub, а `curl` с ним прошёл бы мимо разбора git и gh.
+ *
+ * Настоящий замок на main — ruleset на GitHub: обязательное одобрение владельца,
+ * отдельный аккаунт агента, без обходов (docs/03, п.10). Сторож не граница,
+ * а сеть: ловит ошибки и подброшенные инструкции до того, как они уйдут в сеть.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -41,7 +47,22 @@ function isGuardedFile(file) {
 
 /** Файлы с секретами — те же, что в deny для Read в settings.json. */
 const SECRET_FILE =
-  /(^|[\\/])(\.env(\.(local|production|staging|development|test))?|id_rsa|id_ed25519|terraform\.tfvars|[^\\/]*\.(pem|key|tfstate))$/i;
+  /(^|[\\/])(\.env(\.(local|production|staging|development|test))?|id_rsa|id_ed25519|terraform\.tfvars|\.git-credentials|[._]netrc|[^\\/]*\.(pem|key|tfstate))$/i;
+
+/**
+ * Обращение к переменной окружения, по имени похожей на секрет: $GH_TOKEN,
+ * ${GITHUB_TOKEN}, $env:X_TOKEN, %X_SECRET%, printenv X, process.env.X.
+ * Присваивание (FOO_SECRET=test npm test) сюда не попадает — оно не читает.
+ */
+const SECRET_ENV_REF =
+  /(\$\{?|\$env:|\benv:|%|\bprintenv\s+|\bprocess\.env(\.|\[\s*['"])|\bos\.environ(\.get\(|\[)\s*['"]|\bgetenv\(\s*['"])[A-Za-z0-9_]*(TOKEN|SECRET|PASSWORD|PASSWD|API_?KEY|PRIVATE_?KEY|CREDENTIAL|GIT_CONFIG_VALUE)/i;
+
+/** Всё окружение целиком: process.env без имени, /proc/…/environ. */
+const WHOLE_ENV_REF =
+  /\bprocess\.env\b(?!\s*(\.|\[))|\bos\.environ\b(?!\s*(\.get\(|\[))|\/proc\/[^\s/]+\/environ/;
+
+/** Прямые запросы к API GitHub: для этого есть gh и коннектор, которые проверяются. */
+const GITHUB_API_HOST = /\b(api|uploads)\.github\.com\b/i;
 
 /** Программы, которые выводят содержимое файла — их запуск на секрете запрещён. */
 const FILE_READERS = new Set([
@@ -241,15 +262,75 @@ export function evaluate(command, ctx, depth = 0) {
     verdict.add('ask', 'Слишком глубокая вложенность команд — разобрать не удалось');
     return verdict;
   }
+  // Строка целиком смотрится один раз: вложенные команды — её же части.
+  if (depth === 0) checkRawText(command, verdict);
   for (const inner of nestedCommands(command)) verdict.merge(evaluate(inner, ctx, depth + 1));
   for (const { words } of splitCommands(command)) checkSimpleCommand(words, ctx, verdict, depth);
   return verdict;
+}
+
+/**
+ * Приметы, которые не зависят от того, какая программа запущена: токен можно
+ * передать в curl, node, python или записать в файл — разбирать каждую нет смысла.
+ */
+function checkRawText(command, verdict) {
+  if (SECRET_ENV_REF.test(command)) {
+    verdict.add(
+      'deny',
+      'Обращение к секрету в переменной окружения: в облаке там ключ доступа к GitHub. ' +
+        'Для поиска по коду — инструмент Grep, а не терминал'
+    );
+  }
+  if (WHOLE_ENV_REF.test(command)) {
+    verdict.add('deny', 'Вывод всего окружения процесса — вместе с ним уходят токены');
+  }
+  if (GITHUB_API_HOST.test(command)) {
+    verdict.add(
+      'deny',
+      'Прямой запрос к API GitHub мимо gh и коннектора — сторож не видит, что он делает'
+    );
+  }
+}
+
+/** Команды, которые без аргументов печатают все переменные окружения. */
+function dumpsEnvironment(program, args) {
+  const operands = args.filter((a) => !a.startsWith('-') && !/^[A-Za-z_][A-Za-z0-9_]*=/.test(a));
+  switch (program) {
+    case 'env':
+    case 'printenv':
+      return operands.length === 0;
+    case 'set':
+      // «set -e» и «set -x» — режимы оболочки; печатает только голый set.
+      return args.length === 0;
+    case 'export':
+      return operands.length === 0 && (args.length === 0 || args.includes('-p'));
+    case 'declare':
+    case 'typeset':
+      // «declare -a arr» ничего не печатает; печатают голые и -p/-x без имени.
+      return (
+        operands.length === 0 && (args.length === 0 || args.some((a) => /^-[a-z]*[px]/.test(a)))
+      );
+    case 'compgen':
+      return args.includes('-e');
+    case 'get-childitem':
+    case 'gci':
+    case 'ls':
+    case 'dir':
+    case 'get-item':
+      return args.some((a) => /^env:[\\/*]?$/i.test(a));
+    default:
+      return false;
+  }
 }
 
 function checkSimpleCommand(input, ctx, verdict, depth) {
   let words = input;
   // Присваивания переменных перед командой: FOO=1 git push
   while (words.length > 0 && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[0])) words = words.slice(1);
+  if (words.length > 0 && dumpsEnvironment(programName(words[0]), words.slice(1))) {
+    verdict.add('deny', 'Вывод всех переменных окружения — среди них токены доступа');
+    return;
+  }
   while (words.length > 0 && PASSTHROUGH.has(programName(words[0]))) {
     words = words.slice(1);
     while (words.length > 0 && words[0].startsWith('-')) words = words.slice(1);
@@ -343,6 +424,9 @@ function checkFiles(program, args, verdict) {
 const DANGEROUS_GIT_CONFIG =
   /^(core\.hookspath|core\.sshcommand|alias\.|credential\.|url\.|remote\..*\.(url|pushurl)|push\.default|http\..*extraheader)/i;
 
+/** Ключи git config, в которых лежат учётные данные: их нельзя даже читать. */
+const SECRET_GIT_CONFIG = /^(credential\.|http\..*extraheader)/i;
+
 function checkGit(input, ctx, verdict) {
   let args = input;
   // Глобальные параметры до подкоманды: -C путь, -c ключ=значение и т. п.
@@ -380,6 +464,22 @@ function checkGit(input, ctx, verdict) {
     case 'config':
       if (rest.some((a) => DANGEROUS_GIT_CONFIG.test(a)) && !rest.includes('--get')) {
         verdict.add('deny', 'git config: ключ, через который отключаются хуки или меняется адрес');
+      }
+      // В облаке git получает часть настроек из окружения (GIT_CONFIG_*) — там могут быть учётные данные.
+      if (rest.some((a) => SECRET_GIT_CONFIG.test(a))) {
+        verdict.add('deny', 'git config: чтение ключа с учётными данными');
+      }
+      if (rest.some((a) => ['-l', '--list', '--get-regexp', '--get-urlmatch'].includes(a))) {
+        verdict.add(
+          'deny',
+          'git config --list: вместе с настройками может напечатать учётные данные. ' +
+            'Нужный ключ — git config --get <ключ>'
+        );
+      }
+      break;
+    case 'var':
+      if (rest.includes('-l')) {
+        verdict.add('deny', 'git var -l: печатает все настройки, включая учётные данные');
       }
       break;
     case 'remote':
@@ -608,6 +708,75 @@ function checkGhApi(args, verdict) {
   }
 }
 
+// ───────────────────────────── GitHub-коннектор ─────────────────────────────
+
+const OWN_REPO = { owner: 'yafremaualiaksei', repo: 'efremova.online' };
+
+/** Инструменты коннектора, которые агенту не нужны ни при каких условиях. */
+const API_WRITE = 'Запись в репозиторий через API мимо git: без pre-commit и без проверки сторожем';
+const MCP_FORBIDDEN = new Map([
+  ['merge_pull_request', 'Слияние PR — решение владельца на GitHub'],
+  ['enable_pr_auto_merge', 'Автослияние — то же слияние, только отложенное'],
+  ['create_or_update_file', API_WRITE],
+  ['push_files', API_WRITE],
+  ['delete_file', API_WRITE],
+  ['create_repository', 'Создание репозиториев — не часть работы над сайтом'],
+  ['fork_repository', 'Форк уводит код туда, где не действуют правила репозитория'],
+]);
+
+/**
+ * Перезапуск упавших проверок и отмена — безопасны: выполняется тот же workflow
+ * с того же коммита. Запуск workflow по ветке выполнил бы файл из этой ветки,
+ * удаление логов стирает след.
+ */
+const ACTIONS_ALLOWED = new Set(['rerun_failed_jobs', 'rerun_workflow_run', 'cancel_workflow_run']);
+
+/** Чтение не меняет ничего, его можно делать и в чужих репозиториях. */
+function isReadOnlyTool(tool) {
+  return /^(get|list|search)_/.test(tool) || /_read$/.test(tool);
+}
+
+/**
+ * Вердикт по вызову инструмента MCP. Смотрим только серверы GitHub:
+ * имя вида mcp__github__merge_pull_request или mcp__plugin_github_github__…
+ *
+ * @param {string} toolName
+ * @param {Record<string, unknown>} input
+ * @returns {Verdict}
+ */
+export function evaluateMcp(toolName, input) {
+  const verdict = new Verdict();
+  const [, server = '', ...rest] = toolName.split('__');
+  if (!/github/i.test(server)) return verdict;
+  const tool = rest.join('__');
+
+  const forbidden = MCP_FORBIDDEN.get(tool);
+  if (forbidden !== undefined) verdict.add('deny', `${tool}: ${forbidden}`);
+
+  if (tool === 'actions_run_trigger' && !ACTIONS_ALLOWED.has(String(input.method ?? ''))) {
+    verdict.add(
+      'deny',
+      `actions_run_trigger ${String(input.method ?? '')}: разрешены только перезапуск и отмена`
+    );
+  }
+
+  if (String(input.event ?? '').toUpperCase() === 'APPROVE') {
+    verdict.add('deny', 'Одобрение PR — подпись владельца, агент её не ставит');
+  }
+
+  const owner = typeof input.owner === 'string' ? input.owner.toLowerCase() : null;
+  const repo = typeof input.repo === 'string' ? input.repo.toLowerCase() : null;
+  const foreign =
+    (owner !== null && owner !== OWN_REPO.owner) || (repo !== null && repo !== OWN_REPO.repo);
+  if (foreign && !isReadOnlyTool(tool)) {
+    verdict.add(
+      'deny',
+      `${tool} в ${String(input.owner)}/${String(input.repo)}: чужой репозиторий`
+    );
+  }
+  return verdict;
+}
+
 // ───────────────────────────── запуск как хук ─────────────────────────────
 
 function git(cwd, args) {
@@ -653,20 +822,27 @@ function respond(decision, reason) {
 }
 
 function main() {
-  let command = '';
-  let cwd = process.cwd();
+  let input;
   try {
-    const input = JSON.parse(readFileSync(0, 'utf8'));
-    command = String(input?.tool_input?.command ?? '');
-    cwd = typeof input?.cwd === 'string' && input.cwd !== '' ? input.cwd : cwd;
+    input = JSON.parse(readFileSync(0, 'utf8'));
   } catch {
     respond('ask', '❓ Сторож не смог прочитать команду');
     return;
   }
-  if (command.trim() === '') return;
+  const toolName = String(input?.tool_name ?? '');
+  const toolInput =
+    input?.tool_input !== null && typeof input?.tool_input === 'object' ? input.tool_input : {};
+  const cwd = typeof input?.cwd === 'string' && input.cwd !== '' ? input.cwd : process.cwd();
 
   try {
-    const verdict = evaluate(command, liveContext(cwd));
+    let verdict;
+    if (toolName.startsWith('mcp__')) {
+      verdict = evaluateMcp(toolName, toolInput);
+    } else {
+      const command = String(toolInput.command ?? '');
+      if (command.trim() === '') return;
+      verdict = evaluate(command, liveContext(cwd));
+    }
     if (verdict.decision !== 'none') respond(verdict.decision, verdict.reasons.join('\n'));
   } catch (error) {
     respond('ask', `❓ Сторож упал на этой команде (${String(error)})`);
