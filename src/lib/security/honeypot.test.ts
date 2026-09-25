@@ -41,6 +41,10 @@ describe('ловушки по пути запроса', () => {
       '/api/health',
       '/lekcii/trevoga',
       '/privacy',
+      '/terms',
+      '/site-terms',
+      '/provider',
+      '/admin/profile',
     ];
     for (const path of realPaths) {
       expect(checkPathTrap(path), path).toBeNull();
