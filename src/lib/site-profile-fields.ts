@@ -86,7 +86,7 @@ export const PROFILE_FIELDS: readonly ProfileField[] = [
   {
     key: 'owner.regon',
     label: 'REGON',
-    required: false,
+    required: true,
     schema: z
       .string()
       .trim()
@@ -122,14 +122,14 @@ export const PROFILE_FIELDS: readonly ProfileField[] = [
   {
     key: 'owner.professionalBody',
     label: 'Профессиональное самоуправление или организация',
-    required: false,
+    required: true,
     schema: line(300),
   },
   {
     key: 'owner.ethicsCode',
     label: 'Кодекс профессиональной этики',
     hint: 'Название и, если есть, ссылка',
-    required: false,
+    required: true,
     schema: line(300),
   },
   {

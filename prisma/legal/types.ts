@@ -15,7 +15,7 @@ export interface LegalSection {
 }
 
 export interface LegalDocumentSeed {
-  slug: 'privacy' | 'terms';
+  slug: 'privacy' | 'terms' | 'provider' | 'site-terms';
   locale: 'pl' | 'ru' | 'en';
   version: string;
   title: string;
