@@ -133,7 +133,7 @@ Nonce генерируется заново на каждый запрос: вс
 | Этап | Инструмент | Блокирует слияние |
 |---|---|---|
 | Секреты | Gitleaks (вся история) | да |
-| SAST | Semgrep + CodeQL | при High и выше |
+| SAST | Semgrep (без токена, образ по хешу) + CodeQL | при High и выше |
 | Типы, линтер, формат, тесты | tsc, ESLint + security, Prettier, Vitest | да |
 | Зависимости | npm audit (production) + Dependabot | при High/Critical |
 | Контейнер | Trivy, Hadolint | при High |
