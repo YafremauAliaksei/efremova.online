@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { PrivacySettingsLink } from '@/components/PrivacySettingsLink';
 
 /**
  * Общий подвал сайта.
@@ -38,9 +37,6 @@ export function SiteFooter() {
               <Link href="/terms" className="underline underline-offset-4">
                 Условия услуг
               </Link>
-            </li>
-            <li>
-              <PrivacySettingsLink label="Настройки приватности" />
             </li>
           </ul>
         </nav>
