@@ -63,7 +63,7 @@ npm run dev
 | `npm run verify` | типы + линтер + формат + тесты |
 | `npm run ci` | 11 проверок, 7 из 8 ворот GitHub; нужен Docker |
 | `npm run ci:quick` | быстрая часть без Docker |
-| `npm run admin:link` | одноразовая ссылка входа в админку (15 минут) |
+| `npm run admin:link` | одноразовая ссылка входа в админку (15 минут); на сервере — `docker compose exec app node scripts/admin-link.mjs` |
 | `npm run stack:up` | приложение в Docker «как на сервере» |
 | `npm run dev:db` | только база данных |
 | `npm run db:seed` | демо-содержимое |
