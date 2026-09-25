@@ -284,6 +284,15 @@ async function maybeCleanup(now: Date): Promise<void> {
   await db.honeypotHit.deleteMany({ where: { bucketStart: { lt: retentionCutoff } } });
   await db.securityEvent.deleteMany({ where: { bucketStart: { lt: retentionCutoff } } });
   await db.securityIncident.deleteMany({ where: { openedAt: { lt: retentionCutoff } } });
+  // Блокировка адреса живёт до 60 дней с последнего события — и только если
+  // она уже не действует: снятую досрочно запись удалять не с чего торопиться,
+  // действующую удалять нельзя. Ссылки из security_events обнулятся сами.
+  await db.ipBlocklist.deleteMany({
+    where: {
+      updatedAt: { lt: retentionCutoff },
+      OR: [{ expiresAt: null }, { expiresAt: { lt: now } }],
+    },
+  });
 }
 
 /** Сообщение об ошибке без стека и без значений: логи читают не только мы */
