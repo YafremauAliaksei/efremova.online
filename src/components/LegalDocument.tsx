@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { Filled } from '@/components/Filled';
+import { getSiteProfile } from '@/lib/site-profile';
 import { LOCALE_NAMES, LOCALE_TAGS, type LegalDocumentView, type Locale } from '@/lib/legal';
 
 /**
@@ -8,29 +10,42 @@ import { LOCALE_NAMES, LOCALE_TAGS, type LegalDocumentView, type Locale } from '
  * разметкой HTML. Поэтому здесь нет и не может быть dangerouslySetInnerHTML:
  * даже если в базу попадёт «<script>», он отобразится как текст.
  * Это же требование зафиксировано правилом линтера (docs/03, п.3).
+ *
+ * Данные владельца в тексте — метки {{owner.*}}, их подставляет <Filled>
+ * из профиля в базе (docs/03 п.11.3).
  */
 
 const UI_TEXT = {
   pl: {
-    draftTitle: 'Projekt dokumentu',
+    draftTitle: 'Wzór dokumentu — serwis w budowie',
     draftBody:
-      'Dokument jest w przygotowaniu i przed uruchomieniem serwisu wymaga weryfikacji prawnej.',
+      'Tekst przygotowano jako wzór przed weryfikacją prawną. Nie stanowi porady prawnej ani wiążącej informacji. Miejsca oznaczone ⟦…⟧ zostaną uzupełnione przed rozpoczęciem świadczenia usług.',
     version: 'Wersja dokumentu',
     updated: 'aktualizacja',
     otherLanguages: 'Wersje językowe',
     missing: 'Dokument nie został jeszcze wprowadzony do bazy danych.',
   },
   ru: {
-    draftTitle: 'Черновик документа',
-    draftBody: 'Документ в подготовке и до запуска сайта должен быть проверен юристом.',
+    draftTitle: 'Образец документа — сайт в разработке',
+    draftBody:
+      'Текст подготовлен как образец до проверки юристом. Не является юридической консультацией и не имеет обязательной силы. Места, отмеченные ⟦…⟧, будут заполнены до начала оказания услуг.',
     version: 'Версия документа',
     updated: 'обновлено',
     otherLanguages: 'Версии на других языках',
     missing: 'Документ ещё не заполнен в базе данных.',
   },
+  en: {
+    draftTitle: 'Sample document — site under construction',
+    draftBody:
+      'This text is a sample prepared before legal review. It is not legal advice and is not binding. Places marked ⟦…⟧ will be completed before any services are provided.',
+    version: 'Document version',
+    updated: 'updated',
+    otherLanguages: 'Other languages',
+    missing: 'This document has not been added to the database yet.',
+  },
 } as const satisfies Record<Locale, Record<string, string>>;
 
-export function LegalDocument({
+export async function LegalDocument({
   document,
   basePath,
 }: {
@@ -38,12 +53,18 @@ export function LegalDocument({
   basePath: string;
 }) {
   const t = UI_TEXT[document.locale];
+  const { values, status } = await getSiteProfile();
+  // Пока сайт в разработке, любой документ — образец, даже если в базе
+  // он уже отмечен как окончательный
+  const isSample = document.isDraft || status === 'development';
 
   return (
     // lang на самом блоке: если документ показан на польском, а интерфейс
     // на русском, скринридер прочитает текст с правильным произношением
     <article lang={LOCALE_TAGS[document.locale]}>
-      <h1 className="text-3xl font-semibold">{document.title}</h1>
+      <h1 className="text-3xl font-semibold">
+        <Filled text={document.title} values={values} />
+      </h1>
 
       <p className="mt-2 text-sm text-[var(--color-ink-soft)]">
         {t.version}: <code>{document.version}</code> · {t.updated}{' '}
@@ -77,7 +98,7 @@ export function LegalDocument({
         </nav>
       )}
 
-      {document.isDraft && (
+      {isSample && (
         <div
           role="note"
           className="mt-6 rounded-lg border border-[var(--color-warning)] bg-[#fdf8f0] p-5"
@@ -93,11 +114,13 @@ export function LegalDocument({
           id={section.anchor}
           className={section.anchor === undefined ? 'mt-10' : 'mt-10 scroll-mt-8'}
         >
-          <h2 className="text-2xl font-semibold">{section.heading}</h2>
+          <h2 className="text-2xl font-semibold">
+            <Filled text={section.heading} values={values} />
+          </h2>
 
           {section.paragraphs?.map((paragraph) => (
             <p key={paragraph.slice(0, 40)} className="mt-3 text-[var(--color-ink-soft)]">
-              {paragraph}
+              <Filled text={paragraph} values={values} />
             </p>
           ))}
 
@@ -105,7 +128,7 @@ export function LegalDocument({
             <ul className="mt-3 space-y-2 text-[var(--color-ink-soft)]">
               {section.items.map((item) => (
                 <li key={item.slice(0, 40)} className="pl-4 -indent-4">
-                  — {item}
+                  — <Filled text={item} values={values} />
                 </li>
               ))}
             </ul>

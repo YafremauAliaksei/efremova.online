@@ -30,10 +30,9 @@ export default async function ServicesPage() {
       <main id="main" className="mx-auto max-w-3xl px-6 py-16">
         <h1 className="text-3xl font-semibold">Услуги и цены</h1>
         <p className="mt-4 text-[var(--color-ink-soft)]">
-          Цена показана в валюте вашего региона. Оплата производится до начала консультации; условия
-          переноса и отмены описаны в{' '}
+          Указана итоговая цена в валюте вашего региона. Порядок оплаты, переноса и отмены — в{' '}
           <Link href="/terms" className="underline underline-offset-4">
-            публичной оферте
+            условиях консультаций
           </Link>
           .
         </p>
