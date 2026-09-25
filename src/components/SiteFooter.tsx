@@ -43,7 +43,17 @@ export async function SiteFooter() {
             </li>
             <li>
               <Link href="/terms" className="underline underline-offset-4">
-                Условия услуг
+                Условия консультаций
+              </Link>
+            </li>
+            <li>
+              <Link href="/site-terms" className="underline underline-offset-4">
+                Положения о сайте
+              </Link>
+            </li>
+            <li>
+              <Link href="/provider" className="underline underline-offset-4">
+                Данные владельца
               </Link>
             </li>
           </ul>
@@ -59,7 +69,29 @@ export async function SiteFooter() {
           </Link>
           {' · '}
           <Link href="/terms?lang=pl" hrefLang="pl-PL" className="underline underline-offset-4">
-            Regulamin (PL)
+            Warunki konsultacji (PL)
+          </Link>
+          {' · '}
+          <Link
+            href="/site-terms?lang=pl"
+            hrefLang="pl-PL"
+            className="underline underline-offset-4"
+          >
+            Regulamin serwisu (PL)
+          </Link>
+          {' · '}
+          <Link href="/provider?lang=pl" hrefLang="pl-PL" className="underline underline-offset-4">
+            Informacje o usługodawcy (PL)
+          </Link>
+        </p>
+
+        {/* Сайт психолога может открыть человек, которому помощь нужна сейчас,
+            а не после записи. Номера — на каждой странице, не только в документе */}
+        <p lang="pl-PL" className="mt-4 text-xs">
+          W kryzysie lub zagrożeniu życia: <strong>112</strong> · całodobowo{' '}
+          <strong>800 70 2222</strong> ·{' '}
+          <Link href="/site-terms?lang=pl#kryzys" className="underline underline-offset-4">
+            więcej numerów
           </Link>
         </p>
 

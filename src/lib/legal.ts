@@ -15,6 +15,10 @@ import type { LegalSection } from '../../prisma/legal-content';
  */
 
 export const SUPPORTED_LOCALES = ['pl', 'ru', 'en'] as const;
+
+/** Правовые документы сайта-визитки: у каждого своя страница (LegalPage) */
+export const LEGAL_SLUGS = ['privacy', 'terms', 'provider', 'site-terms'] as const;
+export type LegalSlug = (typeof LEGAL_SLUGS)[number];
 export type Locale = (typeof SUPPORTED_LOCALES)[number];
 
 /** Польский — язык по умолчанию по месту ведения деятельности */
@@ -79,7 +83,7 @@ export interface LegalDocumentView {
  * Факт подмены виден по полю locale в ответе.
  */
 export async function getLegalDocument(
-  slug: 'privacy' | 'terms',
+  slug: LegalSlug,
   locale: Locale
 ): Promise<LegalDocumentView | null> {
   try {

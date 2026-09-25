@@ -18,6 +18,8 @@
  */
 
 import { PRIVACY_DOCUMENTS } from './legal/privacy';
+import { PROVIDER_DOCUMENTS } from './legal/provider';
+import { SITE_TERMS_DOCUMENTS } from './legal/site-terms';
 import type { LegalDocumentSeed } from './legal/types';
 
 export type { LegalDocumentSeed, LegalSection } from './legal/types';
@@ -26,6 +28,8 @@ const TERMS_VERSION = 'terms-2026-09-13';
 
 export const LEGAL_DOCUMENTS: LegalDocumentSeed[] = [
   ...PRIVACY_DOCUMENTS,
+  ...PROVIDER_DOCUMENTS,
+  ...SITE_TERMS_DOCUMENTS,
 
   // ═══════════════════════ REGULAMIN (PL) ═══════════════════════
   {
