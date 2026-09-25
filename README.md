@@ -92,7 +92,6 @@ Lighthouse и полное сканирование ZAP идут только в
 | `/api/internal/users` возвращает «данные пользователей» | ловушка: данные фальшивые, с метками-канарейками |
 | В ответах нет ни одного внешнего домена | так задумано: `default-src 'self'`, `frame-src 'none'`, `connect-src 'self'` — `src/lib/security/headers.ts` |
 | `style-src` в CSP содержит `unsafe-inline` | осознанный компромисс, обоснование в `src/lib/security/headers.ts` |
-| `extract-zip` с открытой уязвимостью | патча не существует; риск принят со сроком в `scripts/check-audit.mjs` |
 
 ### Нашли настоящую уязвимость
 
