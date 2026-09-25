@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
 import { isAdmin } from '@/lib/auth/admin';
+import { BODY_MAX_LENGTH, TITLE_MAX_LENGTH, parseContentBlockEdit } from '@/lib/content-schema';
 
 /**
  * Админка: редактор текстов сайта.
@@ -28,31 +29,70 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic';
 
-export default async function AdminPage() {
+/**
+ * Итог сохранения передаётся через адрес страницы (?saved / ?error), а текст
+ * сообщения берётся только отсюда: из адреса на страницу не попадает ни
+ * одной строки, кроме известного кода.
+ *
+ * Отказ в браузере почти недостижим: длину и одну строку заголовка ограничивает
+ * сама форма, невидимый мусор от вставки удаляется. Остаются служебные символы
+ * и смена направления письма — их при обычном наборе не бывает.
+ */
+const MESSAGES = {
+  saved: 'Сохранено.',
+  missing: 'Блок не найден — обновите страницу, его могли удалить.',
+  id: 'Блок не найден — обновите страницу, его могли удалить.',
+  title: `Заголовок не сохранён: одна строка до ${String(TITLE_MAX_LENGTH)} знаков, без служебных символов.`,
+  body: `Текст не сохранён: до ${String(BODY_MAX_LENGTH)} знаков, без служебных символов.`,
+} as const;
+
+type StatusCode = keyof typeof MESSAGES;
+
+function isStatusCode(value: string | undefined): value is StatusCode {
+  return value !== undefined && Object.hasOwn(MESSAGES, value);
+}
+
+interface PageProps {
+  searchParams: Promise<{ saved?: string; error?: string; block?: string }>;
+}
+
+export default async function AdminPage({ searchParams }: PageProps) {
   // Middleware проверяет наличие cookie — здесь проверяется сама подпись.
   // Две независимые проверки: middleware дешёвая и быстрая, эта настоящая.
   if (!(await isAdmin())) redirect('/admin/denied');
 
   const blocks = await db.contentBlock.findMany({ orderBy: { key: 'asc' } });
 
+  const params = await searchParams;
+  const status: StatusCode | null =
+    params.saved !== undefined ? 'saved' : isStatusCode(params.error) ? params.error : null;
+  // Ключ блока показываем, только если такой блок действительно есть
+  const statusBlock = blocks.find((block) => block.id === params.block);
+
   async function saveBlock(formData: FormData) {
     'use server';
 
     if (!(await isAdmin())) redirect('/admin/denied');
 
-    const id = textField(formData, 'id', 64);
-    const title = textField(formData, 'title', 300);
-    const body = textField(formData, 'body', 20_000);
+    const parsed = parseContentBlockEdit(formData);
+    if (!parsed.ok) {
+      const id = formData.get('id');
+      const block =
+        parsed.field !== 'id' && typeof id === 'string' ? `&block=${encodeURIComponent(id)}` : '';
+      redirect(`/admin?error=${parsed.field}${block}`);
+    }
 
-    if (id === '') return;
-
-    await db.contentBlock.update({ where: { id }, data: { title, body } });
+    const { id, title, body } = parsed.value;
+    // updateMany вместо update: несуществующий блок — это сообщение, а не ошибка 500
+    const { count } = await db.contentBlock.updateMany({ where: { id }, data: { title, body } });
+    if (count === 0) redirect('/admin?error=missing');
 
     // Страницы читают тексты из базы и кэшируются — после правки кэш
     // нужно сбросить, иначе изменения «не видно»
     revalidatePath('/');
     revalidatePath('/about');
     revalidatePath('/admin');
+    redirect(`/admin?saved=1&block=${id}`);
   }
 
   return (
@@ -86,6 +126,20 @@ export default async function AdminPage() {
         </span>
       </nav>
 
+      {status !== null && (
+        <p
+          role={status === 'saved' ? 'status' : 'alert'}
+          className={`mt-6 rounded-lg border px-4 py-3 text-sm ${
+            status === 'saved'
+              ? 'border-[var(--color-line)] text-[var(--color-ink-soft)]'
+              : 'border-red-300 bg-red-50 text-red-900'
+          }`}
+        >
+          {statusBlock !== undefined && <span className="font-mono">{statusBlock.key}: </span>}
+          {MESSAGES[status]}
+        </p>
+      )}
+
       {blocks.length === 0 ? (
         <p className="mt-10 rounded-lg border border-dashed border-[var(--color-line)] p-6 text-[var(--color-ink-soft)]">
           Блоков пока нет. Выполните <code>npm run db:seed</code>.
@@ -109,6 +163,7 @@ export default async function AdminPage() {
                 <input
                   name="title"
                   defaultValue={block.title ?? ''}
+                  maxLength={TITLE_MAX_LENGTH}
                   className="mt-1 w-full rounded border border-[var(--color-line)] px-3 py-2 font-normal"
                 />
               </label>
@@ -118,6 +173,7 @@ export default async function AdminPage() {
                 <textarea
                   name="body"
                   defaultValue={block.body ?? ''}
+                  maxLength={BODY_MAX_LENGTH}
                   rows={5}
                   className="mt-1 w-full rounded border border-[var(--color-line)] px-3 py-2 font-normal"
                 />
@@ -141,19 +197,6 @@ export default async function AdminPage() {
       </p>
     </main>
   );
-}
-
-/**
- * Достаёт текстовое поле формы.
- *
- * ⚠️ formData.get() возвращает строку ИЛИ файл. Простое приведение String()
- * превратило бы подсунутый файл в «[object Object]» и молча записало его
- * в базу. Здесь тип проверяется явно, а длина ограничивается сразу:
- * поле формы — это данные от пользователя, даже если пользователь — владелец.
- */
-function textField(formData: FormData, name: string, maxLength: number): string {
-  const value = formData.get(name);
-  return typeof value === 'string' ? value.slice(0, maxLength) : '';
 }
 
 async function logout() {
