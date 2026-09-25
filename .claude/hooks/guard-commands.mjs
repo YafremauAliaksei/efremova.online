@@ -196,11 +196,26 @@ export function splitCommands(input) {
       endWord();
     } else if (ch === '>' || ch === '<') {
       // Перенаправление — отдельное слово, чтобы «>файл» распознавался как запись.
-      endWord();
+      // Номер дескриптора перед ним («2>») — часть перенаправления, не аргумент.
+      if (hasWord && /^\d+$/.test(word)) {
+        word = '';
+        hasWord = false;
+      } else {
+        endWord();
+      }
       let op = ch;
       while (input[i + 1] === '>') {
         i += 1;
         op += '>';
+      }
+      // «>&1», «2>&-»: перенаправление в дескриптор, «&» здесь не разделитель команд.
+      if (input[i + 1] === '&') {
+        i += 1;
+        op += '&';
+        while (/[\d-]/.test(input[i + 1] ?? '')) {
+          i += 1;
+          op += input[i];
+        }
       }
       words.push(op);
     } else {
@@ -323,11 +338,31 @@ function dumpsEnvironment(program, args) {
   }
 }
 
+/**
+ * Аргументы без перенаправлений: «git push origin x 2>/dev/null» — это push
+ * в origin, а не в remote «/dev/null». Файлы-цели проверяет checkFiles отдельно.
+ */
+function withoutRedirects(args) {
+  const plain = [];
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+    if (arg === '>' || arg === '>>' || arg === '<') {
+      i += 1;
+    } else if (!/^[<>]+&/.test(arg)) {
+      plain.push(arg);
+    }
+  }
+  return plain;
+}
+
 function checkSimpleCommand(input, ctx, verdict, depth) {
   let words = input;
   // Присваивания переменных перед командой: FOO=1 git push
   while (words.length > 0 && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[0])) words = words.slice(1);
-  if (words.length > 0 && dumpsEnvironment(programName(words[0]), words.slice(1))) {
+  if (
+    words.length > 0 &&
+    dumpsEnvironment(programName(words[0]), withoutRedirects(words.slice(1)))
+  ) {
     verdict.add('deny', 'Вывод всех переменных окружения — среди них токены доступа');
     return;
   }
@@ -338,9 +373,8 @@ function checkSimpleCommand(input, ctx, verdict, depth) {
   if (words.length === 0) return;
 
   const program = programName(words[0]);
-  const args = words.slice(1);
-
-  checkFiles(program, args, verdict);
+  checkFiles(program, words.slice(1), verdict);
+  const args = withoutRedirects(words.slice(1));
 
   if (SHELLS.has(program)) {
     const flagIndex = args.findIndex((a) => /^(-c|-lc|-command|\/c|\/k)$/i.test(a));

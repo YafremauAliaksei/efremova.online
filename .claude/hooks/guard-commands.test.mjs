@@ -54,6 +54,11 @@ describe('обычная работа проходит без вопросов',
     'git config --get user.name',
     'git config user.email',
     'git clone https://github.com/YafremauAliaksei/efremova.online.git',
+    'git push -u origin feat/contacts 2>&1 | tail -4',
+    'git push 2>&1',
+    'git push origin HEAD 2>/dev/null',
+    'npm run verify > out.txt 2>&1',
+    'git status >&2',
   ])('%s', (command) => {
     expect(decide(command)).toBe('none');
   });
@@ -78,6 +83,8 @@ describe('push: только своя ветка и только в origin', () 
     ['git push --no-verify', 'обход хуков'],
     ['git push https://github.com/someone/else.git feat/contacts', 'в чужой адрес'],
     ['git push upstream feat/contacts', 'в другой remote'],
+    ['git push origin main 2>&1 | tail -2', 'в main, вывод перенаправлен'],
+    ['git push origin main 2>/dev/null', 'в main, ошибки скрыты'],
   ])('%s — %s', (command) => {
     expect(decide(command)).toBe('deny');
   });
@@ -270,6 +277,13 @@ describe('разбор строки', () => {
     expect(splitCommands('git commit -m "a && b" && git push').map((c) => c.words)).toEqual([
       ['git', 'commit', '-m', 'a && b'],
       ['git', 'push'],
+    ]);
+  });
+
+  it('«2>&1» — перенаправление, а не разделитель команд и не аргумент', () => {
+    expect(splitCommands('git push 2>&1 | tail -1').map((c) => c.words)).toEqual([
+      ['git', 'push', '>&1'],
+      ['tail', '-1'],
     ]);
   });
 
