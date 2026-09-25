@@ -10,6 +10,15 @@
 #  из интернета к ней не подключиться в принципе.
 # ═══════════════════════════════════════════════════════════════════════════
 
+# Логи контейнеров: драйвер json-file по умолчанию копит их бесконечно,
+# а в них бывают IP посетителей из сообщений об ошибках. Предел — 5 файлов
+# по 10 МБ на сервис; старое вытесняется само (docs/03 п.11.2).
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '5'
+
 services:
   # ─────────────────────────── ПРИЛОЖЕНИЕ ───────────────────────────
   app:
@@ -42,6 +51,7 @@ services:
       start_period: 40s
     # ─── Ужесточение контейнера ───
     security_opt: [no-new-privileges:true]
+    logging: *default-logging
     read_only: true # файловую систему изменить нельзя
     tmpfs: [/tmp] # кроме временной папки в памяти
     cap_drop: [ALL] # снимаем все привилегии Linux
@@ -86,6 +96,7 @@ services:
       - -c
       - max_connections=100
     security_opt: [no-new-privileges:true]
+    logging: *default-logging
 
   # ─────────────────────────── NGINX ───────────────────────────
   # Единственный сервис, видимый из интернета
@@ -107,6 +118,7 @@ services:
       app: { condition: service_healthy }
     networks: [backend, frontend]
     security_opt: [no-new-privileges:true]
+    logging: *default-logging
 
   # ─────────────────────────── SSL-СЕРТИФИКАТЫ ───────────────────────────
   # Обновляются автоматически каждые 12 часов. Let's Encrypt, бесплатно.
@@ -117,6 +129,7 @@ services:
       - certbot-certs:/etc/letsencrypt
       - certbot-www:/var/www/certbot
     entrypoint: /bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done;'
+    logging: *default-logging
     networks: [backend]
 
   # ─────────────────────────── БЭКАПЫ ───────────────────────────
@@ -135,10 +148,15 @@ services:
       PGDATABASE: ${POSTGRES_DB}
       BACKUP_SCHEDULE: '0 3 * * *'
       BACKUP_RETENTION_DAYS: '30'
+      NGINX_LOG_RETENTION_DAYS: '14'
+    # Логи nginx удаляет задача rotate-logs.sh этого же контейнера
+    volumes:
+      - nginx-logs:/logs/nginx
     depends_on:
       postgres: { condition: service_healthy }
     networks: [backend]
     security_opt: [no-new-privileges:true]
+    logging: *default-logging
 
 networks:
   # Внутренняя сеть: наружу выхода нет вообще
