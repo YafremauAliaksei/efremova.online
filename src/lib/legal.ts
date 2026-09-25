@@ -14,7 +14,7 @@ import type { LegalSection } from '../../prisma/legal-content';
  * Ссылка на конкретный раздел:                 /privacy?lang=pl#auth
  */
 
-export const SUPPORTED_LOCALES = ['pl', 'ru'] as const;
+export const SUPPORTED_LOCALES = ['pl', 'ru', 'en'] as const;
 export type Locale = (typeof SUPPORTED_LOCALES)[number];
 
 /** Польский — язык по умолчанию по месту ведения деятельности */
@@ -23,12 +23,14 @@ export const DEFAULT_LOCALE: Locale = 'pl';
 export const LOCALE_NAMES: Record<Locale, string> = {
   pl: 'Polski',
   ru: 'Русский',
+  en: 'English',
 };
 
 /** Языковой тег для атрибутов lang и hreflang */
 export const LOCALE_TAGS: Record<Locale, string> = {
   pl: 'pl-PL',
   ru: 'ru-RU',
+  en: 'en',
 };
 
 export function isLocale(value: unknown): value is Locale {

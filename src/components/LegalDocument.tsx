@@ -34,6 +34,15 @@ const UI_TEXT = {
     otherLanguages: 'Версии на других языках',
     missing: 'Документ ещё не заполнен в базе данных.',
   },
+  en: {
+    draftTitle: 'Sample document — site under construction',
+    draftBody:
+      'This text is a sample prepared before legal review. It is not legal advice and is not binding. Places marked ⟦…⟧ will be completed before any services are provided.',
+    version: 'Document version',
+    updated: 'updated',
+    otherLanguages: 'Other languages',
+    missing: 'This document has not been added to the database yet.',
+  },
 } as const satisfies Record<Locale, Record<string, string>>;
 
 export async function LegalDocument({

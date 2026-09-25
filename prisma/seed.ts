@@ -150,28 +150,39 @@ async function main(): Promise<void> {
 
   // ─── Правовые документы ───
   // Опубликованная редакция не правится «на месте»: upsert обновляет только
-  // черновик той же версии. Новая редакция = новый version.
+  // черновик той же версии. Новая редакция = новый version: она становится
+  // действующей, прежние остаются в истории, но перестают быть текущими —
+  // иначе действующих редакций одного документа оказалось бы две.
   for (const doc of LEGAL_DOCUMENTS) {
-    await db.legalDocument.upsert({
-      where: {
-        slug_locale_version: { slug: doc.slug, locale: doc.locale, version: doc.version },
-      },
-      create: {
-        slug: doc.slug,
-        locale: doc.locale,
-        version: doc.version,
-        title: doc.title,
-        sections: doc.sections as unknown as Prisma.InputJsonValue,
-        isDraft: true,
-        isCurrent: true,
-      },
-      update: {
-        title: doc.title,
-        sections: doc.sections as unknown as Prisma.InputJsonValue,
-      },
-    });
+    await db.$transaction([
+      db.legalDocument.updateMany({
+        where: { slug: doc.slug, locale: doc.locale, version: { not: doc.version } },
+        data: { isCurrent: false },
+      }),
+      db.legalDocument.upsert({
+        where: {
+          slug_locale_version: { slug: doc.slug, locale: doc.locale, version: doc.version },
+        },
+        create: {
+          slug: doc.slug,
+          locale: doc.locale,
+          version: doc.version,
+          title: doc.title,
+          sections: doc.sections as unknown as Prisma.InputJsonValue,
+          isDraft: true,
+          isCurrent: true,
+        },
+        update: {
+          title: doc.title,
+          sections: doc.sections as unknown as Prisma.InputJsonValue,
+          isCurrent: true,
+        },
+      }),
+    ]);
   }
-  console.log(`  ✓ Правовых документов: ${String(LEGAL_DOCUMENTS.length)} (черновики, pl + ru)`);
+  console.log(
+    `  ✓ Правовых документов: ${String(LEGAL_DOCUMENTS.length)} (образцы до проверки юристом)`
+  );
 
   console.log('Готово. Настоящие тексты добавляются через админку, а не сюда.');
 }
