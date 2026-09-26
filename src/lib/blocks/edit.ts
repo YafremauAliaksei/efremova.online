@@ -1,7 +1,16 @@
 import { z } from 'zod';
 import { textField } from '../content-schema';
 import { LOCALES, type Locale } from '../i18n';
-import { BLOCKS, type BlockTexts, type BlockType } from './registry';
+import { isLinkTarget } from './pages';
+import {
+  BLOCKS,
+  BLOCK_ALIGNS,
+  BLOCK_BACKGROUNDS,
+  BLOCK_WIDTHS,
+  type BlockStyle,
+  type BlockTexts,
+  type BlockType,
+} from './registry';
 
 /**
  * Правка текстов блока на одном языке из формы админки.
@@ -59,4 +68,44 @@ export function withLocaleTexts(
 
   const others = Object.fromEntries(Object.entries(current).filter(([key]) => key !== locale));
   return Object.keys(entry).length === 0 ? others : { ...others, [locale]: entry };
+}
+
+/**
+ * Оформление и общие данные блока из формы админки. Здесь строже, чем при
+ * чтении из базы: там неизвестное значение молча становится значением по
+ * умолчанию, а здесь — отказ, чтобы в базу не попадало то, что сайт выбросит.
+ */
+export type BlockSettingsResult =
+  | { ok: true; value: { blockId: string; style: BlockStyle; data: Record<string, string> } }
+  | { ok: false; field: string };
+
+const settingsSchema = z.object({
+  blockId: z.string().uuid(),
+  width: z.enum(BLOCK_WIDTHS),
+  align: z.enum(BLOCK_ALIGNS),
+  background: z.enum(BLOCK_BACKGROUNDS),
+});
+
+export function parseBlockSettingsForm(formData: FormData, type: BlockType): BlockSettingsResult {
+  const parsed = settingsSchema.safeParse({
+    blockId: formData.get('blockId') ?? undefined,
+    width: formData.get('width') ?? undefined,
+    align: formData.get('align') ?? undefined,
+    background: formData.get('background') ?? undefined,
+  });
+  if (!parsed.success) {
+    const field = parsed.error.issues[0]?.path[0];
+    return { ok: false, field: typeof field === 'string' ? field : 'blockId' };
+  }
+
+  const { blockId, ...style } = parsed.data;
+  const data: Record<string, string> = {};
+  if (type === 'cta') {
+    const link = formData.get('link');
+    if (link !== null && link !== '') {
+      if (!isLinkTarget(link)) return { ok: false, field: 'link' };
+      data.link = link;
+    }
+  }
+  return { ok: true, value: { blockId, style, data } };
 }
