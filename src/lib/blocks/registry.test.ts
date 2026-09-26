@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseBlockTextForm, withLocaleTexts } from './edit';
+import { parseBlockSettingsForm, parseBlockTextForm, withLocaleTexts } from './edit';
 import { isFreePageSlug, isLinkTarget, isPageSlug, pagePath } from './pages';
 import {
   BLOCK_TYPES,
@@ -238,5 +238,40 @@ describe('форма правки блока', () => {
     expect(withLocaleTexts(content, 'pl', { title: null, body: null })).toEqual({
       ru: { title: 'Р' },
     });
+  });
+});
+
+describe('форма оформления блока', () => {
+  const base = { blockId: ID, width: 'full', align: 'center', background: 'tinted' };
+
+  it('варианты из набора и ссылка кнопки', () => {
+    expect(parseBlockSettingsForm(form({ ...base, link: 'services' }), 'cta')).toEqual({
+      ok: true,
+      value: {
+        blockId: ID,
+        style: { width: 'full', align: 'center', background: 'tinted' },
+        data: { link: 'services' },
+      },
+    });
+  });
+
+  it('пустая ссылка — кнопки нет; у других типов ссылка не сохраняется', () => {
+    expect(parseBlockSettingsForm(form({ ...base, link: '' }), 'cta')).toMatchObject({
+      ok: true,
+      value: { data: {} },
+    });
+    expect(parseBlockSettingsForm(form({ ...base, link: 'services' }), 'text')).toMatchObject({
+      ok: true,
+      value: { data: {} },
+    });
+  });
+
+  it.each([
+    ['ширина не из набора', { ...base, width: '80%' }, 'width'],
+    ['фон не из набора', { ...base, background: 'url(x)' }, 'background'],
+    ['чужой адрес в кнопке', { ...base, link: 'https://evil.example' }, 'link'],
+    ['служебный адрес в кнопке', { ...base, link: 'admin' }, 'link'],
+  ])('%s — отказ', (_, fields, field) => {
+    expect(parseBlockSettingsForm(form(fields), 'cta')).toEqual({ ok: false, field });
   });
 });
