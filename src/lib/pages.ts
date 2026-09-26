@@ -3,7 +3,7 @@ import { cache } from 'react';
 import { db } from '@/lib/db';
 import { i18nTextSchema } from '@/lib/content-schema';
 import { DEFAULT_LOCALE, type Locale } from '@/lib/i18n';
-import { HOME_SLUG, isPageSlug } from '@/lib/blocks/pages';
+import { isPageSlug } from '@/lib/blocks/pages';
 import { toRenderable, type RenderableBlock, type StoredBlock } from '@/lib/blocks/registry';
 
 /**
@@ -29,29 +29,55 @@ export interface NavItem {
   inFooter: boolean;
 }
 
-/** Нейтральная заглушка главной. Настоящие тексты живут только в базе на сервере. */
-const FALLBACK_HOME: StoredBlock[] = [
-  {
-    id: 'fallback-hero',
-    type: 'hero',
-    content: {
-      ru: {
-        title: 'Психологические консультации онлайн',
-        body: 'Страница ещё не заполнена в базе данных. Выполните «npm run db:seed» или добавьте блоки в админке.',
+/**
+ * Нейтральные заглушки главной и «Обо мне» — страниц, которые были в коде до
+ * переезда на блоки. Настоящие тексты живут только в базе на сервере.
+ * Без базы сайт работает на них: так его проверяют Lighthouse и ZAP в CI,
+ * и так его видит любой, кто склонировал публичный репозиторий.
+ */
+const FALLBACK: Record<string, { title: Record<string, string>; blocks: StoredBlock[] }> = {
+  home: {
+    title: {},
+    blocks: [
+      {
+        id: 'fallback-hero',
+        type: 'hero',
+        content: {
+          ru: {
+            title: 'Психологические консультации онлайн',
+            body: 'Страница ещё не заполнена в базе данных. Выполните «npm run db:seed» или добавьте блоки в админке.',
+          },
+          pl: {
+            title: 'Konsultacje psychologiczne online',
+            body: 'Strona nie została jeszcze uzupełniona w bazie danych.',
+          },
+          en: {
+            title: 'Online psychological consultations',
+            body: 'This page has not been filled in the database yet.',
+          },
+        },
+        data: {},
+        style: { align: 'center' },
       },
-      pl: {
-        title: 'Konsultacje psychologiczne online',
-        body: 'Strona nie została jeszcze uzupełniona w bazie danych.',
-      },
-      en: {
-        title: 'Online psychological consultations',
-        body: 'This page has not been filled in the database yet.',
-      },
-    },
-    data: {},
-    style: { align: 'center' },
+    ],
   },
-];
+  about: {
+    title: { ru: 'Обо мне', pl: 'O mnie', en: 'About me' },
+    blocks: [
+      {
+        id: 'fallback-about',
+        type: 'text',
+        content: {
+          ru: { title: 'Обо мне', body: 'Блок «Обо мне» пока не заполнен.' },
+          pl: { title: 'O mnie', body: 'Sekcja „O mnie” nie została jeszcze uzupełniona.' },
+          en: { title: 'About me', body: 'The “About me” section has not been filled in yet.' },
+        },
+        data: {},
+        style: {},
+      },
+    ],
+  },
+};
 
 /** Перевод из JSON-поля: язык страницы, иначе русский, иначе ничего */
 function localized(json: unknown, locale: Locale): string | null {
@@ -66,8 +92,14 @@ function renderable(rows: StoredBlock[], locale: Locale): RenderableBlock[] {
 }
 
 function fallback(slug: string, locale: Locale): PublicPage | null {
-  if (slug !== HOME_SLUG) return null;
-  return { slug, title: null, description: null, blocks: renderable(FALLBACK_HOME, locale) };
+  const page = FALLBACK[slug];
+  if (page === undefined) return null;
+  return {
+    slug,
+    title: localized(page.title, locale),
+    description: null,
+    blocks: renderable(page.blocks, locale),
+  };
 }
 
 /**
