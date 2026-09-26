@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { restoreBlock } from '@/app/admin/actions';
 import { AddBlockButtons, BlockCard, type AdminBlock } from '@/app/admin/BlockCard';
+import { ArchivedPages, NewPageForm, PageSettings } from '@/app/admin/PagePanel';
 import { AdminNav } from '@/components/admin/AdminNav';
 import { db } from '@/lib/db';
 import { isAdmin } from '@/lib/auth/admin';
@@ -56,6 +57,12 @@ const SAVED = {
   archived: 'Блок убран в архив — вернуть можно внизу страницы.',
   restored: 'Блок возвращён из архива в конец страницы.',
   reverted: 'Прежняя версия возвращена. Текущая — в истории, откат обратим.',
+  pageCreated:
+    'Страница создана скрытой. Добавьте блоки, затем включите «опубликована» в настройках.',
+  pageSettings: 'Настройки страницы сохранены.',
+  pageMoved: 'Место в меню изменено.',
+  pageArchived: 'Страница убрана в архив — вернуть можно внизу страницы.',
+  pageRestored: 'Страница возвращена из архива скрытой.',
 } as const;
 
 const ERRORS = {
@@ -68,6 +75,11 @@ const ERRORS = {
   align: 'Выравнивание — только из списка.',
   background: 'Фон — только из списка.',
   link: 'Кнопка может вести только на страницу этого сайта.',
+  pageId: 'Страница не найдена — обновите страницу.',
+  slug: 'Адрес: латиница, цифры и дефис, до 48 знаков; адреса home, services, privacy, terms и служебные заняты.',
+  slugTaken: 'Такой адрес уже есть — у другой страницы или в архиве.',
+  title: 'Нужно название по-русски: одна строка до 80 знаков.',
+  homeArchive: 'Главную нельзя убрать в архив.',
 } as const;
 
 function known<T extends Record<string, string>>(table: T, code: string | undefined) {
@@ -77,6 +89,15 @@ function known<T extends Record<string, string>>(table: T, code: string | undefi
 function errorMessage(code: string | undefined, type: BlockType | undefined): string | null {
   const general = known(ERRORS, code);
   if (general !== null) return general;
+  // Поля настроек страницы: title_ru, description_pl…
+  const pageField = /^(title|description)_(ru|pl|en)$/.exec(code ?? '');
+  if (pageField !== null) {
+    const what = pageField[1] === 'title' ? 'Название' : 'Описание';
+    const lang = LOCALE_NAMES[pageField[2] as Locale];
+    return `${what} (${lang}) не сохранено: одна строка без служебных символов${
+      pageField[1] === 'title' && pageField[2] === DEFAULT_LOCALE ? ', по-русски обязательно' : ''
+    }.`;
+  }
   const field = type === undefined ? undefined : BLOCKS[type].fields.find((f) => f.name === code);
   if (field === undefined) return null;
   const shape = field.kind === 'line' ? 'одна строка' : 'текст';
@@ -99,6 +120,7 @@ interface PageProps {
     saved?: string;
     error?: string;
     block?: string;
+    newpage?: string;
   }>;
 }
 
@@ -113,9 +135,23 @@ export default async function AdminPage({ searchParams }: PageProps) {
   const pages = await db.page.findMany({
     where: { archivedAt: null },
     orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
-    select: { id: true, slug: true, titleI18n: true, isPublished: true },
+    select: {
+      id: true,
+      slug: true,
+      titleI18n: true,
+      descriptionI18n: true,
+      showInHeader: true,
+      showInFooter: true,
+      isPublished: true,
+    },
   });
-  const page = pages.find((p) => p.slug === params.page) ?? pages[0];
+  const archivedPages = await db.page.findMany({
+    where: { archivedAt: { not: null } },
+    orderBy: { archivedAt: 'desc' },
+    select: { id: true, slug: true, titleI18n: true },
+  });
+  const pageIndex = pages.findIndex((p) => p.slug === params.page);
+  const page = pages[pageIndex === -1 ? 0 : pageIndex];
   const [blocks, archived] =
     page === undefined
       ? [[], []]
@@ -193,6 +229,14 @@ export default async function AdminPage({ searchParams }: PageProps) {
               </Link>
             ))}
           </nav>
+          <NewPageForm locale={locale} open={params.newpage !== undefined} />
+
+          <PageSettings
+            page={page}
+            locale={locale}
+            isFirst={page.id === pages[0]?.id}
+            isLast={page.id === pages[pages.length - 1]?.id}
+          />
 
           {/* Вкладки языков. Непереведённый блок на сайте показывается по-русски,
               поэтому счётчик рядом с языком — список того, что осталось перевести */}
@@ -314,6 +358,8 @@ export default async function AdminPage({ searchParams }: PageProps) {
               </ul>
             </section>
           )}
+
+          <ArchivedPages pages={archivedPages} locale={locale} />
 
           <p className="mt-10 text-sm text-[var(--color-ink-soft)]">
             <Link

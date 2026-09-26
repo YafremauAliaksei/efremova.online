@@ -6,6 +6,8 @@ import { isAdmin } from '@/lib/auth/admin';
 import { db } from '@/lib/db';
 import { parseBlockSettingsForm, parseBlockTextForm, withLocaleTexts } from '@/lib/blocks/edit';
 import { insertAfter, moveId, numbered } from '@/lib/blocks/order';
+import { parseNewPageForm, parsePageSettingsForm } from '@/lib/blocks/page-edit';
+import { HOME_SLUG } from '@/lib/blocks/pages';
 import { isBlockType } from '@/lib/blocks/registry';
 import { DEFAULT_LOCALE, isLocale } from '@/lib/i18n';
 
@@ -17,7 +19,7 @@ import { DEFAULT_LOCALE, isLocale } from '@/lib/i18n';
  * администратора и сама проверяет всё, что пришло в форме: middleware
  * пропускает только наличие cookie, а форма — это данные от браузера.
  *
- * Ничего не удаляется (docs/13, п.5): «убрать» — это архив, а любая правка
+ * Ничего не удаляется (docs/13, п.5): «убрать» блок или страницу — это архив, а любая правка
  * содержимого сначала кладёт прежнюю версию в историю блока.
  */
 
@@ -247,4 +249,115 @@ export async function restoreRevision(formData: FormData): Promise<void> {
   ]);
   refresh();
   back(formData, block.page.slug, `&block=${block.id}&saved=reverted#block-${block.id}`);
+}
+
+// ───────────────────────────── страницы ─────────────────────────────
+
+/** Страница, которую можно править: существует и не в архиве */
+async function editablePage(formData: FormData) {
+  const id = uuidFrom(formData, 'pageId');
+  const page = id === null ? null : await db.page.findFirst({ where: { id, archivedAt: null } });
+  if (page === null) redirect('/admin?error=missing');
+  return page;
+}
+
+async function pageIdsInOrder(): Promise<string[]> {
+  const pages = await db.page.findMany({
+    where: { archivedAt: null },
+    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    select: { id: true },
+  });
+  return pages.map((page) => page.id);
+}
+
+async function savePageOrder(ids: string[]): Promise<void> {
+  await db.$transaction(
+    numbered(ids).map(({ id, sortOrder }) => db.page.update({ where: { id }, data: { sortOrder } }))
+  );
+}
+
+/**
+ * Новая страница — скрытая и не в меню: владелец сначала наполняет её
+ * блоками, потом включает. Адрес, занятый другой страницей (в том числе
+ * из архива), — отказ, а не перезапись.
+ */
+export async function createPage(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const parsed = parseNewPageForm(formData);
+  if (!parsed.ok) back(formData, '', `&newpage=1&error=${parsed.field}`);
+
+  const taken = await db.page.findUnique({
+    where: { slug: parsed.value.slug },
+    select: { id: true },
+  });
+  if (taken !== null) back(formData, '', '&newpage=1&error=slugTaken');
+
+  const ids = await pageIdsInOrder();
+  await db.page.create({
+    data: {
+      slug: parsed.value.slug,
+      titleI18n: { [DEFAULT_LOCALE]: parsed.value.title },
+      isPublished: false,
+      sortOrder: ids.length * 10,
+    },
+  });
+  refresh();
+  back(formData, parsed.value.slug, '&saved=pageCreated');
+}
+
+export async function savePageSettings(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const page = await editablePage(formData);
+  const parsed = parsePageSettingsForm(formData);
+  if (!parsed.ok) back(formData, page.slug, `&error=${parsed.field}`);
+
+  const { titleI18n, descriptionI18n, showInHeader, showInFooter, isPublished } = parsed.value;
+  await db.page.update({
+    where: { id: page.id },
+    data: {
+      titleI18n,
+      descriptionI18n,
+      showInHeader,
+      showInFooter,
+      // Главную скрыть нельзя: без неё сайт — это пустой адрес
+      isPublished: page.slug === HOME_SLUG ? true : isPublished,
+    },
+  });
+  refresh();
+  back(formData, page.slug, '&saved=pageSettings');
+}
+
+/** Порядок страниц — это порядок пунктов в шапке и подвале */
+export async function movePage(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const page = await editablePage(formData);
+  const direction = formData.get('direction') === 'up' ? 'up' : 'down';
+  await savePageOrder(moveId(await pageIdsInOrder(), page.id, direction));
+  refresh();
+  back(formData, page.slug, '&saved=pageMoved');
+}
+
+/** «Удалить» страницу = в архив, вместе с блоками; главную — нельзя */
+export async function archivePage(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const page = await editablePage(formData);
+  if (page.slug === HOME_SLUG) back(formData, page.slug, '&error=homeArchive');
+  await db.page.update({ where: { id: page.id }, data: { archivedAt: new Date() } });
+  refresh();
+  back(formData, HOME_SLUG, '&saved=pageArchived');
+}
+
+/** Из архива — скрытой и в конец меню: владелец сам решит, когда показать */
+export async function restorePage(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = uuidFrom(formData, 'pageId');
+  const page =
+    id === null ? null : await db.page.findFirst({ where: { id, archivedAt: { not: null } } });
+  if (page === null) redirect('/admin?error=missing');
+
+  const ids = await pageIdsInOrder();
+  await db.page.update({ where: { id: page.id }, data: { archivedAt: null, isPublished: false } });
+  await savePageOrder([...ids, page.id]);
+  refresh();
+  back(formData, page.slug, '&saved=pageRestored');
 }
