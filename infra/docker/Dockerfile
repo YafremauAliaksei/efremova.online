@@ -27,7 +27,11 @@
 
 # ─── Этап 1: зависимости ───
 # Меняется только когда меняется package-lock.json
-FROM node:22-alpine AS deps
+FROM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS deps
+# Версии пакетов apk не закрепляются (DL3018) — в Alpine это вредный совет:
+# старые версии пропадают из репозитория, и образ перестаёт собираться.
+# Набор пакетов и так определён: базовый образ закреплён по хешу выше.
+# hadolint ignore=DL3018
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
@@ -46,7 +50,7 @@ RUN --mount=type=cache,target=/root/.npm \
     npm ci --ignore-scripts && npx prisma generate
 
 # ─── Этап 2: сборка приложения ───
-FROM node:22-alpine AS builder
+FROM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS builder
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
@@ -61,7 +65,7 @@ RUN --mount=type=cache,target=/app/.next/cache \
     npm run build
 
 # ─── Этап 3: то, что реально поедет на сервер ───
-FROM node:22-alpine AS runner
+FROM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -78,6 +82,8 @@ ENV HOSTNAME=0.0.0.0
 #    регулярно находят уязвимости — и сканер справедливо на них ругается.
 #    Заодно это лишает возможного взломщика установщика пакетов внутри
 #    контейнера. Проверено: убирает 11 находок Trivy из 13.
+# DL3018 — см. этап deps: версия пакетов задаётся базовым образом по хешу
+# hadolint ignore=DL3018
 RUN apk upgrade --no-cache \
  && apk add --no-cache dumb-init \
  && rm -rf /usr/local/lib/node_modules/npm \
