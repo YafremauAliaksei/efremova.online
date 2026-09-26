@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { Filled } from '@/components/Filled';
 import { getSiteProfile } from '@/lib/site-profile';
-import { LOCALE_NAMES, LOCALE_TAGS, type LegalDocumentView, type Locale } from '@/lib/legal';
+import { LOCALE_NAMES, LOCALE_TAGS, localizedPath, type Locale } from '@/lib/i18n';
+import type { LegalDocumentView } from '@/lib/legal';
 
 /**
  * Отрисовка правового документа.
@@ -47,10 +48,11 @@ const UI_TEXT = {
 
 export async function LegalDocument({
   document,
-  basePath,
+  path,
 }: {
   document: LegalDocumentView;
-  basePath: string;
+  /** Адрес документа без языка: /privacy */
+  path: string;
 }) {
   const t = UI_TEXT[document.locale];
   const { values, status } = await getSiteProfile();
@@ -80,7 +82,7 @@ export async function LegalDocument({
               return (
                 <li key={locale}>
                   <Link
-                    href={`${basePath}?lang=${locale}`}
+                    href={localizedPath(locale, path)}
                     hrefLang={LOCALE_TAGS[locale]}
                     aria-current={isCurrent ? 'true' : undefined}
                     className={

@@ -1,5 +1,6 @@
 import 'server-only';
 import { db } from '@/lib/db';
+import { isLocale, type Locale } from '@/lib/i18n';
 import type { LegalSection } from '../../prisma/legal-content';
 
 /**
@@ -7,61 +8,23 @@ import type { LegalSection } from '../../prisma/legal-content';
  *
  * ⚖️ ЯЗЫК — ЭТО ЮРИДИЧЕСКОЕ ТРЕБОВАНИЕ, А НЕ УДОБСТВО
  * Владелец ведёт деятельность в Польше. Документы для потребителя должны быть
- * доступны на польском языке, поэтому польский здесь — язык по умолчанию,
+ * доступны на польском языке, поэтому польский здесь — запасной язык,
  * а не «один из». Русская версия дополнительная.
  *
- * Прямая ссылка на конкретную языковую версию: /privacy?lang=pl
- * Ссылка на конкретный раздел:                 /privacy?lang=pl#auth
+ * Прямая ссылка на конкретную языковую версию: /pl/privacy
+ * Ссылка на конкретный раздел:                 /pl/privacy#cookies
  */
-
-export const SUPPORTED_LOCALES = ['pl', 'ru', 'en'] as const;
 
 /** Правовые документы сайта-визитки: у каждого своя страница (LegalPage) */
 export const LEGAL_SLUGS = ['privacy', 'terms', 'provider', 'site-terms'] as const;
 export type LegalSlug = (typeof LEGAL_SLUGS)[number];
-export type Locale = (typeof SUPPORTED_LOCALES)[number];
-
-/** Польский — язык по умолчанию по месту ведения деятельности */
-export const DEFAULT_LOCALE: Locale = 'pl';
-
-export const LOCALE_NAMES: Record<Locale, string> = {
-  pl: 'Polski',
-  ru: 'Русский',
-  en: 'English',
-};
-
-/** Языковой тег для атрибутов lang и hreflang */
-export const LOCALE_TAGS: Record<Locale, string> = {
-  pl: 'pl-PL',
-  ru: 'ru-RU',
-  en: 'en',
-};
-
-export function isLocale(value: unknown): value is Locale {
-  return typeof value === 'string' && (SUPPORTED_LOCALES as readonly string[]).includes(value);
-}
 
 /**
- * Определяет язык документа.
- *
- * Приоритет: явный параметр в ссылке → язык браузера → польский.
- * Явный параметр важнее всего: ссылку на конкретную версию должно быть
- * возможно отправить, и она обязана открыться именно в этом языке.
+ * Запасной язык документа — польский, по месту ведения деятельности. Сайт
+ * по умолчанию русский, но документ, которого нет на русском, показывается
+ * на официальном языке, а не пропадает.
  */
-export function resolveLocale(param: string | undefined, acceptLanguage: string | null): Locale {
-  if (isLocale(param)) return param;
-
-  if (acceptLanguage !== null) {
-    // Простой разбор без библиотеки: "ru-RU,ru;q=0.9,en;q=0.8" → ru
-    const preferred = acceptLanguage
-      .split(',')
-      .map((part) => part.split(';')[0]?.trim().slice(0, 2).toLowerCase())
-      .find((code) => isLocale(code));
-    if (isLocale(preferred)) return preferred;
-  }
-
-  return DEFAULT_LOCALE;
-}
+export const LEGAL_FALLBACK_LOCALE: Locale = 'pl';
 
 export interface LegalDocumentView {
   slug: string;
@@ -101,14 +64,14 @@ export async function getLegalDocument(
 
     const chosen =
       all.find((doc) => doc.locale === locale) ??
-      all.find((doc) => doc.locale === DEFAULT_LOCALE) ??
+      all.find((doc) => doc.locale === LEGAL_FALLBACK_LOCALE) ??
       all[0];
 
     if (chosen === undefined) return null;
 
     return {
       slug: chosen.slug,
-      locale: isLocale(chosen.locale) ? chosen.locale : DEFAULT_LOCALE,
+      locale: isLocale(chosen.locale) ? chosen.locale : LEGAL_FALLBACK_LOCALE,
       version: chosen.version,
       title: chosen.title,
       sections: (chosen.sections ?? []) as unknown as LegalSection[],

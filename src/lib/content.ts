@@ -1,6 +1,7 @@
 import 'server-only';
 import { db } from '@/lib/db';
 import { contentBlockDataSchema, i18nTextSchema } from '@/lib/content-schema';
+import { DEFAULT_LOCALE, LOCALE_TAGS, type Locale } from '@/lib/i18n';
 
 /**
  * Чтение текстов сайта из базы.
@@ -17,6 +18,12 @@ import { contentBlockDataSchema, i18nTextSchema } from '@/lib/content-schema';
 
 export interface ContentBlockData {
   key: string;
+  /**
+   * Язык, на котором текст на самом деле написан. Если перевода нет,
+   * показывается русский — и страница помечает его lang="ru", чтобы
+   * скринридер не читал русский текст польским произношением.
+   */
+  locale: Locale;
   title: string | null;
   body: string | null;
   data: Record<string, unknown>;
@@ -29,47 +36,61 @@ const FALLBACK: Record<string, ContentBlockData> = {
     title: 'Психологические консультации онлайн',
     body: 'Содержимое этого блока ещё не заполнено в базе данных. Выполните «npm run db:seed» или отредактируйте текст в админке.',
     data: {},
+    locale: DEFAULT_LOCALE,
   },
   'about.main': {
     key: 'about.main',
     title: 'Обо мне',
     body: 'Блок «Обо мне» пока не заполнен.',
     data: {},
+    locale: DEFAULT_LOCALE,
   },
   'approach.main': {
     key: 'approach.main',
     title: 'Подход к работе',
     body: 'Блок «Подход» пока не заполнен.',
     data: {},
+    locale: DEFAULT_LOCALE,
   },
   'cta.main': {
     key: 'cta.main',
     title: 'Записаться на консультацию',
     body: 'Напишите на e-mail, указанный внизу страницы.',
     data: {},
+    locale: DEFAULT_LOCALE,
   },
 };
 
-export async function getContentBlock(key: string, locale = 'ru'): Promise<ContentBlockData> {
-  try {
-    const block = await db.contentBlock.findUnique({
-      where: { key_locale: { key, locale } },
-    });
+function fallback(key: string): ContentBlockData {
+  return FALLBACK[key] ?? { key, title: null, body: null, data: {}, locale: DEFAULT_LOCALE };
+}
 
-    if (block?.isPublished !== true) {
-      return FALLBACK[key] ?? { key, title: null, body: null, data: {} };
-    }
+/**
+ * Блок на нужном языке. Нет перевода или он снят с публикации — русский
+ * вариант; нет и его — заглушка. Пустое место на странице хуже текста
+ * на другом языке: посетитель хотя бы видит, что раздел существует.
+ */
+export async function getContentBlock(key: string, locale: Locale): Promise<ContentBlockData> {
+  try {
+    const rows = await db.contentBlock.findMany({
+      where: { key, locale: { in: [locale, DEFAULT_LOCALE] }, isPublished: true },
+    });
+    const block =
+      rows.find((row) => row.locale === locale) ??
+      rows.find((row) => row.locale === DEFAULT_LOCALE);
+    if (block === undefined) return fallback(key);
 
     return {
       key: block.key,
       title: block.title,
       body: block.body,
       data: contentBlockDataSchema.parse(block.data),
+      locale: block.locale === locale ? locale : DEFAULT_LOCALE,
     };
   } catch {
     // База недоступна — отдаём заглушку, а не падаем.
     // Сам сбой будет виден в /api/health и в мониторинге.
-    return FALLBACK[key] ?? { key, title: null, body: null, data: {} };
+    return fallback(key);
   }
 }
 
@@ -88,7 +109,7 @@ export interface PublicService {
  * никакие сторонние сервисы геолокации не вызываются и IP посетителя
  * никуда не уходит (docs/13, п.1.1).
  */
-export async function getServices(region: string, locale = 'ru'): Promise<PublicService[]> {
+export async function getServices(region: string, locale: Locale): Promise<PublicService[]> {
   try {
     const services = await db.service.findMany({
       where: { isActive: true },
@@ -121,8 +142,8 @@ export async function getServices(region: string, locale = 'ru'): Promise<Public
   }
 }
 
-export function formatPrice(amountMinor: number, currency: string, locale = 'ru'): string {
-  return new Intl.NumberFormat(locale, {
+export function formatPrice(amountMinor: number, currency: string, locale: Locale): string {
+  return new Intl.NumberFormat(LOCALE_TAGS[locale], {
     style: 'currency',
     currency,
     maximumFractionDigits: 0,

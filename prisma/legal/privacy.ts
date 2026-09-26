@@ -16,7 +16,7 @@ import type { LegalDocumentSeed } from './types';
  * Польская версия — основная; русская и английская — переводы.
  */
 
-const VERSION = 'privacy-2026-09-25-draft';
+const VERSION = 'privacy-2026-09-26-draft';
 
 export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
   // ═══════════════════════ POLITYKA PRYWATNOŚCI (PL) ═══════════════════════
@@ -78,6 +78,7 @@ export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
         items: [
           '__cf_bm — Cloudflare; odróżnia ruch ludzi od automatów. Ważność: 30 minut.',
           'cf_clearance — Cloudflare; zapamiętuje przejście kontroli bezpieczeństwa, jeśli była wymagana. Ważność: ⟦ЮРИСТ: czas zgodny z ustawieniami Cloudflare⟧.',
+          'lang — serwis; zapamiętuje wersję językową wybraną przełącznikiem języka. Zapisywany tylko po kliknięciu przełącznika. Ważność: 1 rok. ⟦ЮРИСТ: potwierdzić, że plik zapamiętujący wybór języka nie wymaga zgody⟧',
           '__Host-admin-session — tylko w panelu administratora; odwiedzający serwis go nie otrzymują. Ważność: 30 minut.',
         ],
       },
@@ -177,6 +178,7 @@ export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
         items: [
           '__cf_bm — Cloudflare; отличает людей от автоматических программ. Срок: 30 минут.',
           'cf_clearance — Cloudflare; запоминает, что проверка безопасности пройдена, если она потребовалась. Срок: ⟦ЮРИСТ: срок по настройкам Cloudflare⟧.',
+          'lang — сайт; запоминает язык, выбранный переключателем языка. Записывается только после щелчка по переключателю. Срок: 1 год. ⟦ЮРИСТ: подтвердить, что cookie с выбором языка не требует согласия⟧',
           '__Host-admin-session — только в панели администратора; посетители сайта её не получают. Срок: 30 минут.',
         ],
       },
@@ -276,6 +278,7 @@ export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
         items: [
           '__cf_bm — Cloudflare; distinguishes people from bots. Lifetime: 30 minutes.',
           'cf_clearance — Cloudflare; remembers that a security check was passed, if one was required. Lifetime: ⟦ЮРИСТ: as configured in Cloudflare⟧.',
+          'lang — this site; remembers the language chosen with the language switcher. Set only after clicking the switcher. Lifetime: 1 year. ⟦ЮРИСТ: confirm that a cookie storing the language choice needs no consent⟧',
           '__Host-admin-session — administrator panel only; site visitors never receive it. Lifetime: 30 minutes.',
         ],
       },

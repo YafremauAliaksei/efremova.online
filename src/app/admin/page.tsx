@@ -23,7 +23,7 @@ import { BODY_MAX_LENGTH, TITLE_MAX_LENGTH, parseContentBlockEdit } from '@/lib/
  */
 
 export const metadata: Metadata = {
-  title: 'Админка',
+  title: 'Тексты сайта',
   robots: { index: false, follow: false },
 };
 
@@ -89,8 +89,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
 
     // Страницы читают тексты из базы и кэшируются — после правки кэш
     // нужно сбросить, иначе изменения «не видно»
-    revalidatePath('/');
-    revalidatePath('/about');
+    revalidatePath('/[locale]', 'layout');
     revalidatePath('/admin');
     redirect(`/admin?saved=1&block=${id}`);
   }
