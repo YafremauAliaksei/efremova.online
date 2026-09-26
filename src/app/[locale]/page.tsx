@@ -1,5 +1,10 @@
+import type { Metadata } from 'next';
 import { headers } from 'next/headers';
-import { formatPrice, getContentBlock, getServices } from '@/lib/content';
+import { getContentBlock, getServices } from '@/lib/content';
+import { languageAlternates, langIfDifferent } from '@/lib/i18n';
+import { messages } from '@/lib/messages';
+import { pageLocale, type LocaleParams } from '@/lib/page-locale';
+import { ServiceList } from '@/components/ServiceList';
 import { SiteFooter } from '@/components/SiteFooter';
 
 /**
@@ -18,34 +23,43 @@ import { SiteFooter } from '@/components/SiteFooter';
 
 export const dynamic = 'force-dynamic';
 
-export default async function HomePage() {
+export async function generateMetadata({ params }: LocaleParams): Promise<Metadata> {
+  const locale = await pageLocale(params);
+  return { alternates: languageAlternates(locale, '/') };
+}
+
+export default async function HomePage({ params }: LocaleParams) {
+  const locale = await pageLocale(params);
   const headerList = await headers();
   // Страну сообщает Cloudflare. Никаких сторонних geo-IP сервисов:
   // иначе IP посетителя утекал бы третьей стороне (docs/03).
   const region = headerList.get('cf-ipcountry') ?? 'DEFAULT';
 
   const [hero, about, approach, cta, services] = await Promise.all([
-    getContentBlock('hero.main'),
-    getContentBlock('about.main'),
-    getContentBlock('approach.main'),
-    getContentBlock('cta.main'),
-    getServices(region),
+    getContentBlock('hero.main', locale),
+    getContentBlock('about.main', locale),
+    getContentBlock('approach.main', locale),
+    getContentBlock('cta.main', locale),
+    getServices(region, locale),
   ]);
 
   return (
     <main id="main">
       {/* ЭКРАН 1 — Первое впечатление */}
-      <section className="mx-auto max-w-3xl px-6 py-24 text-center">
+      <section
+        lang={langIfDifferent(hero.locale, locale)}
+        className="mx-auto max-w-3xl px-6 py-24 text-center"
+      >
         <h1 className="text-4xl font-semibold text-balance sm:text-5xl">{hero.title}</h1>
         {hero.body !== null && (
           <p className="mx-auto mt-6 max-w-2xl text-lg text-[var(--color-ink-soft)]">{hero.body}</p>
         )}
         {/* Кнопка вела в личный кабинет. Кабинет уехал на отдельный поддомен,
-            здесь на её месте появится кнопка к контактам (ветка feat/contacts). */}
+            здесь на её месте появится кнопка к контактам (ветка contacts). */}
       </section>
 
       {/* ЭКРАН 2 — Обо мне */}
-      <section className="bg-[var(--color-paper-alt)]">
+      <section lang={langIfDifferent(about.locale, locale)} className="bg-[var(--color-paper-alt)]">
         <div className="mx-auto max-w-3xl px-6 py-20">
           <h2 className="text-3xl font-semibold">{about.title}</h2>
           {about.body !== null && (
@@ -55,7 +69,10 @@ export default async function HomePage() {
       </section>
 
       {/* ЭКРАН 3 — Подход */}
-      <section className="mx-auto max-w-3xl px-6 py-20">
+      <section
+        lang={langIfDifferent(approach.locale, locale)}
+        className="mx-auto max-w-3xl px-6 py-20"
+      >
         <h2 className="text-3xl font-semibold">{approach.title}</h2>
         {approach.body !== null && (
           <p className="mt-6 leading-relaxed text-[var(--color-ink-soft)]">{approach.body}</p>
@@ -65,47 +82,21 @@ export default async function HomePage() {
       {/* ЭКРАН 4 — Услуги и цены */}
       <section className="bg-[var(--color-paper-alt)]">
         <div className="mx-auto max-w-3xl px-6 py-20">
-          <h2 className="text-3xl font-semibold">Услуги</h2>
-
-          {services.length === 0 ? (
-            <p className="mt-6 text-[var(--color-ink-soft)]">
-              Список услуг пока не заполнен. Выполните <code>npm run db:seed</code> для демо-данных.
-            </p>
-          ) : (
-            <ul className="mt-8 space-y-4">
-              {services.map((service) => (
-                <li
-                  key={service.slug}
-                  className="rounded-lg border border-[var(--color-line)] bg-white p-6"
-                >
-                  <div className="flex flex-wrap items-baseline justify-between gap-3">
-                    <h3 className="text-xl font-medium">{service.title}</h3>
-                    <p className="text-lg font-semibold">
-                      {service.price === null
-                        ? 'по запросу'
-                        : formatPrice(service.price.amountMinor, service.price.currency)}
-                    </p>
-                  </div>
-                  <p className="mt-2 text-sm text-[var(--color-ink-soft)]">
-                    {service.durationMinutes} минут
-                  </p>
-                  {service.description !== '' && (
-                    <p className="mt-3 text-[var(--color-ink-soft)]">{service.description}</p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
+          <h2 className="text-3xl font-semibold">{messages(locale).nav.services}</h2>
+          <ServiceList services={services} locale={locale} headingLevel="h3" />
         </div>
       </section>
 
       {/* ЭКРАН 5 — Призыв к действию */}
-      <section className="mx-auto max-w-3xl px-6 py-24 text-center">
+      <section
+        lang={langIfDifferent(cta.locale, locale)}
+        className="mx-auto max-w-3xl px-6 py-24 text-center"
+      >
         <h2 className="text-3xl font-semibold">{cta.title}</h2>
         {cta.body !== null && <p className="mt-4 text-[var(--color-ink-soft)]">{cta.body}</p>}
       </section>
 
-      <SiteFooter />
+      <SiteFooter locale={locale} />
     </main>
   );
 }

@@ -24,27 +24,82 @@ const db = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
 });
 
-/** Тексты-заглушки: понятно, что это демо, и никого не вводит в заблуждение */
-const CONTENT_BLOCKS = [
+/**
+ * Тексты-заглушки: понятно, что это демо, и никого не вводит в заблуждение.
+ * На трёх языках — польская версия текстов для посетителей обязательна
+ * (CLAUDE.md, правило 10), а без переводов нечего проверять в админке.
+ */
+const CONTENT_BLOCKS: {
+  key: string;
+  texts: Record<'ru' | 'pl' | 'en', { title: string; body: string }>;
+}[] = [
   {
     key: 'hero.main',
-    title: 'Психологические консультации онлайн',
-    body: 'Демо-текст первого экрана. Замените его в админке: этот текст хранится в базе данных, а не в коде.',
+    texts: {
+      ru: {
+        title: 'Психологические консультации онлайн',
+        body: 'Демо-текст первого экрана. Замените его в админке: этот текст хранится в базе данных, а не в коде.',
+      },
+      pl: {
+        title: 'Konsultacje psychologiczne online',
+        body: 'Tekst demonstracyjny pierwszego ekranu. Zmień go w panelu administracyjnym: ten tekst jest przechowywany w bazie danych, a nie w kodzie.',
+      },
+      en: {
+        title: 'Online psychological consultations',
+        body: 'Demo text for the first screen. Replace it in the admin panel: this text lives in the database, not in the code.',
+      },
+    },
   },
   {
     key: 'about.main',
-    title: 'Обо мне',
-    body: 'Демо-текст блока «Обо мне». Здесь будет рассказ о специалисте, образовании и опыте. Для поисковых систем это ключевой блок: Google строже оценивает сайты о здоровье и ждёт подтверждённой квалификации.',
+    texts: {
+      ru: {
+        title: 'Обо мне',
+        body: 'Демо-текст блока «Обо мне». Здесь будет рассказ о специалисте, образовании и опыте. Для поисковых систем это ключевой блок: Google строже оценивает сайты о здоровье и ждёт подтверждённой квалификации.',
+      },
+      pl: {
+        title: 'O mnie',
+        body: 'Tekst demonstracyjny sekcji „O mnie”. Tu pojawi się informacja o specjaliście, wykształceniu i doświadczeniu.',
+      },
+      en: {
+        title: 'About me',
+        body: 'Demo text for the “About me” section. It will describe the specialist, their education and experience.',
+      },
+    },
   },
   {
     key: 'approach.main',
-    title: 'Подход к работе',
-    body: 'Демо-текст блока «Подход». Здесь описывается метод работы, длительность и формат консультаций.',
+    texts: {
+      ru: {
+        title: 'Подход к работе',
+        body: 'Демо-текст блока «Подход». Здесь описывается метод работы, длительность и формат консультаций.',
+      },
+      pl: {
+        title: 'Podejście do pracy',
+        body: 'Tekst demonstracyjny sekcji „Podejście”. Tu opisana będzie metoda pracy, czas trwania i forma konsultacji.',
+      },
+      en: {
+        title: 'My approach',
+        body: 'Demo text for the “Approach” section. It will describe the method, duration and format of sessions.',
+      },
+    },
   },
   {
     key: 'cta.main',
-    title: 'Записаться на консультацию',
-    body: 'Демо-текст завершающего блока. Здесь будет приглашение связаться — почтой или в мессенджере.',
+    texts: {
+      ru: {
+        title: 'Записаться на консультацию',
+        body: 'Демо-текст завершающего блока. Здесь будет приглашение связаться — почтой или в мессенджере.',
+      },
+      pl: {
+        title: 'Umów konsultację',
+        body: 'Tekst demonstracyjny sekcji końcowej. Tu pojawi się zaproszenie do kontaktu — mailowo lub przez komunikator.',
+      },
+      en: {
+        title: 'Book a session',
+        body: 'Demo text for the closing section. It will invite visitors to get in touch by email or messenger.',
+      },
+    },
   },
 ];
 
@@ -106,13 +161,15 @@ async function main(): Promise<void> {
   console.log('Заполнение демо-данными...');
 
   for (const block of CONTENT_BLOCKS) {
-    await db.contentBlock.upsert({
-      where: { key_locale: { key: block.key, locale: 'ru' } },
-      create: { ...block, locale: 'ru' },
-      update: { title: block.title, body: block.body },
-    });
+    for (const [locale, text] of Object.entries(block.texts)) {
+      await db.contentBlock.upsert({
+        where: { key_locale: { key: block.key, locale } },
+        create: { key: block.key, locale, ...text },
+        update: text,
+      });
+    }
   }
-  console.log(`  ✓ Блоков контента: ${String(CONTENT_BLOCKS.length)}`);
+  console.log(`  ✓ Блоков контента: ${String(CONTENT_BLOCKS.length)} × 3 языка`);
 
   for (const service of SERVICES) {
     const { prices, ...serviceData } = service;

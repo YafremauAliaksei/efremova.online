@@ -9,9 +9,13 @@ export const dynamic = 'force-dynamic';
 
 const page = createLegalPage({
   slug: 'provider',
-  basePath: '/provider',
-  fallbackTitle: 'Informacje o usługodawcy',
-  description: 'Dane usługodawcy, kontakt i informacje o wykonywanym zawodzie.',
+  path: '/provider',
+  navKey: 'provider',
+  description: {
+    pl: 'Dane usługodawcy, kontakt i informacje o wykonywanym zawodzie.',
+    ru: 'Данные владельца сайта, контакты и сведения о профессии.',
+    en: 'Service provider details, contact and professional information.',
+  },
 });
 
 export const generateMetadata = page.generateMetadata;

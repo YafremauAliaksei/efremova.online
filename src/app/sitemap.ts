@@ -1,4 +1,5 @@
 import type { MetadataRoute } from 'next';
+import { LOCALES, LOCALE_TAGS, localizedPath } from '@/lib/i18n';
 
 /**
  * sitemap.xml — карта сайта для поисковых систем.
@@ -11,6 +12,17 @@ import type { MetadataRoute } from 'next';
  * В карту попадают ТОЛЬКО публичные страницы. Кабинет и служебные адреса
  * не индексируются, и их здесь быть не должно.
  */
+/** Страницы и подсказки для поисковика: адрес без языка, частота, вес */
+const PAGES = [
+  ['/', 'monthly', 1],
+  ['/about', 'monthly', 0.8],
+  ['/services', 'weekly', 0.9],
+  ['/privacy', 'yearly', 0.3],
+  ['/terms', 'yearly', 0.3],
+  ['/site-terms', 'yearly', 0.2],
+  ['/provider', 'yearly', 0.2],
+] as const;
+
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = process.env.APP_URL ?? 'http://localhost:3000';
   const now = new Date();
@@ -18,13 +30,19 @@ export default function sitemap(): MetadataRoute.Sitemap {
   // changeFrequency и priority — это подсказки, а не команды: Google давно
   // ориентируется в основном на реальную частоту изменений. Оставляем честные
   // значения, чтобы не вводить в заблуждение и себя.
-  return [
-    { url: `${baseUrl}/`, lastModified: now, changeFrequency: 'monthly', priority: 1 },
-    { url: `${baseUrl}/about`, lastModified: now, changeFrequency: 'monthly', priority: 0.8 },
-    { url: `${baseUrl}/services`, lastModified: now, changeFrequency: 'weekly', priority: 0.9 },
-    { url: `${baseUrl}/privacy`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
-    { url: `${baseUrl}/terms`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
-    { url: `${baseUrl}/site-terms`, lastModified: now, changeFrequency: 'yearly', priority: 0.2 },
-    { url: `${baseUrl}/provider`, lastModified: now, changeFrequency: 'yearly', priority: 0.2 },
-  ];
+  //
+  // Каждая языковая версия — отдельная запись со ссылками на остальные:
+  // так поисковик понимает, что это переводы, а не дубли (hreflang в карте).
+  return PAGES.flatMap(([path, changeFrequency, priority]) => {
+    const languages = Object.fromEntries(
+      LOCALES.map((locale) => [LOCALE_TAGS[locale], `${baseUrl}${localizedPath(locale, path)}`])
+    );
+    return LOCALES.map((locale) => ({
+      url: `${baseUrl}${localizedPath(locale, path)}`,
+      lastModified: now,
+      changeFrequency,
+      priority,
+      alternates: { languages },
+    }));
+  });
 }

@@ -160,7 +160,7 @@ async function saveProfile(formData: FormData) {
   }
 
   // Данные владельца есть на каждой странице — сбрасывается кэш всего сайта
-  revalidatePath('/', 'layout');
+  revalidatePath('/[locale]', 'layout');
   redirect(
     invalid.length > 0 ? `/admin/profile?invalid=${invalid.join(',')}` : '/admin/profile?saved=1'
   );
@@ -182,6 +182,6 @@ async function setStatus(formData: FormData) {
     create: { key: SITE_STATUS_KEY, value: next },
     update: { value: next },
   });
-  revalidatePath('/', 'layout');
+  revalidatePath('/[locale]', 'layout');
   redirect('/admin/profile?saved=1');
 }

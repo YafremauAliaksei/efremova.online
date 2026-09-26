@@ -1,68 +1,49 @@
 import type { Metadata } from 'next';
-import { headers } from 'next/headers';
 import { LegalDocument, LegalDocumentMissing } from '@/components/LegalDocument';
 import { SiteFooter } from '@/components/SiteFooter';
-import {
-  DEFAULT_LOCALE,
-  getLegalDocument,
-  LOCALE_TAGS,
-  resolveLocale,
-  SUPPORTED_LOCALES,
-  type LegalSlug,
-} from '@/lib/legal';
+import { getLegalDocument, type LegalSlug } from '@/lib/legal';
+import { languageAlternates, localizedPath, type Locale } from '@/lib/i18n';
+import { messages, type Messages } from '@/lib/messages';
+import { pageLocale, type LocaleParams } from '@/lib/page-locale';
 
 /**
  * Страница правового документа — одна на все документы.
  *
  * Текст живёт в базе (модель LegalDocument) на польском — языке места
- * ведения деятельности — и в переводах. Язык выбирается параметром ?lang,
- * затем по браузеру, затем польский. Прямые ссылки на версии и hreflang
- * одинаковы у всех документов, поэтому собраны здесь, а не повторены
- * в каждой странице.
+ * ведения деятельности — и в переводах. Язык берётся из адреса (/pl/privacy);
+ * документа на этом языке нет — показывается польская версия. Ссылки на
+ * версии и hreflang одинаковы у всех документов, поэтому собраны здесь.
  */
-
-interface PageProps {
-  searchParams: Promise<{ lang?: string }>;
-}
 
 interface LegalPageOptions {
   slug: LegalSlug;
-  basePath: string;
-  /** Заголовок, пока документа нет в базе */
-  fallbackTitle: string;
-  description: string;
+  /** Адрес без языка: /privacy */
+  path: string;
+  /** Подпись из меню — заголовок, пока документа нет в базе */
+  navKey: keyof Messages['nav'];
+  description: Record<Locale, string>;
 }
 
-async function currentLocale(searchParams: PageProps['searchParams']) {
-  const { lang } = await searchParams;
-  const headerList = await headers();
-  return resolveLocale(lang, headerList.get('accept-language'));
-}
-
-export function createLegalPage({ slug, basePath, fallbackTitle, description }: LegalPageOptions) {
-  async function generateMetadata({ searchParams }: PageProps): Promise<Metadata> {
-    const locale = await currentLocale(searchParams);
+export function createLegalPage({ slug, path, navKey, description }: LegalPageOptions) {
+  async function generateMetadata({ params }: LocaleParams): Promise<Metadata> {
+    const locale = await pageLocale(params);
     const document = await getLegalDocument(slug, locale);
-
-    // hreflang сообщает поисковику, что это одна страница на разных языках,
-    // а не дубли. Без этого Google считает версии конкурирующими копиями.
-    const languages: Record<string, string> = {};
-    for (const supported of SUPPORTED_LOCALES) {
-      languages[LOCALE_TAGS[supported]] = `${basePath}?lang=${supported}`;
-    }
+    const alternates = languageAlternates(locale, path);
 
     return {
-      title: document?.title ?? fallbackTitle,
-      description,
+      title: document?.title ?? messages(locale).nav[navKey],
+      description: description[locale],
       alternates: {
-        canonical: `${basePath}?lang=${locale}`,
-        languages: { ...languages, 'x-default': `${basePath}?lang=${DEFAULT_LOCALE}` },
+        ...alternates,
+        // Перевода нет и показан польский текст — каноническая страница
+        // польская, иначе поисковик увидит один документ под двумя адресами
+        canonical: localizedPath(document?.locale ?? locale, path),
       },
     };
   }
 
-  async function Page({ searchParams }: PageProps) {
-    const locale = await currentLocale(searchParams);
+  async function Page({ params }: LocaleParams) {
+    const locale = await pageLocale(params);
     const document = await getLegalDocument(slug, locale);
 
     return (
@@ -71,10 +52,10 @@ export function createLegalPage({ slug, basePath, fallbackTitle, description }: 
           {document === null ? (
             <LegalDocumentMissing locale={locale} />
           ) : (
-            <LegalDocument document={document} basePath={basePath} />
+            <LegalDocument document={document} path={path} />
           )}
         </main>
-        <SiteFooter />
+        <SiteFooter locale={locale} />
       </>
     );
   }

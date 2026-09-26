@@ -7,7 +7,8 @@
  *   1. Ловушки (honeypot)     — сканер отсекается сразу, дальше не идёт
  *   2. Защита от CSRF         — проверка источника для изменяющих запросов
  *   3. Гейт админки           — нет cookie → отказ
- *   4. Заголовки безопасности — CSP с nonce на каждый ответ
+ *   4. Язык в адресе          — /about → /ru/about (docs/13, п.3.2)
+ *   5. Заголовки безопасности — CSP с nonce на каждый ответ
  *
  * Личного кабинета на этом домене нет: он уезжает на отдельный поддомен
  * и отдельный сервер (docs/13-site-architecture.md). Поэтому закрытая зона
@@ -26,9 +27,10 @@ import {
   getPrivateAreaHeaders,
 } from '@/lib/security/headers';
 import { buildCanaryPayload, checkPathTrap, looksLikeLegitimateBot } from '@/lib/security/honeypot';
-import { createThrottle, throttleKey } from '@/lib/security/throttle';
 import { siteUrl } from '@/lib/http/redirect';
 import { isSameOriginRequest } from '@/lib/security/csrf';
+import { LOCALE_COOKIE, localeRedirectTarget, splitLocale } from '@/lib/i18n';
+import { createThrottle, throttleKey } from '@/lib/security/throttle';
 
 /**
  * Админка закрыта целиком, кроме двух адресов: обмена одноразовой ссылки
@@ -138,6 +140,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   if (MUTATING_METHODS.has(request.method)) {
     const origin = request.headers.get('origin');
     const fetchSite = request.headers.get('sec-fetch-site');
+
     const sameOrigin = isSameOriginRequest({
       origin,
       fetchSite,
@@ -198,7 +201,29 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   }
 
   // ────────────────────────────────────────────────────────────────
-  // 4. ЗАГОЛОВКИ БЕЗОПАСНОСТИ
+  // 4. ЯЗЫК В АДРЕСЕ
+  //
+  // Адрес без языка перебрасывается на язык: выбранный человеком (cookie),
+  // иначе язык браузера, иначе русский. Три требования docs/13, п.3.2:
+  //   • 307, а не 301 — постоянный переброс браузер запомнил бы навсегда,
+  //     и сменить язык стало бы невозможно;
+  //   • no-store — ответ зависит от посетителя, в общий кэш ему нельзя;
+  //   • никакого переброса по стране — только по тому, что прислал браузер.
+  // ────────────────────────────────────────────────────────────────
+  const localeTarget = localeRedirectTarget(
+    pathname,
+    request.nextUrl.searchParams,
+    request.cookies.get(LOCALE_COOKIE)?.value,
+    request.headers.get('accept-language')
+  );
+  if (localeTarget !== null) {
+    const redirect = NextResponse.redirect(siteRedirectUrl(request, localeTarget), 307);
+    redirect.headers.set('Cache-Control', 'no-store');
+    return withSecurityHeaders(redirect, isDev);
+  }
+
+  // ────────────────────────────────────────────────────────────────
+  // 5. ЗАГОЛОВКИ БЕЗОПАСНОСТИ
   // ────────────────────────────────────────────────────────────────
   const nonce = generateNonce();
 
@@ -206,6 +231,10 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   // и проставят своим <script nonce={...}>
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-nonce', nonce);
+  // Язык адреса для страниц, которым Next.js не передаёт params (not-found).
+  // Заголовок из запроса посетителя перезаписывается всегда: подставить свой
+  // x-locale снаружи нельзя
+  requestHeaders.set('x-locale', splitLocale(pathname).locale ?? '');
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
 
@@ -232,6 +261,23 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 /** Адрес переброса на домене сайта (src/lib/http/redirect.ts, siteUrl) */
 function siteRedirectUrl(request: NextRequest, path: string): URL {
   return siteUrl(path, process.env.APP_URL, request.nextUrl.origin);
+}
+
+/**
+ * Заголовки безопасности на ответ без страницы (переброс языка). Скрипт
+ * проверки заголовков смотрит именно ответ на «/», а это теперь переброс —
+ * и у него должны быть те же CSP и HSTS, что у любой страницы.
+ */
+function withSecurityHeaders(response: NextResponse, isDev: boolean): NextResponse {
+  response.headers.set(
+    'Content-Security-Policy',
+    buildContentSecurityPolicy(generateNonce(), isDev)
+  );
+  for (const [key, value] of Object.entries(getBaseSecurityHeaders())) {
+    if (value === '') response.headers.delete(key);
+    else response.headers.set(key, value);
+  }
+  return response;
 }
 
 /**

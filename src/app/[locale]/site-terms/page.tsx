@@ -10,9 +10,13 @@ export const dynamic = 'force-dynamic';
 
 const page = createLegalPage({
   slug: 'site-terms',
-  basePath: '/site-terms',
-  fallbackTitle: 'Regulamin serwisu',
-  description: 'Zasady korzystania z serwisu informacyjnego.',
+  path: '/site-terms',
+  navKey: 'siteTerms',
+  description: {
+    pl: 'Zasady korzystania z serwisu informacyjnego.',
+    ru: 'Правила пользования информационным сайтом.',
+    en: 'Rules for using this informational website.',
+  },
 });
 
 export const generateMetadata = page.generateMetadata;
