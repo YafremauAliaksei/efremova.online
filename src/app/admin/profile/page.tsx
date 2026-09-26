@@ -46,7 +46,7 @@ export default async function ProfilePage({ searchParams }: PageProps) {
     <main id="main" className="mx-auto max-w-3xl px-6 py-12">
       <p className="text-sm">
         <Link href="/admin" className="underline underline-offset-4">
-          ← Тексты сайта
+          ← Страницы и тексты
         </Link>
       </p>
       <h1 className="mt-4 text-2xl font-semibold">Данные владельца</h1>

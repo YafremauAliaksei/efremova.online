@@ -29,7 +29,7 @@ const db = new PrismaClient({
  * На трёх языках — польская версия текстов для посетителей обязательна
  * (CLAUDE.md, правило 10), а без переводов нечего проверять в админке.
  */
-const CONTENT_BLOCKS: {
+const DEMO_TEXTS: {
   key: string;
   texts: Record<'ru' | 'pl' | 'en', { title: string; body: string }>;
 }[] = [
@@ -103,6 +103,68 @@ const CONTENT_BLOCKS: {
   },
 ];
 
+/** Текст демо-блока по ключу на всех языках */
+function texts(key: string): Record<string, { title: string; body: string }> {
+  const block = DEMO_TEXTS.find((candidate) => candidate.key === key);
+  if (block === undefined) throw new Error(`Нет демо-текста ${key}`);
+  return block.texts;
+}
+
+/** Страницы из блоков — та же вёрстка, что до переезда на блоки (docs/13, п.4) */
+const PAGES: {
+  slug: string;
+  sortOrder: number;
+  title: Record<string, string>;
+  description: Record<string, string>;
+  blocks: {
+    type: string;
+    content: Prisma.InputJsonValue;
+    data?: Prisma.InputJsonValue;
+    style?: Prisma.InputJsonValue;
+  }[];
+}[] = [
+  {
+    slug: 'home',
+    sortOrder: 0,
+    title: { ru: 'Главная', pl: 'Strona główna', en: 'Home' },
+    description: {},
+    blocks: [
+      { type: 'hero', content: texts('hero.main'), style: { align: 'center' } },
+      { type: 'text', content: texts('about.main'), style: { background: 'tinted' } },
+      { type: 'text', content: texts('approach.main') },
+      {
+        type: 'services',
+        content: { ru: { title: 'Услуги' }, pl: { title: 'Usługi' }, en: { title: 'Services' } },
+        style: { background: 'tinted' },
+      },
+      { type: 'cta', content: texts('cta.main'), style: { align: 'center' } },
+    ],
+  },
+  {
+    slug: 'about',
+    sortOrder: 10,
+    title: { ru: 'Обо мне', pl: 'O mnie', en: 'About me' },
+    description: {
+      ru: 'Образование, опыт и подход к работе.',
+      pl: 'Wykształcenie, doświadczenie i podejście do pracy.',
+      en: 'Education, experience and approach.',
+    },
+    blocks: [
+      { type: 'text', content: texts('about.main') },
+      { type: 'text', content: texts('approach.main') },
+      {
+        type: 'cta',
+        content: {
+          ru: { button: 'Услуги и цены' },
+          pl: { button: 'Usługi i ceny' },
+          en: { button: 'Services and prices' },
+        },
+        data: { link: 'services' },
+      },
+    ],
+  },
+];
+
 /** Цены заведомо круглые и демонстрационные */
 const SERVICES = [
   {
@@ -160,16 +222,35 @@ const TESTIMONIALS = [
 async function main(): Promise<void> {
   console.log('Заполнение демо-данными...');
 
-  for (const block of CONTENT_BLOCKS) {
-    for (const [locale, text] of Object.entries(block.texts)) {
-      await db.contentBlock.upsert({
-        where: { key_locale: { key: block.key, locale } },
-        create: { key: block.key, locale, ...text },
-        update: text,
-      });
-    }
+  for (const page of PAGES) {
+    const saved = await db.page.upsert({
+      where: { slug: page.slug },
+      create: {
+        slug: page.slug,
+        titleI18n: page.title,
+        descriptionI18n: page.description,
+        showInHeader: true,
+        showInFooter: true,
+        sortOrder: page.sortOrder,
+      },
+      update: {},
+    });
+    // Блоки создаются только у пустой страницы: повторный сид не затирает
+    // то, что владелец уже поправил или переставил в админке
+    const existing = await db.pageBlock.count({ where: { pageId: saved.id } });
+    if (existing > 0) continue;
+    await db.pageBlock.createMany({
+      data: page.blocks.map((block, index) => ({
+        pageId: saved.id,
+        type: block.type,
+        sortOrder: index * 10,
+        content: block.content,
+        data: block.data ?? {},
+        style: block.style ?? {},
+      })),
+    });
   }
-  console.log(`  ✓ Блоков контента: ${String(CONTENT_BLOCKS.length)} × 3 языка`);
+  console.log(`  ✓ Страниц: ${String(PAGES.length)} (блоки на трёх языках)`);
 
   for (const service of SERVICES) {
     const { prices, ...serviceData } = service;

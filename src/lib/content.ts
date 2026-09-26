@@ -1,98 +1,15 @@
 import 'server-only';
 import { db } from '@/lib/db';
-import { contentBlockDataSchema, i18nTextSchema } from '@/lib/content-schema';
-import { DEFAULT_LOCALE, LOCALE_TAGS, type Locale } from '@/lib/i18n';
+import { i18nTextSchema } from '@/lib/content-schema';
+import { LOCALE_TAGS, type Locale } from '@/lib/i18n';
 
 /**
- * Чтение текстов сайта из базы.
+ * Услуги и цены из базы для публичных страниц.
  *
- * Ключевое требование: сайт должен подниматься и выглядеть осмысленно
- * ДАЖЕ если база пуста или недоступна. Это нужно по трём причинам:
- *   1. Любой человек может склонировать публичный репозиторий и запустить —
- *      он увидит работающий сайт с заглушками, а не стену ошибок.
- *   2. Сбой базы не должен превращать главную страницу в 500 —
- *      посетитель хотя бы увидит контакты.
- *   3. В репозитории нет ни одного настоящего текста владельца,
- *      значит и утечь из репозитория нечему.
+ * Тексты страниц читает src/lib/pages.ts; здесь — только услуги. База
+ * недоступна — пустой список, а не ошибка 500: посетитель хотя бы увидит
+ * остальную страницу и контакты.
  */
-
-export interface ContentBlockData {
-  key: string;
-  /**
-   * Язык, на котором текст на самом деле написан. Если перевода нет,
-   * показывается русский — и страница помечает его lang="ru", чтобы
-   * скринридер не читал русский текст польским произношением.
-   */
-  locale: Locale;
-  title: string | null;
-  body: string | null;
-  data: Record<string, unknown>;
-}
-
-/** Нейтральные заглушки. Настоящие тексты живут только в базе на сервере. */
-const FALLBACK: Record<string, ContentBlockData> = {
-  'hero.main': {
-    key: 'hero.main',
-    title: 'Психологические консультации онлайн',
-    body: 'Содержимое этого блока ещё не заполнено в базе данных. Выполните «npm run db:seed» или отредактируйте текст в админке.',
-    data: {},
-    locale: DEFAULT_LOCALE,
-  },
-  'about.main': {
-    key: 'about.main',
-    title: 'Обо мне',
-    body: 'Блок «Обо мне» пока не заполнен.',
-    data: {},
-    locale: DEFAULT_LOCALE,
-  },
-  'approach.main': {
-    key: 'approach.main',
-    title: 'Подход к работе',
-    body: 'Блок «Подход» пока не заполнен.',
-    data: {},
-    locale: DEFAULT_LOCALE,
-  },
-  'cta.main': {
-    key: 'cta.main',
-    title: 'Записаться на консультацию',
-    body: 'Напишите на e-mail, указанный внизу страницы.',
-    data: {},
-    locale: DEFAULT_LOCALE,
-  },
-};
-
-function fallback(key: string): ContentBlockData {
-  return FALLBACK[key] ?? { key, title: null, body: null, data: {}, locale: DEFAULT_LOCALE };
-}
-
-/**
- * Блок на нужном языке. Нет перевода или он снят с публикации — русский
- * вариант; нет и его — заглушка. Пустое место на странице хуже текста
- * на другом языке: посетитель хотя бы видит, что раздел существует.
- */
-export async function getContentBlock(key: string, locale: Locale): Promise<ContentBlockData> {
-  try {
-    const rows = await db.contentBlock.findMany({
-      where: { key, locale: { in: [locale, DEFAULT_LOCALE] }, isPublished: true },
-    });
-    const block =
-      rows.find((row) => row.locale === locale) ??
-      rows.find((row) => row.locale === DEFAULT_LOCALE);
-    if (block === undefined) return fallback(key);
-
-    return {
-      key: block.key,
-      title: block.title,
-      body: block.body,
-      data: contentBlockDataSchema.parse(block.data),
-      locale: block.locale === locale ? locale : DEFAULT_LOCALE,
-    };
-  } catch {
-    // База недоступна — отдаём заглушку, а не падаем.
-    // Сам сбой будет виден в /api/health и в мониторинге.
-    return fallback(key);
-  }
-}
 
 export interface PublicService {
   slug: string;

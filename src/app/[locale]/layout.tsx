@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import '../globals.css';
 import { DevelopmentNotice } from '@/components/DevelopmentNotice';
-import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { SiteHeader } from '@/components/SiteHeader';
 import { DEFAULT_LOCALE, LOCALES, LOCALE_TAGS, OG_LOCALES, isLocale } from '@/lib/i18n';
 import { messages } from '@/lib/messages';
 
@@ -73,9 +73,7 @@ export default async function LocaleLayout({ children, params }: LayoutProps) {
           {t.skipLink}
         </a>
         <DevelopmentNotice />
-        <div className="mx-auto flex max-w-3xl justify-end px-6 pt-4">
-          <LanguageSwitcher current={locale} label={t.languageNav} />
-        </div>
+        <SiteHeader locale={locale} />
         {children}
       </body>
     </html>

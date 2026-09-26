@@ -3,11 +3,11 @@ import { Filled } from '@/components/Filled';
 import { localizedPath, type Locale } from '@/lib/i18n';
 import { messages } from '@/lib/messages';
 import { getSiteProfile } from '@/lib/site-profile';
+import { getNavigation } from '@/lib/pages';
+import { pagePath } from '@/lib/blocks/pages';
 
-/** Пункты меню подвала: ключ подписи и адрес без языка */
-const FOOTER_LINKS = [
-  ['home', '/'],
-  ['about', '/about'],
+/** Страницы со своим кодом: они в подвале всегда (ссылки на документы — требование GDPR) */
+const CODE_LINKS = [
   ['services', '/services'],
   ['privacy', '/privacy'],
   ['terms', '/terms'],
@@ -29,16 +29,26 @@ const FOOTER_LINKS = [
 export async function SiteFooter({ locale }: { locale: Locale }) {
   const { values } = await getSiteProfile();
   const t = messages(locale);
+  // Страницы из базы с флагом «в подвале», затем страницы со своим кодом
+  const links = [
+    ...(await getNavigation(locale))
+      .filter((item) => item.inFooter)
+      .map((item) => ({ key: item.slug, path: pagePath(item.slug), label: item.title })),
+    ...CODE_LINKS.map(([key, path]) => ({ key, path, label: t.nav[key] })),
+  ];
 
   return (
     <footer className="border-t border-[var(--color-line)]">
       <div className="mx-auto max-w-3xl px-6 py-10 text-sm text-[var(--color-ink-soft)]">
         <nav aria-label={t.sectionsNav}>
           <ul className="flex flex-wrap gap-x-6 gap-y-2">
-            {FOOTER_LINKS.map(([key, path]) => (
-              <li key={key}>
-                <Link href={localizedPath(locale, path)} className="underline underline-offset-4">
-                  {t.nav[key]}
+            {links.map((link) => (
+              <li key={link.key}>
+                <Link
+                  href={localizedPath(locale, link.path)}
+                  className="underline underline-offset-4"
+                >
+                  {link.label}
                 </Link>
               </li>
             ))}
