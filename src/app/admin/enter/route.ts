@@ -1,5 +1,6 @@
 import { headers } from 'next/headers';
-import { NextResponse } from 'next/server';
+import type { NextResponse } from 'next/server';
+import { relativeRedirect } from '@/lib/http/redirect';
 import { consumeLoginToken, createAdminSession } from '@/lib/auth/admin';
 import { recordSecurityEvent } from '@/lib/security/recorder';
 
@@ -28,13 +29,13 @@ export async function GET(request: Request): Promise<NextResponse> {
     null;
 
   if (token === null || token.length < 20) {
-    return deny(request, ip, 'no_token');
+    return deny(ip, 'no_token');
   }
 
   const result = await consumeLoginToken(token, ip);
 
   if (!result.ok) {
-    return deny(request, ip, result.reason);
+    return deny(ip, result.reason);
   }
 
   await createAdminSession();
@@ -49,12 +50,11 @@ export async function GET(request: Request): Promise<NextResponse> {
     count: 1,
   });
 
-  return NextResponse.redirect(new URL('/admin', request.url), {
-    headers: { 'Cache-Control': 'no-store' },
-  });
+  // 303: после входа браузер идёт в админку обычным GET
+  return relativeRedirect('/admin', 303, { 'Cache-Control': 'no-store' });
 }
 
-async function deny(request: Request, ip: string | null, reason: string): Promise<NextResponse> {
+async function deny(ip: string | null, reason: string): Promise<NextResponse> {
   // Неудачная попытка входа в админку — событие безопасности, а не мелочь:
   // это либо ошибка владельца, либо чужая попытка подобрать ссылку.
   //
@@ -71,6 +71,5 @@ async function deny(request: Request, ip: string | null, reason: string): Promis
     count: 1,
   });
 
-  const url = new URL('/admin/denied', request.url);
-  return NextResponse.redirect(url, { headers: { 'Cache-Control': 'no-store' } });
+  return relativeRedirect('/admin/denied', 303, { 'Cache-Control': 'no-store' });
 }

@@ -27,6 +27,8 @@ import {
 } from '@/lib/security/headers';
 import { buildCanaryPayload, checkPathTrap, looksLikeLegitimateBot } from '@/lib/security/honeypot';
 import { createThrottle, throttleKey } from '@/lib/security/throttle';
+import { siteUrl } from '@/lib/http/redirect';
+import { isSameOriginRequest } from '@/lib/security/csrf';
 
 /**
  * Админка закрыта целиком, кроме двух адресов: обмена одноразовой ссылки
@@ -136,10 +138,11 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   if (MUTATING_METHODS.has(request.method)) {
     const origin = request.headers.get('origin');
     const fetchSite = request.headers.get('sec-fetch-site');
-    const selfOrigin = request.nextUrl.origin;
-
-    const sameSite = fetchSite === 'same-origin' || fetchSite === 'none';
-    const originOk = origin === null || origin === selfOrigin;
+    const sameOrigin = isSameOriginRequest({
+      origin,
+      fetchSite,
+      host: request.headers.get('host'),
+    });
 
     // Единственное исключение — внутренние обработчики журнала безопасности.
     //
@@ -161,7 +164,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     // проверка на ДРУГУЮ, а не снимается защита.
     const isInternalApi = pathname.startsWith('/api/internal/');
 
-    if (!isInternalApi && (!originOk || !sameSite)) {
+    if (!isInternalApi && !sameOrigin) {
       const csrfDecision = eventThrottle.register(
         throttleKey(clientIp(request), 'CSRF_FAIL'),
         Date.now(),
@@ -189,7 +192,9 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   if (isAdminArea && !request.cookies.has(ADMIN_COOKIE)) {
     // Без объяснений и без редиректа на форму входа: формы входа в админку
     // не существует, войти можно только по ссылке из терминала сервера
-    return withPrivateHeaders(NextResponse.redirect(new URL('/admin/denied', request.url)));
+    return withPrivateHeaders(
+      NextResponse.redirect(siteRedirectUrl(request, '/admin/denied'), 307)
+    );
   }
 
   // ────────────────────────────────────────────────────────────────
@@ -222,6 +227,11 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   }
 
   return response;
+}
+
+/** Адрес переброса на домене сайта (src/lib/http/redirect.ts, siteUrl) */
+function siteRedirectUrl(request: NextRequest, path: string): URL {
+  return siteUrl(path, process.env.APP_URL, request.nextUrl.origin);
 }
 
 /**
