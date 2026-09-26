@@ -61,7 +61,9 @@ services:
 
   # ─────────────────────────── БАЗА ДАННЫХ ───────────────────────────
   postgres:
-    image: postgres:17-alpine
+    # Закреплён по хешу: тег можно перевесить на другой образ, хеш — нет.
+    # Обновляет Dependabot (docker-compose), вместе с хешем.
+    image: postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -101,7 +103,7 @@ services:
   # ─────────────────────────── NGINX ───────────────────────────
   # Единственный сервис, видимый из интернета
   nginx:
-    image: nginx:1.29-alpine
+    image: nginx:1.29-alpine@sha256:5616878291a2eed594aee8db4dade5878cf7edcb475e59193904b198d9b830de
     restart: unless-stopped
     ports:
       - '80:80'
