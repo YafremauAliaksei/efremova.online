@@ -165,33 +165,93 @@ model SiteSetting {
   @@map("site_settings")
 }
 
-/// Тексты сайта живут в базе, а НЕ в коде.
+/// Страница сайта. Сколько страниц, в каком порядке и что в меню — решает
+/// владелец в админке, а не код (docs/13, п.4).
 ///
-/// Зачем так (docs/06-public-repo-strategy.md):
-///   • репозиторий можно держать публичным — в нём нет ни одного личного текста,
-///     фотографии, цены или отзыва: только код и обезличенная демо-заготовка;
-///   • владелец правит тексты через админку, без программиста и без деплоя;
-///   • перевод на другой язык — это строка в базе, а не правка кода.
-model ContentBlock {
-  id     String @id @default(uuid()) @db.Uuid
-  /// Смысловой ключ: hero.title, about.body, cta.button
-  key    String
-  locale String @default("ru")
+/// Тексты живут в базе, а НЕ в коде (docs/06): репозиторий публичный, в нём
+/// нет ни одного личного текста, а владелец правит страницы без программиста.
+///
+/// Адрес — `/<язык>/<slug>`; главная — slug `home`, адрес `/<язык>`.
+/// Страницы, у которых есть свой код (услуги, правовые документы), здесь
+/// не хранятся: их slug зарезервирован (src/lib/blocks/pages.ts).
+model Page {
+  id   String @id @default(uuid()) @db.Uuid
+  slug String @unique
 
-  title String?
-  body  String?
-  /// Для блоков сложной формы: списки преимуществ, пункты подхода
-  data  Json    @default("{}")
+  /// Название в меню и заголовок для поисковика: { "ru": "...", "pl": "...", "en": "..." }
+  titleI18n       Json @default("{}")
+  /// Описание для поисковика: { "ru": "...", ... }
+  descriptionI18n Json @default("{}")
 
-  isPublished Boolean @default(true)
-  sortOrder   Int     @default(0)
+  showInHeader Boolean @default(false)
+  showInFooter Boolean @default(false)
+  isPublished  Boolean @default(true)
+  sortOrder    Int     @default(0)
+
+  /// «Удалить» в админке = отправить в архив: с сайта страница исчезает,
+  /// из базы — нет (docs/13, п.5)
+  archivedAt DateTime? @db.Timestamptz
 
   createdAt DateTime @default(now()) @db.Timestamptz
   updatedAt DateTime @updatedAt @db.Timestamptz
 
-  @@unique([key, locale])
-  @@index([locale, isPublished])
-  @@map("content_blocks")
+  blocks PageBlock[]
+
+  @@index([isPublished, sortOrder])
+  @@map("pages")
+}
+
+/// Блок страницы: экран «первое впечатление», текст, призыв, список услуг…
+///
+/// Тип объявлен в коде (src/lib/blocks/registry.ts) вместе со схемой проверки
+/// и отрисовкой. В базе — только какой блок, где стоит и что в нём написано.
+/// Неизвестный тип или испорченное содержимое пропускаются, а не роняют
+/// страницу: откат версии сайта не ломает страницы с блоками нового типа.
+model PageBlock {
+  id     String @id @default(uuid()) @db.Uuid
+  pageId String @db.Uuid
+
+  type        String
+  sortOrder   Int     @default(0)
+  isPublished Boolean @default(true)
+
+  /// Тексты по языкам: { "ru": { "title": "...", "body": "..." }, "pl": {...} }.
+  /// Набор полей задаёт тип блока.
+  content Json @default("{}")
+  /// Общее для всех языков: ссылка на ролик, картинка, адрес кнопки.
+  data    Json @default("{}")
+  /// Оформление из набора вариантов, а не произвольные значения (docs/13, п.4.2):
+  /// { "width": "narrow|wide|full", "align": "left|center", "background": "base|tinted" }
+  style   Json @default("{}")
+
+  archivedAt DateTime? @db.Timestamptz
+
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+
+  page      Page            @relation(fields: [pageId], references: [id], onDelete: Restrict)
+  revisions BlockRevision[]
+
+  @@index([pageId, sortOrder])
+  @@map("page_blocks")
+}
+
+/// Снимок содержимого блока ДО каждого сохранения: промахнулись, стёрли
+/// абзац, нажали «Сохранить» — прежняя версия на месте (docs/13, п.5).
+model BlockRevision {
+  id      String @id @default(uuid()) @db.Uuid
+  blockId String @db.Uuid
+
+  content Json
+  data    Json
+  style   Json
+
+  createdAt DateTime @default(now()) @db.Timestamptz
+
+  block PageBlock @relation(fields: [blockId], references: [id], onDelete: Cascade)
+
+  @@index([blockId, createdAt])
+  @@map("block_revisions")
 }
 
 model LectureCategory {

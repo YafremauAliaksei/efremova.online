@@ -1,133 +1,75 @@
 import { describe, expect, it } from 'vitest';
-import {
-  BODY_MAX_LENGTH,
-  TITLE_MAX_LENGTH,
-  contentBlockDataSchema,
-  i18nTextSchema,
-  parseContentBlockEdit,
-} from './content-schema';
+import { BODY_MAX_LENGTH, TITLE_MAX_LENGTH, i18nTextSchema, textField } from './content-schema';
 
 /**
- * Тесты правки текстов из админки.
+ * Тесты проверки текстов из админки.
  *
  * Главное здесь — отказ вместо тихой порчи: раньше длинный текст обрезался
- * без предупреждения, а подсунутый файл или невидимые символы уходили в базу.
+ * без предупреждения, а невидимые символы уходили в базу.
  */
 
-const ID = '3f2b8c1e-6a4d-4e5f-9b7a-1c2d3e4f5a6b';
+const title = textField(TITLE_MAX_LENGTH, true);
+const body = textField(BODY_MAX_LENGTH, false);
 
-function form(fields: Record<string, string | Blob>): FormData {
-  const data = new FormData();
-  for (const [name, value] of Object.entries(fields)) data.append(name, value);
-  return data;
-}
-
-describe('правка блока: что сохраняется', () => {
-  it('обычный заголовок и текст проходят как есть', () => {
-    const result = parseContentBlockEdit(
-      form({ id: ID, title: 'Обо мне', body: 'Первый абзац.\n\nВторой абзац.' })
-    );
-    expect(result).toEqual({
-      ok: true,
-      value: { id: ID, title: 'Обо мне', body: 'Первый абзац.\n\nВторой абзац.' },
-    });
+describe('текст: что сохраняется', () => {
+  it('обычный текст с абзацами проходит как есть', () => {
+    expect(body.parse('Первый абзац.\n\nВторой абзац.')).toBe('Первый абзац.\n\nВторой абзац.');
   });
 
   it('переводы строк Windows приводятся к \\n, края обрезаются', () => {
-    const result = parseContentBlockEdit(
-      form({ id: ID, title: '  Заголовок  ', body: 'а\r\nб\rв\n' })
-    );
-    expect(result).toEqual({ ok: true, value: { id: ID, title: 'Заголовок', body: 'а\nб\nв' } });
+    expect(title.parse('  Заголовок  ')).toBe('Заголовок');
+    expect(body.parse('а\r\nб\rв\n')).toBe('а\nб\nв');
   });
 
   it('невидимый мусор от вставки удаляется, а не отклоняет правку', () => {
-    const result = parseContentBlockEdit(
-      form({ id: ID, title: '\uFEFFОб\u200Bо мне', body: 'Пер\u2060вый\u200C абзац\uFEFF' })
-    );
-    expect(result).toEqual({ ok: true, value: { id: ID, title: 'Обо мне', body: 'Первый абзац' } });
+    expect(title.parse('\uFEFFОб\u200Bо мне')).toBe('Обо мне');
+    expect(body.parse('Пер\u2060вый\u200C абзац\uFEFF')).toBe('Первый абзац');
   });
 
   it('составные эмодзи с соединителем нулевой ширины сохраняются', () => {
     const family = '\u{1F468}\u200D\u{1F469}\u200D\u{1F467}';
-    const result = parseContentBlockEdit(form({ id: ID, title: 'Т', body: `Семья ${family}` }));
-    expect(result).toEqual({ ok: true, value: { id: ID, title: 'Т', body: `Семья ${family}` } });
+    expect(body.parse(`Семья ${family}`)).toBe(`Семья ${family}`);
   });
 
-  it('пустое поле сохраняется как отсутствие текста, а не пустая строка', () => {
-    const result = parseContentBlockEdit(form({ id: ID, title: '   ', body: '' }));
-    expect(result).toEqual({ ok: true, value: { id: ID, title: null, body: null } });
-  });
-
-  it('служебные поля Next.js в форме не мешают и не попадают в результат', () => {
-    const result = parseContentBlockEdit(
-      form({ id: ID, title: 'Т', body: 'Б', $ACTION_ID_abc: '', role: 'admin' })
-    );
-    expect(result).toEqual({ ok: true, value: { id: ID, title: 'Т', body: 'Б' } });
+  it('пустое поле — отсутствие текста, а не пустая строка', () => {
+    expect(title.parse('   ')).toBeNull();
+    expect(body.parse('')).toBeNull();
   });
 
   it('текст ровно на пределе длины проходит', () => {
-    const result = parseContentBlockEdit(
-      form({ id: ID, title: 'т'.repeat(TITLE_MAX_LENGTH), body: 'б'.repeat(BODY_MAX_LENGTH) })
-    );
-    expect(result.ok).toBe(true);
+    expect(title.safeParse('т'.repeat(TITLE_MAX_LENGTH)).success).toBe(true);
+    expect(body.safeParse('б'.repeat(BODY_MAX_LENGTH)).success).toBe(true);
   });
 });
 
-describe('правка блока: что отклоняется', () => {
+describe('текст: что отклоняется', () => {
   it.each([
-    ['нет id', { title: 'Т', body: 'Б' }, 'id'],
-    ['id не UUID', { id: '1 OR 1=1', title: 'Т', body: 'Б' }, 'id'],
-    [
-      'заголовок длиннее предела',
-      { id: ID, title: 'т'.repeat(TITLE_MAX_LENGTH + 1), body: 'Б' },
-      'title',
-    ],
-    ['заголовок в две строки', { id: ID, title: 'Строка\nещё строка', body: 'Б' }, 'title'],
-    [
-      'текст длиннее предела',
-      { id: ID, title: 'Т', body: 'б'.repeat(BODY_MAX_LENGTH + 1) },
-      'body',
-    ],
-    ['нулевой байт', { id: ID, title: 'Т', body: 'до\u0000после' }, 'body'],
-    ['смена направления письма', { id: ID, title: 'Т', body: 'цена \u202E001' }, 'body'],
-    ['изоляция направления письма', { id: ID, title: 'Т\u2066x\u2069', body: 'Б' }, 'title'],
-    ['метка направления справа налево', { id: ID, title: 'Т', body: 'а\u200Fб' }, 'body'],
-  ])('%s', (_, fields, field) => {
-    expect(parseContentBlockEdit(form(fields))).toEqual({ ok: false, field });
+    ['заголовок длиннее предела', title, 'т'.repeat(TITLE_MAX_LENGTH + 1)],
+    ['заголовок в две строки', title, 'Строка\nещё строка'],
+    ['текст длиннее предела', body, 'б'.repeat(BODY_MAX_LENGTH + 1)],
+    ['нулевой байт', body, 'до\u0000после'],
+    ['смена направления письма', body, 'цена \u202E001'],
+    ['изоляция направления письма', title, 'Т\u2066x\u2069'],
+    ['метка направления справа налево', body, 'а\u200Fб'],
+  ])('%s', (_, field, value) => {
+    expect(field.safeParse(value).success).toBe(false);
   });
 
-  it('файл вместо текста отклоняется, а не превращается в «[object File]»', () => {
-    const result = parseContentBlockEdit(
-      form({ id: ID, title: 'Т', body: new Blob(['<script>'], { type: 'text/html' }) })
-    );
-    expect(result).toEqual({ ok: false, field: 'body' });
-  });
-
-  it('длинный текст не обрезается молча — отклоняется целиком', () => {
-    const result = parseContentBlockEdit(
-      form({ id: ID, title: 'Т', body: 'б'.repeat(BODY_MAX_LENGTH + 500) })
-    );
-    expect(result.ok).toBe(false);
+  it('не строка — отказ, а не «[object File]»', () => {
+    expect(body.safeParse(new Blob(['<script>'])).success).toBe(false);
+    expect(body.safeParse(42).success).toBe(false);
   });
 });
 
-describe('чтение JSON из базы', () => {
-  it('объект data проходит как есть', () => {
-    expect(contentBlockDataSchema.parse({ items: ['a', 'b'] })).toEqual({ items: ['a', 'b'] });
-  });
-
-  it.each([[null], [[1, 2]], ['строка'], [42]])('data = %j → пустой объект', (value) => {
-    expect(contentBlockDataSchema.parse(value)).toEqual({});
-  });
-
-  it('переводы: язык → строка', () => {
+describe('переводы в JSON из базы', () => {
+  it('язык → строка', () => {
     expect(i18nTextSchema.parse({ ru: 'Консультация', pl: 'Konsultacja' })).toEqual({
       ru: 'Консультация',
       pl: 'Konsultacja',
     });
   });
 
-  it('испорченные переводы не роняют страницу услуг', () => {
+  it('испорченные переводы не роняют страницу', () => {
     expect(i18nTextSchema.parse({ ru: 42 })).toEqual({});
     expect(i18nTextSchema.parse(null)).toEqual({});
   });

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * Схемы контента: что можно сохранить из админки и как читать JSON из базы.
+ * Проверка текстов: что можно сохранить из админки и как читать JSON из базы.
  *
  * ── ПОЧЕМУ ПРОВЕРКА НУЖНА, ЕСЛИ ПИШЕТ ТОЛЬКО ВЛАДЕЛЕЦ ────────────────────
  * Поле формы — это данные от браузера, а не от человека. Их может подменить
@@ -33,9 +33,12 @@ const FORBIDDEN_CHARS =
  */
 const INVISIBLE_JUNK = /[\u200B\u200C\u2060-\u2064\uFEFF]/g;
 
-export type ContentField = 'id' | 'title' | 'body';
-
-function textField(maxLength: number, singleLine: boolean) {
+/**
+ * Поле текста: невидимый мусор удаляется, переводы строк приводятся к \n,
+ * края обрезаются; служебные символы, смена направления письма и лишняя
+ * длина — отказ. Пустое поле — null, а не пустая строка.
+ */
+export function textField(maxLength: number, singleLine: boolean) {
   return z
     .string()
     .transform((value) => value.replace(INVISIBLE_JUNK, '').replace(/\r\n?/g, '\n').trim())
@@ -48,37 +51,6 @@ function textField(maxLength: number, singleLine: boolean) {
     )
     .transform((value) => (value === '' ? null : value));
 }
-
-export const contentBlockEditSchema = z.object({
-  id: z.string().uuid(),
-  title: textField(TITLE_MAX_LENGTH, true),
-  body: textField(BODY_MAX_LENGTH, false),
-});
-
-export type ContentBlockEdit = z.infer<typeof contentBlockEditSchema>;
-
-export type ParseResult =
-  { ok: true; value: ContentBlockEdit } | { ok: false; field: ContentField };
-
-/**
- * Разбирает форму правки блока. Берутся только известные поля: Next.js
- * добавляет в форму служебные ключи, и они не должны ни ломать проверку,
- * ни попадать в базу. Файл вместо строки отклоняется схемой.
- */
-export function parseContentBlockEdit(formData: FormData): ParseResult {
-  const result = contentBlockEditSchema.safeParse({
-    id: formData.get('id') ?? undefined,
-    title: formData.get('title') ?? '',
-    body: formData.get('body') ?? '',
-  });
-  if (result.success) return { ok: true, value: result.data };
-
-  const field = result.error.issues[0]?.path[0];
-  return { ok: false, field: field === 'title' || field === 'body' ? field : 'id' };
-}
-
-/** JSON-поле `data` блока: объект с любыми значениями, иначе — пустой объект. */
-export const contentBlockDataSchema = z.record(z.string(), z.unknown()).catch({});
 
 /** Переводы в JSON-полях (`titleI18n`): язык → строка, иначе — пусто. */
 export const i18nTextSchema = z.record(z.string(), z.string()).catch({});
