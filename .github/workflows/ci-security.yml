@@ -29,11 +29,16 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# ⚠️ Раннер закреплён версией, а не ubuntu-latest. latest переезжает на новую
+# систему в день, выбранный GitHub (Ubuntu 26 — с 19.10.2026), и CI может
+# покраснеть без единой нашей правки. Переход на новую версию — отдельный PR,
+# когда мы сами решим (CLAUDE.md, правило 11: чужой код — закреплённым).
+
 jobs:
   # ─────────────────── ВОРОТА 1: СЕКРЕТЫ (самое быстрое) ───────────────────
   secrets-scan:
     name: 🔑 Поиск секретов в коде
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -59,7 +64,7 @@ jobs:
   # ─────────────────── ВОРОТА 2: КАЧЕСТВО КОДА ───────────────────
   quality:
     name: 🧹 Типы, линтер, формат, тесты
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -98,7 +103,7 @@ jobs:
   # ─────────────────── ВОРОТА 3: SAST — анализ кода ───────────────────
   sast:
     name: 🔍 SAST (Semgrep + CodeQL)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       security-events: write # для загрузки отчёта в Security-вкладку GitHub
@@ -140,7 +145,7 @@ jobs:
   # ─────────────────── ВОРОТА 4: ЗАВИСИМОСТИ ───────────────────
   dependencies:
     name: 📦 Уязвимости в библиотеках
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -175,7 +180,7 @@ jobs:
   # ─────────────────── ВОРОТА 5: КОНТЕЙНЕР И ИНФРАСТРУКТУРА ───────────────────
   container-scan:
     name: 🐳 Docker и Terraform
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Сборка образа
@@ -206,23 +211,21 @@ jobs:
           # локально зелено, на GitHub красно. Расхождение флагов — такой же
           # баг, как расхождение кода.
           #
-          # Почему именно error, а не warning: единственное замечание уровня
-          # warning здесь — DL3018 «закрепите версии пакетов в apk add».
-          # В Alpine это вредный совет: старые версии пакетов исчезают
-          # из репозитория, и образ перестаёт собираться вообще. Версию
-          # фиксирует сам базовый образ (node:22-alpine).
+          # Порог error: замечания уровня warning не блокируют. DL3018
+          # («закрепите версии в apk add») отключён в самом Dockerfile
+          # с объяснением — в Alpine это вредный совет.
           failure-threshold: error
 
   # ─────────────────── ВОРОТА 6: DAST — атака на работающее приложение ───────────────────
   dast:
     name: 🎯 DAST (OWASP ZAP)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [quality]
     # Только в PR: поднятие полного окружения занимает время
     if: github.event_name == 'pull_request'
     services:
       postgres:
-        image: postgres:17-alpine
+        image: postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
         env:
           POSTGRES_PASSWORD: ci_only_password
           POSTGRES_DB: efremova_test
@@ -282,7 +285,7 @@ jobs:
   # ─────────────────── ВОРОТА 7: ПРОИЗВОДИТЕЛЬНОСТЬ ───────────────────
   lighthouse:
     name: 🚀 Lighthouse (защита от «сползания» скорости)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [quality]
     if: github.event_name == 'pull_request'
     steps:
@@ -304,20 +307,83 @@ jobs:
         # Пороги заданы в .lighthouserc.json.
         # Accessibility, Best Practices и SEO — строго 100.
 
+  # ─────────────────── ВОРОТА 8: МИГРАЦИИ И БРАУЗЕРНЫЕ ТЕСТЫ ───────────────────
+  e2e:
+    name: 🎭 Миграции и браузерные тесты
+    runs-on: ubuntu-24.04
+    needs: [quality]
+    if: github.event_name == 'pull_request'
+    # Официальный образ Playwright: браузер уже внутри и совпадает с версией
+    # @playwright/test из package-lock.json. По хешу — как любой чужой код
+    # (CLAUDE.md, правило 11); браузер не скачивается во время прогона.
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.1-noble@sha256:f1e7e01021efd65dd1a2c56064be399f3e4de00fd021ac561325f2bfbb2b837a
+    services:
+      postgres:
+        image: postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+        env:
+          POSTGRES_PASSWORD: ci_only_password
+          POSTGRES_DB: efremova_e2e
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+    env:
+      # Задача идёт в контейнере: база — по имени сервиса, а не localhost
+      DATABASE_URL: postgresql://postgres:ci_only_password@postgres:5432/efremova_e2e
+      AUTH_SECRET: ci_only_not_a_real_secret_value_32ch
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci --ignore-scripts
+      - run: npx prisma generate
+
+      # Миграции на чистой базе — ровно так, как они пойдут на сервер
+      - name: Миграции на чистой базе
+        run: npx prisma migrate deploy
+
+      # Схема в prisma/schema.prisma обязана совпадать с тем, что создали
+      # миграции. Правка схемы без миграции (правило 7 CLAUDE.md) — код 2
+      # и отчёт, какой таблицы и колонки не хватает.
+      - name: Схема совпадает с миграциями
+        run: npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
+
+      # Дважды: повторный сид на живой базе не должен падать и затирать
+      # правки владельца
+      - name: Сид дважды
+        run: npm run db:seed && npm run db:seed
+
+      - run: npm run build
+
+      # Сервер тесты поднимают сами (playwright.config.ts, webServer)
+      - name: Браузерные тесты
+        run: npm run test:e2e
+
+      - name: Следы упавших тестов
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7
+
   # ─────────────────── ИТОГ ───────────────────
   gate:
     name: ✅ Все ворота пройдены
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # ⚠️ В списке обязаны быть ВСЕ ворота. Раньше здесь не было dast и lighthouse,
     # и гейт рапортовал «все проверки пройдены» за 4 секунды, пока эти двое горели
     # красным (PR #21). Опасность не во вранье как таковом, а в том, что этот гейт
     # выбран обязательной проверкой в защите ветки: пропусти его — и защита
     # разрешает мерж сломанного кода, выглядя при этом полностью исправной.
-    needs: [secrets-scan, quality, sast, dependencies, container-scan, dast, lighthouse]
+    needs: [secrets-scan, quality, sast, dependencies, container-scan, dast, lighthouse, e2e]
     if: always()
     steps:
       - name: Проверка результатов
-        # dast и lighthouse при push в main помечаются skipped (они объявлены
+        # dast, lighthouse и e2e при push в main помечаются skipped (они объявлены
         # только для pull_request). skipped — не failure, гейт остаётся зелёным.
         # cancelled ловим тоже: отменённая задача ничего не проверила, а значит
         # считать её пройденной нельзя.

@@ -107,8 +107,10 @@ const CHECKS = [
     name: 'Качество Dockerfile',
     gate: '🐳 Docker и Terraform',
     why: 'Hadolint: те же замечания, что и на GitHub',
+    // Та же версия, что в hadolint-action на GitHub; по хешу, а не :latest (CLAUDE.md, правило 11)
     cmd:
-      'docker run --rm -i hadolint/hadolint:latest hadolint --failure-threshold error - ' +
+      'docker run --rm -i hadolint/hadolint:v2.12.0@sha256:30a8fd2e785ab6176eed53f74769e04f125afb2f74a6c52aef7d463583b6d45e ' +
+      'hadolint --failure-threshold error - ' +
       '< infra/docker/Dockerfile',
     needsDocker: true,
   },
