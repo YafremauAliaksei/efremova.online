@@ -56,3 +56,7 @@ npm-debug.log*
 .vscode/*
 !.vscode/extensions.json
 .idea/
+
+# Браузерные тесты (npm run test:e2e): отчёты и следы падений
+test-results/
+playwright-report/
