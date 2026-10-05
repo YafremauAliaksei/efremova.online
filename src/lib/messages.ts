@@ -36,6 +36,18 @@ const ru = {
     onRequest: 'по запросу',
     minutes: 'минут',
   },
+  contacts: {
+    title: 'Контакты',
+    listLabel: 'Способы связи',
+    empty: 'Контакты скоро появятся.',
+    kinds: {
+      telegram: 'Telegram',
+      whatsapp: 'WhatsApp',
+      viber: 'Viber',
+      email: 'Почта',
+      phone: 'Телефон',
+    },
+  },
   notFound: {
     title: 'Страница не найдена',
     body: 'Такой страницы нет. Возможно, адрес набран с ошибкой.',
@@ -70,6 +82,18 @@ const pl = {
     onRequest: 'na zapytanie',
     minutes: 'minut',
   },
+  contacts: {
+    title: 'Kontakt',
+    listLabel: 'Sposoby kontaktu',
+    empty: 'Dane kontaktowe pojawią się wkrótce.',
+    kinds: {
+      telegram: 'Telegram',
+      whatsapp: 'WhatsApp',
+      viber: 'Viber',
+      email: 'E-mail',
+      phone: 'Telefon',
+    },
+  },
   notFound: {
     title: 'Nie znaleziono strony',
     body: 'Taka strona nie istnieje. Możliwe, że adres zawiera błąd.',
@@ -101,6 +125,18 @@ const en = {
     empty: 'The list of services has not been filled in yet.',
     onRequest: 'on request',
     minutes: 'minutes',
+  },
+  contacts: {
+    title: 'Contact',
+    listLabel: 'Ways to get in touch',
+    empty: 'Contact details will appear soon.',
+    kinds: {
+      telegram: 'Telegram',
+      whatsapp: 'WhatsApp',
+      viber: 'Viber',
+      email: 'Email',
+      phone: 'Phone',
+    },
   },
   notFound: {
     title: 'Page not found',

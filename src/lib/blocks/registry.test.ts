@@ -30,7 +30,9 @@ function form(fields: Record<string, string | Blob>): FormData {
 
 describe('типы блоков', () => {
   it('реестр знает объявленные типы', () => {
-    expect(BLOCK_TYPES).toEqual(expect.arrayContaining(['hero', 'text', 'cta', 'services']));
+    expect(BLOCK_TYPES).toEqual(
+      expect.arrayContaining(['hero', 'text', 'cta', 'services', 'contacts'])
+    );
     expect(isBlockType('hero')).toBe(true);
   });
 
@@ -97,6 +99,22 @@ describe('тексты по языкам', () => {
 
   it('список услуг рисуется и без заголовка', () => {
     expect(toRenderable(row('services', {}), 'pl')?.type).toBe('services');
+  });
+
+  it('контакты рисуются и без своего текста: адреса берутся из профиля', () => {
+    const block = toRenderable(row('contacts', {}), 'en');
+    expect(block?.type).toBe('contacts');
+    expect(block?.texts).toEqual({ title: null, body: null });
+    // Подписи кнопок — на языке страницы, а не lang="ru"
+    expect(block?.textLocale).toBe('en');
+  });
+
+  it('в блок контактов нельзя подложить свой адрес ссылки', () => {
+    const block = toRenderable(
+      row('contacts', { ru: { title: 'Связаться' } }, { href: 'javascript:alert(1)' }),
+      'ru'
+    );
+    expect(block?.data).toEqual({});
   });
 
   it('форма админки получает текст языка как есть, без подмены русским', () => {
