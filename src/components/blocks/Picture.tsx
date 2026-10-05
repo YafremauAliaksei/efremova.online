@@ -6,7 +6,21 @@ import { mediaUrl, type PageImage } from '@/lib/media/store';
  * height заранее резервируют место — текст не прыгает, пока фото грузится.
  * Все адреса — свой домен (/media/…): ни одного обращения наружу.
  */
-export function Picture({ image, alt, sizes }: { image: PageImage; alt: string; sizes: string }) {
+export function Picture({
+  image,
+  alt,
+  sizes,
+  priority = false,
+}: {
+  image: PageImage;
+  alt: string;
+  sizes: string;
+  /**
+   * Фото в первом экране — главный элемент для метрики LCP: грузится сразу
+   * и с высоким приоритетом. Остальные — лениво, когда до них дошла прокрутка.
+   */
+  priority?: boolean;
+}) {
   const srcSet = (format: string) =>
     image.variants
       .filter((variant) => variant.format === format)
@@ -26,7 +40,8 @@ export function Picture({ image, alt, sizes }: { image: PageImage; alt: string; 
         alt={alt}
         width={fallback.width}
         height={fallback.height}
-        loading="lazy"
+        loading={priority ? 'eager' : 'lazy'}
+        fetchPriority={priority ? 'high' : 'auto'}
         decoding="async"
         className="h-auto w-full rounded-lg"
       />

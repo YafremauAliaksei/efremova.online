@@ -180,6 +180,7 @@ export async function PageBlocks({
                       image={image}
                       alt={block.texts.alt ?? ''}
                       sizes="(min-width: 768px) 50vw, 100vw"
+                      priority={first}
                     />
                   </div>
                 </div>
