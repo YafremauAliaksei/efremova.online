@@ -95,6 +95,25 @@ describe('тексты по языкам', () => {
     }
   );
 
+  it('текст и фото: из базы берутся только id картинки и сторона', () => {
+    const block = toRenderable(
+      row(
+        'image',
+        { ru: { title: 'Кабинет', alt: 'Кресло у окна' } },
+        { image: ID, side: 'left', src: 'https://evil.example/x.jpg' }
+      ),
+      'ru'
+    );
+    expect(block?.texts.alt).toBe('Кресло у окна');
+    expect(block?.data).toEqual({ image: ID, side: 'left' });
+
+    const broken = toRenderable(
+      row('image', { ru: { title: 'x' } }, { image: 'javascript:1', side: 'top' }),
+      'ru'
+    );
+    expect(broken?.data).toEqual({ side: 'right' });
+  });
+
   it('список услуг рисуется и без заголовка', () => {
     expect(toRenderable(row('services', {}), 'pl')?.type).toBe('services');
   });
@@ -263,6 +282,31 @@ describe('форма оформления блока', () => {
     expect(parseBlockSettingsForm(form({ ...base, link: 'services' }), 'text')).toMatchObject({
       ok: true,
       value: { data: {} },
+    });
+  });
+
+  it('фото: id картинки и сторона; у других типов не сохраняются', () => {
+    expect(
+      parseBlockSettingsForm(form({ ...base, image: ID, side: 'left' }), 'image')
+    ).toMatchObject({ ok: true, value: { data: { image: ID, side: 'left' } } });
+    expect(parseBlockSettingsForm(form({ ...base, image: '' }), 'image')).toMatchObject({
+      ok: true,
+      value: { data: { side: 'right' } },
+    });
+    expect(parseBlockSettingsForm(form({ ...base, image: ID }), 'text')).toMatchObject({
+      ok: true,
+      value: { data: {} },
+    });
+  });
+
+  it.each([
+    ['не id вместо картинки', { image: '/etc/passwd' }, 'image'],
+    ['адрес вместо картинки', { image: 'https://evil.example/x.jpg' }, 'image'],
+    ['сторона не из набора', { side: 'top' }, 'side'],
+  ])('фото: %s — отказ', (_, patch, field) => {
+    expect(parseBlockSettingsForm(form({ ...base, ...patch }), 'image')).toEqual({
+      ok: false,
+      field,
     });
   });
 

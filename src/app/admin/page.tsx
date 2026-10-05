@@ -75,6 +75,8 @@ const ERRORS = {
   align: 'Выравнивание — только из списка.',
   background: 'Фон — только из списка.',
   link: 'Кнопка может вести только на страницу этого сайта.',
+  image: 'Фото не найдено или убрано в архив — выберите другое в разделе «Картинки».',
+  side: 'Сторона фото — только из списка.',
   pageId: 'Страница не найдена — обновите страницу.',
   slug: 'Адрес: латиница, цифры и дефис, до 48 знаков; адреса home, services, privacy, terms и служебные заняты.',
   slugTaken: 'Такой адрес уже есть — у другой страницы или в архиве.',
@@ -171,6 +173,11 @@ export default async function AdminPage({ searchParams }: PageProps) {
   const pageTitle = (p: { slug: string; titleI18n: unknown }) =>
     i18nTextSchema.parse(p.titleI18n)[DEFAULT_LOCALE] ?? p.slug;
   const linkTargets = pages.map((p) => ({ slug: p.slug, title: pageTitle(p) }));
+  const images = await db.mediaAsset.findMany({
+    where: { archivedAt: null },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true, label: true, width: true, height: true },
+  });
   const missing = (lang: Locale) =>
     blocks.filter(
       (b) =>
@@ -310,6 +317,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
                   locale={locale}
                   pageId={page.id}
                   linkTargets={linkTargets}
+                  images={images}
                 />
               );
             })}

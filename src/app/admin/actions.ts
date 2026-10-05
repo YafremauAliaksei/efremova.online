@@ -117,6 +117,16 @@ export async function saveBlockSettings(formData: FormData): Promise<void> {
   const parsed = parseBlockSettingsForm(formData, block.type);
   if (!parsed.ok) back(formData, block.page.slug, `&block=${block.id}&error=${parsed.field}`);
 
+  // Фото — только из своих картинок и не из архива: чужой id в блок не попадёт
+  const imageId = parsed.value.data.image;
+  if (imageId !== undefined) {
+    const image = await db.mediaAsset.findFirst({
+      where: { id: imageId, archivedAt: null },
+      select: { id: true },
+    });
+    if (image === null) back(formData, block.page.slug, `&block=${block.id}&error=image`);
+  }
+
   await db.$transaction([
     db.blockRevision.create({
       data: {

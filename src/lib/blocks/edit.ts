@@ -7,6 +7,7 @@ import {
   BLOCK_ALIGNS,
   BLOCK_BACKGROUNDS,
   BLOCK_WIDTHS,
+  IMAGE_SIDES,
   type BlockStyle,
   type BlockTexts,
   type BlockType,
@@ -106,6 +107,17 @@ export function parseBlockSettingsForm(formData: FormData, type: BlockType): Blo
       if (!isLinkTarget(link)) return { ok: false, field: 'link' };
       data.link = link;
     }
+  }
+  if (type === 'image') {
+    // Существует ли картинка и не в архиве ли она — проверяет действие, у него есть база
+    const image = formData.get('image');
+    if (image !== null && image !== '') {
+      if (!z.string().uuid().safeParse(image).success) return { ok: false, field: 'image' };
+      data.image = image as string;
+    }
+    const side = z.enum(IMAGE_SIDES).safeParse(formData.get('side') ?? 'right');
+    if (!side.success) return { ok: false, field: 'side' };
+    data.side = side.data;
   }
   return { ok: true, value: { blockId, style, data } };
 }

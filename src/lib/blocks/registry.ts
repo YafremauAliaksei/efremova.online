@@ -61,6 +61,16 @@ const TITLE: TextFieldDef = {
 };
 const BODY: TextFieldDef = { name: 'body', label: 'Текст', kind: 'text', max: BODY_MAX_LENGTH };
 const BUTTON: TextFieldDef = { name: 'button', label: 'Надпись на кнопке', kind: 'line', max: 60 };
+/** Описание фото: его читает экранный диктор и видит поисковик */
+const ALT: TextFieldDef = {
+  name: 'alt',
+  label: 'Что на фото (для незрячих и поисковиков)',
+  kind: 'line',
+  max: 200,
+};
+
+/** С какой стороны от текста фото на широком экране; на телефоне — над текстом */
+export const IMAGE_SIDES = ['right', 'left'] as const;
 
 /** У блока без общих данных — пустой объект, лишние ключи отбрасываются */
 const noData = z.object({}).strip().catch({});
@@ -88,6 +98,18 @@ export const BLOCKS = {
         link: z.string().refine(isLinkTarget).optional().catch(undefined),
       })
       .catch({}),
+  },
+  image: {
+    label: 'Текст и фото',
+    hint: 'Заголовок, абзацы и фото из раздела «Картинки»',
+    fields: [TITLE, BODY, ALT],
+    data: z
+      .object({
+        /** id картинки из media_assets; адрес файла собирается при отрисовке */
+        image: z.string().uuid().optional().catch(undefined),
+        side: z.enum(IMAGE_SIDES).catch('right'),
+      })
+      .catch({ side: 'right' }),
   },
   services: {
     label: 'Список услуг',
