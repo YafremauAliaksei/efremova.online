@@ -214,7 +214,12 @@ export async function PageBlocks({
                     {cover === undefined ? (
                       <div className="aspect-video" />
                     ) : (
-                      <Picture image={cover} alt="" sizes="(min-width: 1024px) 768px, 100vw" />
+                      <Picture
+                        image={cover}
+                        alt=""
+                        sizes="(min-width: 1024px) 768px, 100vw"
+                        priority={first}
+                      />
                     )}
                     <span className="absolute inset-0 flex items-center justify-center">
                       <span className="rounded-full bg-black/70 px-6 py-3 font-medium text-white transition-colors group-hover:bg-black/85">
