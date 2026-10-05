@@ -20,6 +20,7 @@ import {
   type BlockType,
 } from '@/lib/blocks/registry';
 import { DEFAULT_LOCALE, LOCALE_TAGS, type Locale } from '@/lib/i18n';
+import { youtubeWatchUrl } from '@/lib/video';
 
 /**
  * Карточка блока в конструкторе: тексты на выбранном языке, порядок,
@@ -134,6 +135,7 @@ export function BlockCard({
   const blockData = BLOCKS[block.type].data.parse(block.data) as Record<string, unknown>;
   const image = typeof blockData.image === 'string' ? blockData.image : '';
   const side = blockData.side === 'left' ? 'left' : 'right';
+  const video = typeof blockData.video === 'string' ? blockData.video : '';
   const link =
     typeof (block.data as Record<string, unknown> | null)?.link === 'string'
       ? String((block.data as Record<string, unknown>).link)
@@ -268,6 +270,7 @@ export function BlockCard({
         <summary className="cursor-pointer text-[var(--color-ink-soft)]">
           Оформление{block.type === 'cta' ? ' и кнопка' : ''}
           {block.type === 'image' ? ' и фото' : ''}
+          {block.type === 'video' ? ' и ролик' : ''}
         </summary>
         <form action={saveBlockSettings} className="mt-3 flex flex-wrap items-end gap-4">
           <Hidden blockId={block.id} locale={locale} />
@@ -342,6 +345,24 @@ export function BlockCard({
                 </select>
               </label>
             </>
+          )}
+          {block.type === 'video' && (
+            <label className="block w-full">
+              Ссылка на ролик YouTube
+              <input
+                name="video"
+                defaultValue={video === '' ? '' : youtubeWatchUrl(video)}
+                placeholder="https://www.youtube.com/watch?v=…"
+                className="mt-1 block w-full rounded border border-[var(--color-line)] px-2 py-1"
+              />
+              <span className="mt-1 block text-xs text-[var(--color-ink-soft)]">
+                {video === ''
+                  ? 'Обложку сервер скачает сам и положит в «Картинки».'
+                  : image === ''
+                    ? 'Обложки пока нет — нажмите «Применить», чтобы скачать её снова.'
+                    : 'Обложка скачана и лежит в «Картинках».'}
+              </span>
+            </label>
           )}
           {block.type === 'cta' && (
             <label className="block">

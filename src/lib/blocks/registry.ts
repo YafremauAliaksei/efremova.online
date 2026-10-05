@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { BODY_MAX_LENGTH, TITLE_MAX_LENGTH, textField } from '../content-schema';
 import { DEFAULT_LOCALE, type Locale } from '../i18n';
 import { isLinkTarget } from './pages';
+import { isVideoId } from '../video';
 
 /**
  * Реестр типов блоков (docs/13, п.4).
@@ -110,6 +111,19 @@ export const BLOCKS = {
         side: z.enum(IMAGE_SIDES).catch('right'),
       })
       .catch({ side: 'right' }),
+  },
+  video: {
+    label: 'Видео',
+    hint: 'Карточка ролика с YouTube: обложка со своего сайта, переход — через предупреждение',
+    fields: [TITLE, BODY],
+    data: z
+      .object({
+        /** id ролика — 11 знаков; адрес на YouTube собирает код */
+        video: z.string().refine(isVideoId).optional().catch(undefined),
+        /** Обложка, скачанная сервером в «Картинки» */
+        image: z.string().uuid().optional().catch(undefined),
+      })
+      .catch({}),
   },
   services: {
     label: 'Список услуг',

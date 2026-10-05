@@ -36,6 +36,15 @@ const ru = {
     onRequest: 'по запросу',
     minutes: 'минут',
   },
+  video: {
+    watch: 'Смотреть на YouTube',
+    leaveTitle: 'Переход на YouTube',
+    leaveBody:
+      'Ролик открывается на сайте YouTube, который принадлежит Google. Google получит ваш IP-адрес и может сохранить cookie в браузере — по своим правилам, а не по правилам этого сайта.',
+    leaveGo: 'Перейти на YouTube',
+    leaveBack: 'Вернуться на сайт',
+    leavePrivacy: 'Подробнее — в политике конфиденциальности',
+  },
   notFound: {
     title: 'Страница не найдена',
     body: 'Такой страницы нет. Возможно, адрес набран с ошибкой.',
@@ -70,6 +79,15 @@ const pl = {
     onRequest: 'na zapytanie',
     minutes: 'minut',
   },
+  video: {
+    watch: 'Obejrzyj w YouTube',
+    leaveTitle: 'Przejście do YouTube',
+    leaveBody:
+      'Film otworzy się w serwisie YouTube, należącym do Google. Google otrzyma Twój adres IP i może zapisać pliki cookie w przeglądarce — na własnych zasadach, a nie na zasadach tego serwisu.',
+    leaveGo: 'Przejdź do YouTube',
+    leaveBack: 'Wróć do serwisu',
+    leavePrivacy: 'Więcej w polityce prywatności',
+  },
   notFound: {
     title: 'Nie znaleziono strony',
     body: 'Taka strona nie istnieje. Możliwe, że adres zawiera błąd.',
@@ -101,6 +119,15 @@ const en = {
     empty: 'The list of services has not been filled in yet.',
     onRequest: 'on request',
     minutes: 'minutes',
+  },
+  video: {
+    watch: 'Watch on YouTube',
+    leaveTitle: 'Leaving for YouTube',
+    leaveBody:
+      'The video opens on YouTube, which is owned by Google. Google will receive your IP address and may store cookies in your browser under its own rules, not the rules of this website.',
+    leaveGo: 'Go to YouTube',
+    leaveBack: 'Back to the website',
+    leavePrivacy: 'More in the privacy policy',
   },
   notFound: {
     title: 'Page not found',

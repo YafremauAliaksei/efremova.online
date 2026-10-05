@@ -17,7 +17,18 @@ export const HOME_SLUG = 'home';
  */
 export const CODE_PAGE_SLUGS = ['services', 'privacy', 'terms', 'site-terms', 'provider'] as const;
 
-const RESERVED = new Set<string>([...CODE_PAGE_SLUGS, 'admin', 'api', '_next', 'ru', 'pl', 'en']);
+// out — страницы-предупреждения перед уходом на чужой сайт; media — картинки
+const RESERVED = new Set<string>([
+  ...CODE_PAGE_SLUGS,
+  'admin',
+  'api',
+  '_next',
+  'media',
+  'out',
+  'ru',
+  'pl',
+  'en',
+]);
 
 /** latin, цифры и дефис; без дефиса по краям и двойного дефиса; до 48 знаков */
 export function isPageSlug(value: unknown): value is string {

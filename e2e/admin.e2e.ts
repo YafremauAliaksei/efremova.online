@@ -303,3 +303,43 @@ test('текст и фото: блок с картинкой — на сайте
   expect(await img.evaluate((node: HTMLImageElement) => node.naturalWidth)).toBeGreaterThan(0);
   await site.close();
 });
+
+test('видео: карточка ведёт на предупреждение, на YouTube — только вторым щелчком', async () => {
+  const id = 'dQw4w9WgXcQ';
+  const title = `Ролик ${RUN}`;
+  await admin.goto('/admin?page=about&lang=ru');
+  await admin.getByRole('button', { name: '+ Видео' }).last().click();
+  await saved(admin, 'Блок добавлен');
+
+  const card = admin.locator('article[id^="block-"]').last();
+  await card.locator('input[name=title]').fill(title);
+  await card.getByRole('button', { name: 'Сохранить текст' }).click();
+  await saved(admin, 'Текст сохранён');
+
+  await card.locator('summary', { hasText: 'Оформление' }).click();
+  await card.locator('input[name=video]').fill(`https://youtu.be/${id}?si=share`);
+  await card.getByRole('button', { name: 'Применить' }).click();
+  // Обложку сервер качает с YouTube; нет сети — блок сохраняется без неё
+  await expect(admin.locator('main [role=status]')).toContainText(
+    /Оформление сохранено|обложку с YouTube скачать не удалось/
+  );
+
+  // Ни одного запроса браузера к чужому домену на странице с роликом
+  const site = await admin.context().newPage();
+  const foreign: string[] = [];
+  site.on('request', (request) => {
+    if (!request.url().startsWith('http://localhost:3000/')) foreign.push(request.url());
+  });
+  await site.goto('/ru/about');
+  const link = site.locator('main section', { hasText: title }).locator(`a[data-video="${id}"]`);
+  await expect(link).toHaveAttribute('href', `/ru/out/youtube/${id}`);
+  await link.click();
+  await expect(site.locator('main h1')).toHaveText('Переход на YouTube');
+  expect(foreign).toEqual([]);
+
+  const go = site.getByRole('link', { name: 'Перейти на YouTube' });
+  await expect(go).toHaveAttribute('href', `https://www.youtube.com/watch?v=${id}`);
+  await expect(go).toHaveAttribute('rel', /noreferrer/);
+  expect((await site.request.get('/ru/out/youtube/too-short')).status()).toBe(404);
+  await site.close();
+});

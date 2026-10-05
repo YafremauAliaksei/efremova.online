@@ -8,7 +8,9 @@ import { parseBlockSettingsForm, parseBlockTextForm, withLocaleTexts } from '@/l
 import { insertAfter, moveId, numbered } from '@/lib/blocks/order';
 import { parseNewPageForm, parsePageSettingsForm } from '@/lib/blocks/page-edit';
 import { HOME_SLUG } from '@/lib/blocks/pages';
-import { isBlockType } from '@/lib/blocks/registry';
+import { BLOCKS, isBlockType } from '@/lib/blocks/registry';
+import { saveUpload } from '@/lib/media/store';
+import { fetchThumbnail } from '@/lib/media/thumbnail';
 import { DEFAULT_LOCALE, isLocale } from '@/lib/i18n';
 
 /**
@@ -127,6 +129,14 @@ export async function saveBlockSettings(formData: FormData): Promise<void> {
     if (image === null) back(formData, block.page.slug, `&block=${block.id}&error=image`);
   }
 
+  const data = { ...parsed.value.data };
+  let saved = 'settings';
+  if (block.type === 'video' && data.video !== undefined) {
+    const cover = await videoCover(block.data, data.video);
+    if (cover === null) saved = 'settingsNoCover';
+    else data.image = cover;
+  }
+
   await db.$transaction([
     db.blockRevision.create({
       data: {
@@ -138,11 +148,32 @@ export async function saveBlockSettings(formData: FormData): Promise<void> {
     }),
     db.pageBlock.update({
       where: { id: block.id },
-      data: { style: parsed.value.style, data: parsed.value.data },
+      data: { style: parsed.value.style, data },
     }),
   ]);
   refresh();
-  back(formData, block.page.slug, `&block=${block.id}&saved=settings`);
+  back(formData, block.page.slug, `&block=${block.id}&saved=${saved}`);
+}
+
+/**
+ * Обложка ролика: та же, если ролик не сменился и обложка не в архиве;
+ * иначе сервер скачивает её с YouTube и сохраняет как обычную картинку.
+ * null — скачать не вышло; блок всё равно сохраняется, карточка — без
+ * обложки, а владелец видит, что можно нажать «Применить» ещё раз.
+ */
+async function videoCover(previous: unknown, video: string): Promise<string | null> {
+  const before = BLOCKS.video.data.parse(previous);
+  if (before.video === video && before.image !== undefined) {
+    const kept = await db.mediaAsset.findFirst({
+      where: { id: before.image, archivedAt: null },
+      select: { id: true },
+    });
+    if (kept !== null) return kept.id;
+  }
+  const bytes = await fetchThumbnail(video);
+  if (bytes === null) return null;
+  const result = await saveUpload(bytes, `Обложка YouTube ${video}`);
+  return result.ok ? result.assetId : null;
 }
 
 // ───────────────────────────── состав страницы ─────────────────────────────

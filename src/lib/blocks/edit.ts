@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { textField } from '../content-schema';
 import { LOCALES, type Locale } from '../i18n';
 import { isLinkTarget } from './pages';
+import { parseVideoId } from '../video';
 import {
   BLOCKS,
   BLOCK_ALIGNS,
@@ -118,6 +119,15 @@ export function parseBlockSettingsForm(formData: FormData, type: BlockType): Blo
     const side = z.enum(IMAGE_SIDES).safeParse(formData.get('side') ?? 'right');
     if (!side.success) return { ok: false, field: 'side' };
     data.side = side.data;
+  }
+  if (type === 'video') {
+    // Обложку по id скачивает действие: у него есть сеть и база
+    const raw = formData.get('video');
+    if (typeof raw === 'string' && raw.trim() !== '') {
+      const id = parseVideoId(raw);
+      if (id === null) return { ok: false, field: 'video' };
+      data.video = id;
+    }
   }
   return { ok: true, value: { blockId, style, data } };
 }

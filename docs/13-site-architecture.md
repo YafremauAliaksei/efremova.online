@@ -187,6 +187,7 @@ MediaAsset    загруженные картинки
 | адреса страниц, занятые адреса | `src/lib/blocks/pages.ts` |
 | чтение страниц и меню из базы | `src/lib/pages.ts` |
 | отрисовка блоков | `src/components/blocks/PageBlocks.tsx` |
+| ролики: id из ссылки, обложка, переход через предупреждение | `src/lib/video.ts`, `src/lib/media/thumbnail.ts`, `src/app/[locale]/out/youtube/[id]/page.tsx` |
 | картинки: проверка, пересборка, раздача | `src/lib/media/image.ts`, `src/lib/media/store.ts`, `src/app/media/[file]/route.ts` |
 | страницы из базы: `/ru`, `/ru/<slug>` | `src/app/[locale]/page.tsx`, `src/app/[locale]/[...path]/page.tsx` |
 

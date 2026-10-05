@@ -7,6 +7,7 @@ import type { BlockStyle, RenderableBlock } from '@/lib/blocks/registry';
 import { langIfDifferent, localizedPath, type Locale } from '@/lib/i18n';
 import { messages } from '@/lib/messages';
 import { getPageImages } from '@/lib/media/store';
+import { leavePath } from '@/lib/video';
 
 /**
  * Отрисовка блоков страницы.
@@ -85,7 +86,9 @@ export async function PageBlocks({
   // Фото блоков — одним запросом на страницу, без байтов
   const images = await getPageImages(
     blocks.flatMap((block) =>
-      block.type === 'image' && typeof block.data.image === 'string' ? [block.data.image] : []
+      (block.type === 'image' || block.type === 'video') && typeof block.data.image === 'string'
+        ? [block.data.image]
+        : []
     )
   );
 
@@ -184,6 +187,43 @@ export async function PageBlocks({
                   </div>
                 </div>
               );
+            break;
+          }
+          case 'video': {
+            const video = typeof block.data.video === 'string' ? block.data.video : null;
+            const cover =
+              typeof block.data.image === 'string' ? images.get(block.data.image) : undefined;
+            inner = (
+              <>
+                {title !== null && title !== undefined && (
+                  <Heading first={first} large={false} text={title} />
+                )}
+                {body !== null && body !== undefined && (
+                  <Paragraphs text={body} className="mt-4 text-[var(--color-ink-soft)]" />
+                )}
+                {video !== null && (
+                  // Не на YouTube, а на свою страницу-предупреждение: Google узнает
+                  // о посетителе, только если тот нажмёт второй раз
+                  <Link
+                    href={localizedPath(locale, leavePath(video))}
+                    prefetch={false}
+                    data-video={video}
+                    className="group relative mt-8 block overflow-hidden rounded-lg bg-[var(--color-paper-alt)]"
+                  >
+                    {cover === undefined ? (
+                      <div className="aspect-video" />
+                    ) : (
+                      <Picture image={cover} alt="" sizes="(min-width: 1024px) 768px, 100vw" />
+                    )}
+                    <span className="absolute inset-0 flex items-center justify-center">
+                      <span className="rounded-full bg-black/70 px-6 py-3 font-medium text-white transition-colors group-hover:bg-black/85">
+                        ▶ {messages(locale).video.watch}
+                      </span>
+                    </span>
+                  </Link>
+                )}
+              </>
+            );
             break;
           }
           case 'services':
