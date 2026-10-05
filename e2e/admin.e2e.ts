@@ -297,6 +297,8 @@ test('текст и фото: блок с картинкой — на сайте
   const srcset = (await img.getAttribute('srcset')) ?? '';
   for (const entry of srcset.split(','))
     expect(entry.trim()).toMatch(/^\/media\/[0-9a-f]{64}\.webp \d+w$/);
+  // loading="lazy": фото грузится, когда до него доходит прокрутка
+  await img.scrollIntoViewIfNeeded();
   await expect(img).toHaveJSProperty('complete', true);
   expect(await img.evaluate((node: HTMLImageElement) => node.naturalWidth)).toBeGreaterThan(0);
   await site.close();
