@@ -187,6 +187,7 @@ MediaAsset    загруженные картинки
 | адреса страниц, занятые адреса | `src/lib/blocks/pages.ts` |
 | чтение страниц и меню из базы | `src/lib/pages.ts` |
 | отрисовка блоков | `src/components/blocks/PageBlocks.tsx` |
+| услуги: формы, деньги, выбор цены по региону | `src/lib/services/edit.ts` |
 | страницы из базы: `/ru`, `/ru/<slug>` | `src/app/[locale]/page.tsx`, `src/app/[locale]/[...path]/page.tsx` |
 
 Тексты блока на трёх языках лежат в одном JSON: `{"ru": {"title": …}, "pl": {…}}`.

@@ -252,29 +252,16 @@ async function main(): Promise<void> {
   }
   console.log(`  ✓ Страниц: ${String(PAGES.length)} (блоки на трёх языках)`);
 
+  // Услуги и цены владелец правит в админке: повторный сид создаёт только
+  // недостающие и не трогает существующие — ни названия, ни историю цен
   for (const service of SERVICES) {
     const { prices, ...serviceData } = service;
-
-    const created = await db.service.upsert({
+    const existing = await db.service.findUnique({
       where: { slug: service.slug },
-      create: serviceData,
-      update: serviceData,
+      select: { id: true },
     });
-
-    for (const price of prices) {
-      const existing = await db.servicePrice.findFirst({
-        where: { serviceId: created.id, region: price.region, currency: price.currency },
-      });
-
-      if (existing === null) {
-        await db.servicePrice.create({ data: { ...price, serviceId: created.id } });
-      } else {
-        await db.servicePrice.update({
-          where: { id: existing.id },
-          data: { amountMinor: price.amountMinor },
-        });
-      }
-    }
+    if (existing !== null) continue;
+    await db.service.create({ data: { ...serviceData, prices: { create: prices } } });
   }
   console.log(`  ✓ Услуг: ${String(SERVICES.length)}`);
 
