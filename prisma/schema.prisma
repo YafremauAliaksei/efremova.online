@@ -254,6 +254,55 @@ model BlockRevision {
   @@map("block_revisions")
 }
 
+/// Загруженная картинка (docs/13, п.7).
+///
+/// Исходный файл не хранится: только пересобранные варианты без EXIF.
+/// Имя исходного файла тоже не хранится — «IMG_дом_мамы.jpg» говорит больше,
+/// чем нужно. Подпись для админки владелец пишет сам.
+///
+/// Картинки лежат в базе, а не на диске: бэкап — один файл, контейнеру не
+/// нужна папка с правом записи. Граница пересмотра — 50 МБ (docs/13, п.7.3).
+model MediaAsset {
+  id         String @id @default(uuid()) @db.Uuid
+  /// sha256 исходного файла: тот же файл второй раз не создаёт дубль
+  sourceHash String @unique
+
+  /// Подпись в админке — чтобы узнать картинку в списке
+  label  String @default("")
+  /// Размер после поворота по EXIF
+  width  Int
+  height Int
+
+  /// «Удалить» = в архив: картинка могла стоять в блоке (docs/13, п.5)
+  archivedAt DateTime? @db.Timestamptz
+  createdAt  DateTime  @default(now()) @db.Timestamptz
+
+  variants MediaVariant[]
+
+  @@index([archivedAt, createdAt])
+  @@map("media_assets")
+}
+
+/// Вариант картинки для сайта: формат и ширина. Адрес — /media/<hash>.<формат>;
+/// содержимое по нему не меняется никогда, поэтому кэшируется навсегда.
+model MediaVariant {
+  id      String @id @default(uuid()) @db.Uuid
+  assetId String @db.Uuid
+
+  /// avif | webp
+  format String
+  width  Int
+  height Int
+  /// sha256 содержимого — имя файла
+  hash   String @unique
+  bytes  Bytes
+
+  asset MediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, format, width])
+  @@map("media_variants")
+}
+
 model LectureCategory {
   id        String @id @default(uuid()) @db.Uuid
   slug      String @unique
