@@ -17,7 +17,9 @@ terraform.tfvars
 # ─── Зависимости и сборка ───
 node_modules/
 .next/
-out/
+# Только корень: папка статического экспорта Next. Без «/» правило прятало
+# и маршрут src/app/[locale]/out/ — страницу-предупреждение перед YouTube
+/out/
 build/
 dist/
 .turbo/

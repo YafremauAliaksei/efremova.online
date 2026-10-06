@@ -16,7 +16,9 @@ import type { LegalDocumentSeed } from './types';
  * Польская версия — основная; русская и английская — переводы.
  */
 
-const VERSION = 'privacy-2026-09-26-draft';
+// 2026-10-05: переход на YouTube из карточки ролика (задача 5) — получатели,
+// передача за пределы ЕЭЗ и «браузер не обращается к другим сервисам»
+const VERSION = 'privacy-2026-10-05-draft';
 
 export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
   // ═══════════════════════ POLITYKA PRYWATNOŚCI (PL) ═══════════════════════
@@ -37,7 +39,7 @@ export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
       {
         heading: '2. Czego dotyczy ta polityka',
         paragraphs: [
-          'Polityka dotyczy serwisu informacyjnego pod tym adresem. Serwis nie ma kont użytkowników, formularzy, analityki ani reklam. Czcionki, obrazy i skrypty pochodzą wyłącznie z tej domeny — Twoja przeglądarka nie łączy się z żadnym innym serwisem, dopóki sam(a) nie klikniesz odnośnika do komunikatora lub poczty.',
+          'Polityka dotyczy serwisu informacyjnego pod tym adresem. Serwis nie ma kont użytkowników, formularzy, analityki ani reklam. Czcionki, obrazy i skrypty pochodzą wyłącznie z tej domeny — Twoja przeglądarka nie łączy się z żadnym innym serwisem, dopóki sam(a) nie klikniesz odnośnika do komunikatora lub poczty albo nie przejdziesz do YouTube. Okładki filmów są zapisane w tym serwisie — samo wyświetlenie strony z filmem nie łączy się z YouTube.',
         ],
       },
       {
@@ -54,11 +56,13 @@ export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
       },
       {
         heading: '4. Odbiorcy danych',
+        anchor: 'recipients',
         items: [
           'Dostawca serwera: {{service.hosting}} — przechowuje serwis i dzienniki na podstawie umowy powierzenia przetwarzania danych.',
           'Cloudflare, Inc. (USA) — sieć dostarczania treści i ochrona przed atakami; przez jej serwery przechodzi ruch do serwisu. Działa na podstawie umowy powierzenia przetwarzania danych.',
           'Dostawca poczty: {{service.email}} — gdy piszesz do nas e-mail.',
           'Komunikatory (np. WhatsApp — Meta Platforms, Telegram, Viber) — gdy wybierzesz kontakt przez komunikator, jego dostawca przetwarza dane jako odrębny administrator, na własnych zasadach.',
+          'YouTube (Google Ireland Limited) — gdy na stronie z ostrzeżeniem wybierzesz „Przejdź do YouTube”. Od tej chwili Google przetwarza dane (m.in. adres IP, pliki cookie) jako odrębny administrator, na własnych zasadach. Wcześniej, na stronach tego serwisu, Twoja przeglądarka z YouTube się nie łączy.',
           'Organy publiczne — wyłącznie wtedy, gdy wymaga tego prawo.',
         ],
       },
@@ -66,7 +70,7 @@ export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
         heading: '5. Przekazywanie danych poza Europejski Obszar Gospodarczy',
         paragraphs: [
           'Cloudflare, Inc. ma siedzibę w USA. Przekazanie odbywa się na podstawie decyzji Komisji Europejskiej z 10 lipca 2023 r. w sprawie ram ochrony danych UE–USA (Data Privacy Framework) oraz standardowych klauzul umownych. ⟦ЮРИСТ: potwierdzić certyfikację DPF Cloudflare na dzień publikacji⟧',
-          'Dostawcy komunikatorów mogą przekazywać dane poza EOG na zasadach opisanych w swoich politykach prywatności.',
+          'Dostawcy komunikatorów i Google (YouTube) mogą przekazywać dane poza EOG na zasadach opisanych w swoich politykach prywatności.',
         ],
       },
       {
@@ -137,7 +141,7 @@ export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
       {
         heading: '2. О чём эта политика',
         paragraphs: [
-          'Политика касается информационного сайта по этому адресу. На сайте нет учётных записей, форм, аналитики и рекламы. Шрифты, изображения и скрипты загружаются только с этого домена: ваш браузер не обращается ни к одному другому сервису, пока вы сами не перейдёте по ссылке на мессенджер или почту.',
+          'Политика касается информационного сайта по этому адресу. На сайте нет учётных записей, форм, аналитики и рекламы. Шрифты, изображения и скрипты загружаются только с этого домена: ваш браузер не обращается ни к одному другому сервису, пока вы сами не перейдёте по ссылке на мессенджер, почту или YouTube. Обложки роликов хранятся на этом сайте — сама страница с роликом к YouTube не обращается.',
         ],
       },
       {
@@ -154,11 +158,13 @@ export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
       },
       {
         heading: '4. Кто получает данные',
+        anchor: 'recipients',
         items: [
           'Хостинг: {{service.hosting}} — хранит сайт и журналы по договору поручения обработки данных.',
           'Cloudflare, Inc. (США) — сеть доставки контента и защита от атак; через её серверы проходит трафик сайта. Работает по договору поручения обработки данных.',
           'Почтовый сервис: {{service.email}} — если вы пишете нам письмо.',
           'Мессенджеры (например, WhatsApp — Meta Platforms, Telegram, Viber) — если вы выбрали связь через мессенджер, его владелец обрабатывает данные как самостоятельный администратор по своим правилам.',
+          'YouTube (Google Ireland Limited) — если на странице-предупреждении вы нажали «Перейти на YouTube». С этого момента Google обрабатывает данные (в том числе IP-адрес и cookie) как самостоятельный администратор по своим правилам. До этого, на страницах этого сайта, ваш браузер к YouTube не обращается.',
           'Государственные органы — только когда этого требует закон.',
         ],
       },
@@ -166,7 +172,7 @@ export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
         heading: '5. Передача данных за пределы Европейской экономической зоны',
         paragraphs: [
           'Cloudflare, Inc. находится в США. Передача основана на решении Европейской комиссии от 10 июля 2023 года о рамках защиты данных ЕС–США (Data Privacy Framework) и стандартных договорных условиях. ⟦ЮРИСТ: подтвердить сертификацию DPF у Cloudflare на дату публикации⟧',
-          'Владельцы мессенджеров могут передавать данные за пределы ЕЭЗ по правилам своих политик конфиденциальности.',
+          'Владельцы мессенджеров и Google (YouTube) могут передавать данные за пределы ЕЭЗ по правилам своих политик конфиденциальности.',
         ],
       },
       {
@@ -237,7 +243,7 @@ export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
       {
         heading: '2. Scope',
         paragraphs: [
-          'This policy covers the informational website at this address. The site has no user accounts, forms, analytics or advertising. Fonts, images and scripts are served only from this domain: your browser contacts no other service unless you follow a link to a messenger or e-mail yourself.',
+          'This policy covers the informational website at this address. The site has no user accounts, forms, analytics or advertising. Fonts, images and scripts are served only from this domain: your browser contacts no other service unless you follow a link to a messenger, e-mail or YouTube yourself. Video covers are stored on this site: a page with a video does not contact YouTube.',
         ],
       },
       {
@@ -254,11 +260,13 @@ export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
       },
       {
         heading: '4. Recipients',
+        anchor: 'recipients',
         items: [
           'Hosting provider: {{service.hosting}} — stores the site and its logs under a data processing agreement.',
           'Cloudflare, Inc. (USA) — content delivery network and attack protection; traffic to the site passes through its servers. Acts under a data processing agreement.',
           'E-mail provider: {{service.email}} — when you write to us by e-mail.',
           'Messengers (e.g. WhatsApp — Meta Platforms, Telegram, Viber) — if you choose to contact us via a messenger, its provider processes the data as a separate controller under its own terms.',
+          'YouTube (Google Ireland Limited) — if you choose “Go to YouTube” on the notice page. From that moment Google processes data (including your IP address and cookies) as a separate controller under its own terms. Before that, on the pages of this site, your browser does not contact YouTube.',
           'Public authorities — only where required by law.',
         ],
       },
@@ -266,7 +274,7 @@ export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
         heading: '5. Transfers outside the European Economic Area',
         paragraphs: [
           'Cloudflare, Inc. is based in the USA. Transfers rely on the European Commission decision of 10 July 2023 on the EU–US Data Privacy Framework and on standard contractual clauses. ⟦ЮРИСТ: confirm Cloudflare DPF certification on the publication date⟧',
-          'Messenger providers may transfer data outside the EEA under their own privacy policies.',
+          'Messenger providers and Google (YouTube) may transfer data outside the EEA under their own privacy policies.',
         ],
       },
       {

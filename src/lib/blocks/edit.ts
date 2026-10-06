@@ -2,11 +2,13 @@ import { z } from 'zod';
 import { textField } from '../content-schema';
 import { LOCALES, type Locale } from '../i18n';
 import { isLinkTarget } from './pages';
+import { parseVideoId } from '../video';
 import {
   BLOCKS,
   BLOCK_ALIGNS,
   BLOCK_BACKGROUNDS,
   BLOCK_WIDTHS,
+  IMAGE_SIDES,
   type BlockStyle,
   type BlockTexts,
   type BlockType,
@@ -105,6 +107,26 @@ export function parseBlockSettingsForm(formData: FormData, type: BlockType): Blo
     if (link !== null && link !== '') {
       if (!isLinkTarget(link)) return { ok: false, field: 'link' };
       data.link = link;
+    }
+  }
+  if (type === 'image') {
+    // Существует ли картинка и не в архиве ли она — проверяет действие, у него есть база
+    const image = formData.get('image');
+    if (image !== null && image !== '') {
+      if (!z.string().uuid().safeParse(image).success) return { ok: false, field: 'image' };
+      data.image = image as string;
+    }
+    const side = z.enum(IMAGE_SIDES).safeParse(formData.get('side') ?? 'right');
+    if (!side.success) return { ok: false, field: 'side' };
+    data.side = side.data;
+  }
+  if (type === 'video') {
+    // Обложку по id скачивает действие: у него есть сеть и база
+    const raw = formData.get('video');
+    if (typeof raw === 'string' && raw.trim() !== '') {
+      const id = parseVideoId(raw);
+      if (id === null) return { ok: false, field: 'video' };
+      data.video = id;
     }
   }
   return { ok: true, value: { blockId, style, data } };

@@ -89,3 +89,35 @@ export async function findMediaFile(hash: string, format: OutputFormat): Promise
 export function mediaUrl(variant: { hash: string; format: string }): string {
   return `/media/${variant.hash}.${variant.format}`;
 }
+
+export interface PageImage {
+  width: number;
+  height: number;
+  variants: { hash: string; format: string; width: number; height: number }[];
+}
+
+/**
+ * Картинки блоков страницы одним запросом: только адреса и размеры, без
+ * байтов. Картинка в архиве или удалённая из базы — её просто нет в ответе,
+ * и блок рисуется без фото.
+ */
+export async function getPageImages(ids: readonly string[]): Promise<Map<string, PageImage>> {
+  if (ids.length === 0) return new Map();
+  try {
+    const assets = await db.mediaAsset.findMany({
+      where: { id: { in: [...ids] }, archivedAt: null },
+      select: {
+        id: true,
+        width: true,
+        height: true,
+        variants: {
+          orderBy: { width: 'asc' },
+          select: { hash: true, format: true, width: true, height: true },
+        },
+      },
+    });
+    return new Map(assets.map(({ id, ...image }) => [id, image]));
+  } catch {
+    return new Map();
+  }
+}
