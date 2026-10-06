@@ -1,4 +1,5 @@
-import { formatPrice, type PublicService } from '@/lib/content';
+import type { PublicService } from '@/lib/content';
+import { formatPrice } from '@/lib/services/edit';
 import type { Locale } from '@/lib/i18n';
 import { messages } from '@/lib/messages';
 
