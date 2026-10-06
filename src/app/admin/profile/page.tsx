@@ -2,7 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { isAdmin } from '@/lib/auth/admin';
+import { isAdmin, isTotpEnabled } from '@/lib/auth/admin';
+import { SecondFactorWarning } from '@/components/admin/AdminNav';
 import { db } from '@/lib/db';
 import { getSiteProfile } from '@/lib/site-profile';
 import {
@@ -50,6 +51,7 @@ export default async function ProfilePage({ searchParams }: PageProps) {
         </Link>
       </p>
       <h1 className="mt-4 text-2xl font-semibold">Данные владельца</h1>
+      {!isTotpEnabled() && <SecondFactorWarning />}
       <p className="mt-3 text-sm text-[var(--color-ink-soft)]">
         Подставляются в подвал и правовые документы. Хранятся только в базе и не попадают в
         публичный репозиторий. Пустое поле видно на сайте как «⟦не заполнено⟧».
@@ -76,7 +78,8 @@ export default async function ProfilePage({ searchParams }: PageProps) {
           role="alert"
           className="mt-6 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900"
         >
-          Рабочий режим недоступен, пока не заполнены обязательные поля.
+          Рабочий режим недоступен, пока не заполнены обязательные поля и не настроен второй фактор
+          входа.
         </p>
       )}
 
@@ -126,7 +129,7 @@ export default async function ProfilePage({ searchParams }: PageProps) {
           />
           <button
             type="submit"
-            disabled={status === 'development' && missing.length > 0}
+            disabled={status === 'development' && (missing.length > 0 || !isTotpEnabled())}
             className="rounded-lg border border-[var(--color-line)] px-5 py-2 text-sm font-medium disabled:opacity-50"
           >
             {status === 'development' ? 'Перевести в рабочий режим' : 'Вернуть в режим разработки'}
@@ -175,6 +178,8 @@ async function setStatus(formData: FormData) {
     // Проверка на сервере, а не только disabled у кнопки: форму можно отправить и без неё
     const { values } = await getSiteProfile();
     if (missingRequired(values).length > 0) redirect('/admin/profile?blocked=1');
+    // Рабочий сайт с входом по одной ссылке — нет (PROJECT_LOG, задача 13)
+    if (!isTotpEnabled()) redirect('/admin/profile?blocked=1');
   }
 
   await db.siteSetting.upsert({

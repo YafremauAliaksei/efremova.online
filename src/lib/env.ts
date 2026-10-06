@@ -46,6 +46,13 @@ const serverSchema = z.object({
    */
   AUTH_SECRET: optionalSecret,
 
+  /**
+   * Секрет второго фактора входа в админку (base32, из npm run admin:2fa).
+   * Не задан — вход только по ссылке, а админка показывает красную плашку
+   * и не даёт перевести сайт в рабочий режим (PROJECT_LOG, задача 13).
+   */
+  ADMIN_TOTP_SECRET: optionalSecret,
+
   /** 'false' выключает ловушки — нужно только при отладке */
   HONEYPOT_ENABLED: z.string().optional(),
   /** Чтобы легальный пентест по договору не спотыкался о ловушки */
