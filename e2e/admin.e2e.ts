@@ -135,7 +135,7 @@ test('блок: добавить, написать, поднять, скрыть
   const title = `Раздел ${RUN}`;
   await admin.goto('/admin?page=about&lang=ru');
 
-  await admin.getByRole('button', { name: '+ Текст' }).last().click();
+  await admin.getByRole('button', { name: '+ Текст', exact: true }).last().click();
   await saved(admin, 'Блок добавлен');
 
   const card = admin.locator('article[id^="block-"]').last();
@@ -211,7 +211,7 @@ test('страница: создать скрытой, опубликовать,
   await saved(admin, 'Страница создана скрытой');
   expect((await admin.request.get(`/ru/${slug}`)).status()).toBe(404);
 
-  await admin.getByRole('button', { name: '+ Текст' }).last().click();
+  await admin.getByRole('button', { name: '+ Текст', exact: true }).last().click();
   await saved(admin, 'Блок добавлен');
   const card = admin.locator('article[id^="block-"]').last();
   await card.locator('input[name=title]').fill(title);
@@ -304,6 +304,102 @@ test('картинки: загрузка без EXIF, отказ SVG, архив
     .click();
   await saved(admin, 'убрана в архив');
   expect((await admin.request.get(src ?? '')).status()).toBe(404);
+});
+
+test('текст и фото: блок с картинкой — на сайте, со своего домена', async () => {
+  // Своя картинка для этого теста: прошлую тест картинок убрал в архив
+  const photo = await sharp({
+    create: {
+      width: 1200,
+      height: 900,
+      channels: 3,
+      background: `#${RUN.split('').reverse().join('')}`,
+    },
+  })
+    .jpeg()
+    .toBuffer();
+  await admin.goto('/admin/media');
+  await admin.locator('input[name=file]').setInputFiles({
+    name: 'office.jpg',
+    mimeType: 'image/jpeg',
+    buffer: photo,
+  });
+  await admin.locator('input[name=label]').first().fill(`Кабинет ${RUN}`);
+  await admin.getByRole('button', { name: 'Загрузить' }).click();
+  await saved(admin, 'Картинка загружена');
+
+  const title = `С фото ${RUN}`;
+  await admin.goto('/admin?page=about&lang=ru');
+  await admin.getByRole('button', { name: '+ Текст и фото' }).last().click();
+  await saved(admin, 'Блок добавлен');
+
+  const card = admin.locator('article[id^="block-"]').last();
+  await card.locator('input[name=title]').fill(title);
+  await card.locator('input[name=alt]').fill('Кресло у окна');
+  await card.getByRole('button', { name: 'Сохранить текст' }).click();
+  await saved(admin, 'Текст сохранён');
+
+  await card.locator('summary', { hasText: 'Оформление' }).click();
+  await card.locator('select[name=image]').selectOption({ label: `Кабинет ${RUN} · 1200×900` });
+  await card.locator('select[name=side]').selectOption('left');
+  await card.getByRole('button', { name: 'Применить' }).click();
+  await saved(admin, 'Оформление сохранено');
+
+  const site = await admin.context().newPage();
+  await site.goto('/ru/about');
+  const section = site.locator('main section', { hasText: title });
+  const img = section.locator('picture img');
+  await expect(img).toHaveAttribute('alt', 'Кресло у окна');
+  await expect(section.locator('picture source[type="image/avif"]')).toHaveCount(1);
+  // Все адреса — свой домен
+  const srcset = (await img.getAttribute('srcset')) ?? '';
+  for (const entry of srcset.split(','))
+    expect(entry.trim()).toMatch(/^\/media\/[0-9a-f]{64}\.webp \d+w$/);
+  // loading="lazy": фото грузится, когда до него доходит прокрутка
+  await img.scrollIntoViewIfNeeded();
+  await expect(img).toHaveJSProperty('complete', true);
+  expect(await img.evaluate((node: HTMLImageElement) => node.naturalWidth)).toBeGreaterThan(0);
+  await site.close();
+});
+
+test('видео: карточка ведёт на предупреждение, на YouTube — только вторым щелчком', async () => {
+  const id = 'dQw4w9WgXcQ';
+  const title = `Ролик ${RUN}`;
+  await admin.goto('/admin?page=about&lang=ru');
+  await admin.getByRole('button', { name: '+ Видео' }).last().click();
+  await saved(admin, 'Блок добавлен');
+
+  const card = admin.locator('article[id^="block-"]').last();
+  await card.locator('input[name=title]').fill(title);
+  await card.getByRole('button', { name: 'Сохранить текст' }).click();
+  await saved(admin, 'Текст сохранён');
+
+  await card.locator('summary', { hasText: 'Оформление' }).click();
+  await card.locator('input[name=video]').fill(`https://youtu.be/${id}?si=share`);
+  await card.getByRole('button', { name: 'Применить' }).click();
+  // Обложку сервер качает с YouTube; нет сети — блок сохраняется без неё
+  await expect(admin.locator('main [role=status]')).toContainText(
+    /Оформление сохранено|обложку с YouTube скачать не удалось/
+  );
+
+  // Ни одного запроса браузера к чужому домену на странице с роликом
+  const site = await admin.context().newPage();
+  const foreign: string[] = [];
+  site.on('request', (request) => {
+    if (!request.url().startsWith('http://localhost:3000/')) foreign.push(request.url());
+  });
+  await site.goto('/ru/about');
+  const link = site.locator('main section', { hasText: title }).locator(`a[data-video="${id}"]`);
+  await expect(link).toHaveAttribute('href', `/ru/out/youtube/${id}`);
+  await link.click();
+  await expect(site.locator('main h1')).toHaveText('Переход на YouTube');
+  expect(foreign).toEqual([]);
+
+  const go = site.getByRole('link', { name: 'Перейти на YouTube' });
+  await expect(go).toHaveAttribute('href', `https://www.youtube.com/watch?v=${id}`);
+  await expect(go).toHaveAttribute('rel', /noreferrer/);
+  expect((await site.request.get('/ru/out/youtube/too-short')).status()).toBe(404);
+  await site.close();
 });
 
 test('услуги: создать, назначить цены по регионам, показать, сменить цену', async ({ browser }) => {

@@ -1,12 +1,15 @@
 import Link from 'next/link';
 import { ContactList } from '@/components/ContactList';
 import { ServiceList } from '@/components/ServiceList';
+import { Picture } from '@/components/blocks/Picture';
 import { contactLinks } from '@/lib/contacts';
 import { getServices } from '@/lib/content';
 import { pagePath } from '@/lib/blocks/pages';
 import type { BlockStyle, RenderableBlock } from '@/lib/blocks/registry';
 import { langIfDifferent, localizedPath, type Locale } from '@/lib/i18n';
 import { messages } from '@/lib/messages';
+import { getPageImages } from '@/lib/media/store';
+import { leavePath } from '@/lib/video';
 import { getSiteProfile } from '@/lib/site-profile';
 
 /**
@@ -83,6 +86,14 @@ export async function PageBlocks({
   const services = blocks.some((block) => block.type === 'services')
     ? await getServices(region, locale)
     : [];
+  // Фото блоков — одним запросом на страницу, без байтов
+  const images = await getPageImages(
+    blocks.flatMap((block) =>
+      (block.type === 'image' || block.type === 'video') && typeof block.data.image === 'string'
+        ? [block.data.image]
+        : []
+    )
+  );
   // Профиль читают и подвал, и плашка «в разработке»: cache() не идёт в базу второй раз
   const contacts = blocks.some((block) => block.type === 'contacts')
     ? contactLinks((await getSiteProfile()).values)
@@ -142,6 +153,87 @@ export async function PageBlocks({
                       {button}
                     </Link>
                   </div>
+                )}
+              </>
+            );
+            break;
+          }
+          case 'image': {
+            const image =
+              typeof block.data.image === 'string' ? images.get(block.data.image) : undefined;
+            const text = (
+              <div>
+                {title !== null && title !== undefined && (
+                  <Heading first={first} large={false} text={title} />
+                )}
+                {body !== null && body !== undefined && (
+                  <Paragraphs
+                    text={body}
+                    className="mt-6 leading-relaxed text-[var(--color-ink-soft)]"
+                  />
+                )}
+              </div>
+            );
+            inner =
+              image === undefined ? (
+                text
+              ) : (
+                <div className="grid items-center gap-10 md:grid-cols-2">
+                  {text}
+                  {/* На телефоне фото над текстом; на широком экране — сбоку */}
+                  <div
+                    className={
+                      block.data.side === 'left' ? 'order-first' : 'order-first md:order-last'
+                    }
+                  >
+                    <Picture
+                      image={image}
+                      alt={block.texts.alt ?? ''}
+                      sizes="(min-width: 768px) 50vw, 100vw"
+                      priority={first}
+                    />
+                  </div>
+                </div>
+              );
+            break;
+          }
+          case 'video': {
+            const video = typeof block.data.video === 'string' ? block.data.video : null;
+            const cover =
+              typeof block.data.image === 'string' ? images.get(block.data.image) : undefined;
+            inner = (
+              <>
+                {title !== null && title !== undefined && (
+                  <Heading first={first} large={false} text={title} />
+                )}
+                {body !== null && body !== undefined && (
+                  <Paragraphs text={body} className="mt-4 text-[var(--color-ink-soft)]" />
+                )}
+                {video !== null && (
+                  // Не на YouTube, а на свою страницу-предупреждение: Google узнает
+                  // о посетителе, только если тот нажмёт второй раз
+                  <Link
+                    href={localizedPath(locale, leavePath(video))}
+                    prefetch={false}
+                    data-video={video}
+                    className="group relative mt-8 block overflow-hidden rounded-lg bg-[var(--color-paper-alt)]"
+                  >
+                    {cover === undefined ? (
+                      <div className="aspect-video" />
+                    ) : (
+                      <Picture
+                        image={cover}
+                        alt=""
+                        sizes="(min-width: 1024px) 768px, 100vw"
+                        priority={first}
+                      />
+                    )}
+                    <span className="absolute inset-0 flex items-center justify-center">
+                      <span className="rounded-full bg-black/70 px-6 py-3 font-medium text-white transition-colors group-hover:bg-black/85">
+                        ▶ {messages(locale).video.watch}
+                      </span>
+                    </span>
+                  </Link>
                 )}
               </>
             );

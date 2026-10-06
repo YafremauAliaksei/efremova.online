@@ -50,6 +50,8 @@ export const dynamic = 'force-dynamic';
 const SAVED = {
   text: 'Текст сохранён. Прежний — в истории блока.',
   settings: 'Оформление сохранено.',
+  settingsNoCover:
+    'Ролик сохранён, но обложку с YouTube скачать не удалось — карточка пока без неё. Нажмите «Применить» ещё раз позже.',
   added: 'Блок добавлен. Пока в нём нет текста, на сайте его не видно.',
   moved: 'Порядок изменён.',
   hidden: 'Блок скрыт с сайта.',
@@ -75,6 +77,10 @@ const ERRORS = {
   align: 'Выравнивание — только из списка.',
   background: 'Фон — только из списка.',
   link: 'Кнопка может вести только на страницу этого сайта.',
+  image: 'Фото не найдено или убрано в архив — выберите другое в разделе «Картинки».',
+  side: 'Сторона фото — только из списка.',
+  video:
+    'Это не ссылка на ролик YouTube. Скопируйте адрес ролика из браузера или кнопки «Поделиться».',
   pageId: 'Страница не найдена — обновите страницу.',
   slug: 'Адрес: латиница, цифры и дефис, до 48 знаков; адреса home, services, privacy, terms и служебные заняты.',
   slugTaken: 'Такой адрес уже есть — у другой страницы или в архиве.',
@@ -171,6 +177,11 @@ export default async function AdminPage({ searchParams }: PageProps) {
   const pageTitle = (p: { slug: string; titleI18n: unknown }) =>
     i18nTextSchema.parse(p.titleI18n)[DEFAULT_LOCALE] ?? p.slug;
   const linkTargets = pages.map((p) => ({ slug: p.slug, title: pageTitle(p) }));
+  const images = await db.mediaAsset.findMany({
+    where: { archivedAt: null },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true, label: true, width: true, height: true },
+  });
   const missing = (lang: Locale) =>
     blocks.filter(
       (b) =>
@@ -310,6 +321,7 @@ export default async function AdminPage({ searchParams }: PageProps) {
                   locale={locale}
                   pageId={page.id}
                   linkTargets={linkTargets}
+                  images={images}
                 />
               );
             })}
