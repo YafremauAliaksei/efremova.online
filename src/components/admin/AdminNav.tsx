@@ -7,11 +7,12 @@ import Link from 'next/link';
 
 const SECTIONS = [
   { href: '/admin', label: 'Страницы и тексты' },
+  { href: '/admin/services', label: 'Услуги и цены' },
   { href: '/admin/media', label: 'Картинки' },
   { href: '/admin/profile', label: 'Данные владельца' },
 ] as const;
 
-const PLANNED = ['Услуги и цены', 'Правовые документы'] as const;
+const PLANNED = ['Правовые документы'] as const;
 
 export function AdminNav({ current }: { current: (typeof SECTIONS)[number]['href'] }) {
   return (
