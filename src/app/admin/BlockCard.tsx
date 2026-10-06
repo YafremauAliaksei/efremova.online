@@ -157,7 +157,7 @@ export function BlockCard({
           {!block.isPublished && (
             <span className="rounded-full bg-[var(--color-paper-alt)] px-2 text-xs">скрыт</span>
           )}
-          {!hasAnyText && block.type !== 'services' && (
+          {!hasAnyText && !def.withoutText && (
             <span className="rounded-full bg-amber-100 px-2 text-xs text-amber-900">
               пустой — на сайте не виден
             </span>
