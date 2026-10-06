@@ -1,5 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { expect, test, type Page } from '@playwright/test';
+import { base32Decode, totp } from '../src/lib/auth/totp';
+import { E2E_TOTP_KEY } from './totp-key';
 import sharp from 'sharp';
 
 /**
@@ -21,6 +23,26 @@ function loginLink(): string {
   const link = /http:\/\/localhost:3000\/admin\/enter\?token=\S+/.exec(output)?.[0];
   if (link === undefined) throw new Error('admin:link не выдал ссылку');
   return link;
+}
+
+const TOTP_KEY = base32Decode(E2E_TOTP_KEY) ?? new Uint8Array();
+
+/**
+ * Вход как у владельца: ссылка из терминала, затем код из «телефона».
+ * Код текущего шага уже мог уйти на предыдущий вход в те же 30 секунд —
+ * сервер второй раз его не примет (так и задумано), и тогда берётся код
+ * следующего шага: его сервер тоже принимает.
+ */
+async function signIn(page: Page): Promise<void> {
+  await page.goto(loginLink());
+  await expect(page).toHaveURL(/\/admin\/2fa$/);
+  for (const offset of [0, 30_000]) {
+    await page.locator('input[name=code]').fill(totp(TOTP_KEY, new Date(Date.now() + offset)));
+    await page.getByRole('button', { name: 'Войти' }).click();
+    await page.waitForURL(/\/admin(\/2fa\?left=\d)?$/);
+    if (new URL(page.url()).pathname === '/admin') return;
+  }
+  throw new Error('Код второго фактора не принят');
 }
 
 /** Итог действия в админке: сообщение со статусом, а не ошибка */
@@ -45,8 +67,7 @@ let admin: Page;
 test.beforeAll(async ({ browser }) => {
   // Свой контекст: из него же открываются вкладки сайта для проверки
   admin = await (await browser.newContext({ locale: 'ru-RU' })).newPage();
-  await admin.goto(loginLink());
-  await expect(admin).toHaveURL(/\/admin$/);
+  await signIn(admin);
 });
 
 test.afterAll(async () => {
@@ -62,9 +83,44 @@ test('без входа админки не видно', async ({ page, request 
   // Использованная ссылка второй раз не пускает
   const link = loginLink();
   await page.goto(link);
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(/\/admin\/2fa$/);
   const again = await request.get(link, { maxRedirects: 0 });
   expect(again.headers().location).toMatch(/\/admin\/denied$/);
+});
+
+test('второй фактор: одной ссылки мало, пять неверных кодов — нужна новая ссылка', async ({
+  page,
+}) => {
+  // Без пропуска из ссылки страницы кода нет
+  await page.goto('/admin/2fa');
+  await expect(page).toHaveURL(/\/admin\/denied$/);
+
+  await page.goto(loginLink());
+  await expect(page).toHaveURL(/\/admin\/2fa$/);
+  // Страница до входа — тоже закрытая зона: не кэшируется и не индексируется
+  const headers = (await page.request.get('/admin/2fa')).headers();
+  expect(headers['cache-control']).toContain('no-store');
+  expect(headers['x-robots-tag']).toContain('noindex');
+
+  // С пропуском, но без кода — в админку не пускает
+  await page.goto('/admin');
+  await expect(page).toHaveURL(/\/admin\/denied$/);
+
+  for (const left of [4, 3, 2, 1]) {
+    await page.goto('/admin/2fa');
+    await page.locator('input[name=code]').fill('000000');
+    await page.getByRole('button', { name: 'Войти' }).click();
+    await expect(page.locator('main [role=alert]')).toContainText(
+      `Осталось попыток: ${String(left)}`
+    );
+  }
+  await page.locator('input[name=code]').fill('000000');
+  await page.getByRole('button', { name: 'Войти' }).click();
+  await expect(page).toHaveURL(/\/admin\/denied$/);
+
+  // Пропуск сгорел: даже верный код теперь не нужен — страницы кода нет
+  await page.goto('/admin/2fa');
+  await expect(page).toHaveURL(/\/admin\/denied$/);
 });
 
 test('запрос с чужого сайта — 403', async ({ request }) => {

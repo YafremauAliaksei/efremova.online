@@ -1,7 +1,12 @@
 import { headers } from 'next/headers';
 import type { NextResponse } from 'next/server';
 import { relativeRedirect } from '@/lib/http/redirect';
-import { consumeLoginToken, createAdminSession } from '@/lib/auth/admin';
+import {
+  consumeLoginToken,
+  createAdminSession,
+  createPendingSecondFactor,
+  isTotpEnabled,
+} from '@/lib/auth/admin';
 import { recordSecurityEvent } from '@/lib/security/recorder';
 
 /**
@@ -38,6 +43,12 @@ export async function GET(request: Request): Promise<NextResponse> {
     return deny(ip, result.reason);
   }
 
+  // Второй фактор включён — ссылка даёт только пропуск к странице кода
+  if (isTotpEnabled()) {
+    await createPendingSecondFactor();
+    return relativeRedirect('/admin/2fa', 303, { 'Cache-Control': 'no-store' });
+  }
+
   await createAdminSession();
 
   await recordSecurityEvent({
@@ -46,7 +57,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     ip,
     country: null,
     path: '/admin/enter',
-    details: { event: 'ADMIN_LOGIN', outcome: 'success' },
+    details: { event: 'ADMIN_LOGIN', outcome: 'success', factors: 'link' },
     count: 1,
   });
 

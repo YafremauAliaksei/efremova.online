@@ -44,7 +44,8 @@
     "stack:logs": "docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f app",
     "ci": "node scripts/ci-local.mjs",
     "ci:quick": "node scripts/ci-local.mjs --quick",
-    "admin:link": "node scripts/admin-link.mjs"
+    "admin:link": "node scripts/admin-link.mjs",
+    "admin:2fa": "node scripts/admin-2fa.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.0",
