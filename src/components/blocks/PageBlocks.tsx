@@ -1,10 +1,13 @@
 import Link from 'next/link';
+import { ContactList } from '@/components/ContactList';
 import { ServiceList } from '@/components/ServiceList';
+import { contactLinks } from '@/lib/contacts';
 import { getServices } from '@/lib/content';
 import { pagePath } from '@/lib/blocks/pages';
 import type { BlockStyle, RenderableBlock } from '@/lib/blocks/registry';
 import { langIfDifferent, localizedPath, type Locale } from '@/lib/i18n';
 import { messages } from '@/lib/messages';
+import { getSiteProfile } from '@/lib/site-profile';
 
 /**
  * Отрисовка блоков страницы.
@@ -80,6 +83,10 @@ export async function PageBlocks({
   const services = blocks.some((block) => block.type === 'services')
     ? await getServices(region, locale)
     : [];
+  // Профиль читают и подвал, и плашка «в разработке»: cache() не идёт в базу второй раз
+  const contacts = blocks.some((block) => block.type === 'contacts')
+    ? contactLinks((await getSiteProfile()).values)
+    : [];
 
   return (
     <>
@@ -153,6 +160,21 @@ export async function PageBlocks({
                   locale={locale}
                   headingLevel={first ? 'h2' : 'h3'}
                 />
+              </>
+            );
+            break;
+          case 'contacts':
+            inner = (
+              <>
+                <Heading
+                  first={first}
+                  large={false}
+                  text={title ?? messages(locale).contacts.title}
+                />
+                {body !== null && body !== undefined && (
+                  <Paragraphs text={body} className="mt-4 text-[var(--color-ink-soft)]" />
+                )}
+                <ContactList links={contacts} locale={locale} />
               </>
             );
             break;
