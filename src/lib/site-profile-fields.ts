@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { normalizePhone, normalizeTelegram } from './contacts';
 
 /**
  * Поля профиля владельца и разбор меток в текстах (docs/03 п.11.3).
@@ -21,6 +22,23 @@ const line = (max: number) =>
     .trim()
     .max(max)
     .refine((value) => !value.includes('\n'));
+
+/**
+ * Значение, которое хранится в приведённом виде: «@name» и «t.me/name»
+ * сохраняются как «name», «0048 600-…» — как «+48600…». Ссылки на сайте
+ * собираются из уже проверенной записи (src/lib/contacts.ts).
+ */
+const normalized = (normalize: (raw: string) => string | null) =>
+  z.string().transform((raw, ctx) => {
+    const value = normalize(raw);
+    if (value === null) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom });
+      return z.NEVER;
+    }
+    return value;
+  });
+
+const PHONE_HINT = 'В международном формате, с кодом страны: +48 600 000 000';
 
 /** NIP: 10 цифр, последняя — контрольная (веса 6,5,7,2,3,4,5,6,7, модуль 11). */
 export function isValidNip(value: string): boolean {
@@ -70,11 +88,30 @@ export const PROFILE_FIELDS: readonly ProfileField[] = [
   {
     key: 'owner.phone',
     label: 'Телефон',
+    hint: PHONE_HINT,
     required: false,
-    schema: z
-      .string()
-      .trim()
-      .regex(/^\+?[0-9 ()-]{6,20}$/),
+    schema: normalized(normalizePhone),
+  },
+  {
+    key: 'contact.telegram',
+    label: 'Telegram',
+    hint: 'Имя пользователя: @name или ссылка t.me/name',
+    required: false,
+    schema: normalized(normalizeTelegram),
+  },
+  {
+    key: 'contact.whatsapp',
+    label: 'WhatsApp',
+    hint: PHONE_HINT,
+    required: false,
+    schema: normalized(normalizePhone),
+  },
+  {
+    key: 'contact.viber',
+    label: 'Viber',
+    hint: PHONE_HINT,
+    required: false,
+    schema: normalized(normalizePhone),
   },
   {
     key: 'owner.nip',

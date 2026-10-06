@@ -104,10 +104,20 @@ const DEMO_TEXTS: {
 ];
 
 /** Текст демо-блока по ключу на всех языках */
-function texts(key: string): Record<string, { title: string; body: string }> {
+function texts(key: string): Record<'ru' | 'pl' | 'en', { title: string; body: string }> {
   const block = DEMO_TEXTS.find((candidate) => candidate.key === key);
   if (block === undefined) throw new Error(`Нет демо-текста ${key}`);
   return block.texts;
+}
+
+/** Кнопка завершающего блока главной: контакты в один клик (docs/13, п.1) */
+function contactCta(): Prisma.InputJsonValue {
+  const { ru, pl, en } = texts('cta.main');
+  return {
+    ru: { ...ru, button: 'Связаться' },
+    pl: { ...pl, button: 'Skontaktuj się' },
+    en: { ...en, button: 'Get in touch' },
+  };
 }
 
 /** Страницы из блоков — та же вёрстка, что до переезда на блоки (docs/13, п.4) */
@@ -137,7 +147,12 @@ const PAGES: {
         content: { ru: { title: 'Услуги' }, pl: { title: 'Usługi' }, en: { title: 'Services' } },
         style: { background: 'tinted' },
       },
-      { type: 'cta', content: texts('cta.main'), style: { align: 'center' } },
+      {
+        type: 'cta',
+        content: contactCta(),
+        data: { link: 'contacts' },
+        style: { align: 'center' },
+      },
     ],
   },
   {
@@ -160,6 +175,37 @@ const PAGES: {
           en: { button: 'Services and prices' },
         },
         data: { link: 'services' },
+      },
+    ],
+  },
+  {
+    // Ради этой страницы затевался сайт (docs/13, п.2). Адреса и номера —
+    // не здесь, а в «Данных владельца»: в публичном репозитории их нет.
+    slug: 'contacts',
+    sortOrder: 20,
+    title: { ru: 'Контакты', pl: 'Kontakt', en: 'Contact' },
+    description: {
+      ru: 'Как связаться и договориться о консультации.',
+      pl: 'Jak się skontaktować i umówić konsultację.',
+      en: 'How to get in touch and arrange a session.',
+    },
+    blocks: [
+      {
+        type: 'contacts',
+        content: {
+          ru: {
+            title: 'Контакты',
+            body: 'Демо-текст. Напишите в удобный мессенджер или на почту — отвечу и предложу время консультации.',
+          },
+          pl: {
+            title: 'Kontakt',
+            body: 'Tekst demonstracyjny. Napisz przez wygodny komunikator lub e-mailem — odpowiem i zaproponuję termin konsultacji.',
+          },
+          en: {
+            title: 'Contact',
+            body: 'Demo text. Write via your preferred messenger or by email, and I will reply with a time for a session.',
+          },
+        },
       },
     ],
   },
@@ -252,29 +298,16 @@ async function main(): Promise<void> {
   }
   console.log(`  ✓ Страниц: ${String(PAGES.length)} (блоки на трёх языках)`);
 
+  // Услуги и цены владелец правит в админке: повторный сид создаёт только
+  // недостающие и не трогает существующие — ни названия, ни историю цен
   for (const service of SERVICES) {
     const { prices, ...serviceData } = service;
-
-    const created = await db.service.upsert({
+    const existing = await db.service.findUnique({
       where: { slug: service.slug },
-      create: serviceData,
-      update: serviceData,
+      select: { id: true },
     });
-
-    for (const price of prices) {
-      const existing = await db.servicePrice.findFirst({
-        where: { serviceId: created.id, region: price.region, currency: price.currency },
-      });
-
-      if (existing === null) {
-        await db.servicePrice.create({ data: { ...price, serviceId: created.id } });
-      } else {
-        await db.servicePrice.update({
-          where: { id: existing.id },
-          data: { amountMinor: price.amountMinor },
-        });
-      }
-    }
+    if (existing !== null) continue;
+    await db.service.create({ data: { ...serviceData, prices: { create: prices } } });
   }
   console.log(`  ✓ Услуг: ${String(SERVICES.length)}`);
 

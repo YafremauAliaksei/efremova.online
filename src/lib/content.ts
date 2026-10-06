@@ -1,7 +1,8 @@
 import 'server-only';
 import { db } from '@/lib/db';
 import { i18nTextSchema } from '@/lib/content-schema';
-import { LOCALE_TAGS, type Locale } from '@/lib/i18n';
+import type { Locale } from '@/lib/i18n';
+import { DEFAULT_REGION, normalizeRegion, pickPrice } from '@/lib/services/edit';
 
 /**
  * Услуги и цены из базы для публичных страниц.
@@ -27,14 +28,20 @@ export interface PublicService {
  * никуда не уходит (docs/13, п.1.1).
  */
 export async function getServices(region: string, locale: Locale): Promise<PublicService[]> {
+  // Заголовок приходит снаружи: «pl», мусор или его отсутствие — общая цена
+  const visitorRegion = normalizeRegion(region) ?? DEFAULT_REGION;
+  const now = new Date();
   try {
     const services = await db.service.findMany({
       where: { isActive: true },
-      orderBy: { sortOrder: 'asc' },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
       include: {
         prices: {
-          where: { OR: [{ region }, { region: 'DEFAULT' }] },
-          orderBy: { validFrom: 'desc' },
+          where: {
+            region: { in: [visitorRegion, DEFAULT_REGION] },
+            validFrom: { lte: now },
+            OR: [{ validTo: null }, { validTo: { gt: now } }],
+          },
         },
       },
     });
@@ -43,8 +50,7 @@ export async function getServices(region: string, locale: Locale): Promise<Publi
       // JSON из базы — не обещание типа: испорченная запись даёт пустой перевод, а не 500
       const titles = i18nTextSchema.parse(service.titleI18n);
       const descriptions = i18nTextSchema.parse(service.descriptionI18n);
-      // Цена для конкретного региона приоритетнее общей
-      const price = service.prices.find((p) => p.region === region) ?? service.prices[0] ?? null;
+      const price = pickPrice(service.prices, visitorRegion, now);
 
       return {
         slug: service.slug,
@@ -57,12 +63,4 @@ export async function getServices(region: string, locale: Locale): Promise<Publi
   } catch {
     return [];
   }
-}
-
-export function formatPrice(amountMinor: number, currency: string, locale: Locale): string {
-  return new Intl.NumberFormat(LOCALE_TAGS[locale], {
-    style: 'currency',
-    currency,
-    maximumFractionDigits: 0,
-  }).format(amountMinor / 100);
 }
