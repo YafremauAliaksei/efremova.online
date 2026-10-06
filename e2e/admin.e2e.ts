@@ -49,7 +49,9 @@ test.beforeAll(async ({ browser }) => {
 });
 
 test.afterAll(async () => {
-  await admin.context().close();
+  // Если браузер не поднялся, beforeAll упал раньше присваивания — без этой
+  // проверки к настоящей ошибке в отчёте добавляется вторая, ложная
+  if (typeof admin !== 'undefined') await admin.context().close();
 });
 
 test('без входа админки не видно', async ({ page, request }) => {
