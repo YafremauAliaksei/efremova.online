@@ -189,6 +189,7 @@ MediaAsset    загруженные картинки
 | отрисовка блоков | `src/components/blocks/PageBlocks.tsx` |
 | ролики: id из ссылки, обложка, переход через предупреждение | `src/lib/video.ts`, `src/lib/media/thumbnail.ts`, `src/app/[locale]/out/youtube/[id]/page.tsx` |
 | картинки: проверка, пересборка, раздача | `src/lib/media/image.ts`, `src/lib/media/store.ts`, `src/app/media/[file]/route.ts` |
+| контакты: проверка адресов и сборка ссылок | `src/lib/contacts.ts` |
 | страницы из базы: `/ru`, `/ru/<slug>` | `src/app/[locale]/page.tsx`, `src/app/[locale]/[...path]/page.tsx` |
 
 Тексты блока на трёх языках лежат в одном JSON: `{"ru": {"title": …}, "pl": {…}}`.

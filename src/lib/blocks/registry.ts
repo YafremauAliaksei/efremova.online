@@ -82,12 +82,14 @@ export const BLOCKS = {
     hint: 'Крупный заголовок и подзаголовок в начале страницы',
     fields: [TITLE, BODY],
     data: noData,
+    withoutText: false,
   },
   text: {
     label: 'Текст',
     hint: 'Заголовок и абзацы; пустая строка между абзацами',
     fields: [TITLE, BODY],
     data: noData,
+    withoutText: false,
   },
   cta: {
     label: 'Призыв с кнопкой',
@@ -99,6 +101,7 @@ export const BLOCKS = {
         link: z.string().refine(isLinkTarget).optional().catch(undefined),
       })
       .catch({}),
+    withoutText: false,
   },
   image: {
     label: 'Текст и фото',
@@ -111,6 +114,7 @@ export const BLOCKS = {
         side: z.enum(IMAGE_SIDES).catch('right'),
       })
       .catch({ side: 'right' }),
+    withoutText: false,
   },
   video: {
     label: 'Видео',
@@ -124,16 +128,32 @@ export const BLOCKS = {
         image: z.string().uuid().optional().catch(undefined),
       })
       .catch({}),
+    withoutText: false,
   },
   services: {
     label: 'Список услуг',
     hint: 'Услуги и цены в валюте посетителя; сами услуги — в разделе «Услуги»',
     fields: [TITLE],
     data: noData,
+    withoutText: true,
+  },
+  contacts: {
+    label: 'Контакты',
+    hint: 'Кнопки «написать» в мессенджеры и на почту; адреса — в «Данных владельца»',
+    fields: [TITLE, BODY],
+    data: noData,
+    withoutText: true,
   },
 } as const satisfies Record<
   string,
-  { label: string; hint: string; fields: readonly TextFieldDef[]; data: z.ZodType<unknown> }
+  {
+    label: string;
+    hint: string;
+    fields: readonly TextFieldDef[];
+    data: z.ZodType<unknown>;
+    /** Рисуется и без своего текста: содержимое приходит не из блока, а из базы */
+    withoutText: boolean;
+  }
 >;
 
 export type BlockType = keyof typeof BLOCKS;
@@ -241,13 +261,15 @@ export function toRenderable(row: StoredBlock, locale: Locale): RenderableBlock 
     };
   }
 
-  // Блок без текста совсем: услуги рисуются и без заголовка, остальным нечего показать
-  if (type !== 'services') return null;
+  // Блок без текста совсем: услуги и контакты рисуются и без заголовка,
+  // остальным нечего показать
+  if (!BLOCKS[type].withoutText) return null;
   return {
     id: row.id,
     type,
-    texts: { title: null },
-    textLocale: DEFAULT_LOCALE,
+    texts: Object.fromEntries(BLOCKS[type].fields.map((field) => [field.name, null])),
+    // Своего текста нет — на странице только подписи интерфейса на её языке
+    textLocale: locale,
     data: {},
     style: blockStyleSchema.parse(row.style),
   };

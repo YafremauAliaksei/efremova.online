@@ -36,6 +36,18 @@ const ru = {
     onRequest: 'по запросу',
     minutes: 'минут',
   },
+  contacts: {
+    title: 'Контакты',
+    listLabel: 'Способы связи',
+    empty: 'Контакты скоро появятся.',
+    kinds: {
+      telegram: 'Telegram',
+      whatsapp: 'WhatsApp',
+      viber: 'Viber',
+      email: 'Почта',
+      phone: 'Телефон',
+    },
+  },
   video: {
     watch: 'Смотреть на YouTube',
     leaveTitle: 'Переход на YouTube',
@@ -79,6 +91,18 @@ const pl = {
     onRequest: 'na zapytanie',
     minutes: 'minut',
   },
+  contacts: {
+    title: 'Kontakt',
+    listLabel: 'Sposoby kontaktu',
+    empty: 'Dane kontaktowe pojawią się wkrótce.',
+    kinds: {
+      telegram: 'Telegram',
+      whatsapp: 'WhatsApp',
+      viber: 'Viber',
+      email: 'E-mail',
+      phone: 'Telefon',
+    },
+  },
   video: {
     watch: 'Obejrzyj w YouTube',
     leaveTitle: 'Przejście do YouTube',
@@ -119,6 +143,18 @@ const en = {
     empty: 'The list of services has not been filled in yet.',
     onRequest: 'on request',
     minutes: 'minutes',
+  },
+  contacts: {
+    title: 'Contact',
+    listLabel: 'Ways to get in touch',
+    empty: 'Contact details will appear soon.',
+    kinds: {
+      telegram: 'Telegram',
+      whatsapp: 'WhatsApp',
+      viber: 'Viber',
+      email: 'Email',
+      phone: 'Phone',
+    },
   },
   video: {
     watch: 'Watch on YouTube',

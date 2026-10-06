@@ -84,6 +84,36 @@ describe('поля профиля', () => {
     });
   });
 
+  it('контакты сохраняются в приведённом виде', () => {
+    expect(validateField('contact.telegram', 'https://t.me/demo_name')).toEqual({
+      ok: true,
+      value: 'demo_name',
+    });
+    expect(validateField('contact.whatsapp', '0048 600-000-000')).toEqual({
+      ok: true,
+      value: '+48600000000',
+    });
+    expect(validateField('owner.phone', '+48 (600) 000 000')).toEqual({
+      ok: true,
+      value: '+48600000000',
+    });
+  });
+
+  it.each([
+    ['contact.telegram', 'ab'],
+    ['contact.telegram', 'javascript:alert(1)'],
+    ['contact.viber', '600 000 000'],
+    ['owner.phone', '+48 600 000 000 ext 5'],
+  ])('контакт %s = %j отклоняется', (key, value) => {
+    expect(validateField(key, value)).toEqual({ ok: false });
+  });
+
+  it('контакты необязательны: сайт выходит из разработки и без мессенджеров', () => {
+    const contactKeys = ['contact.telegram', 'contact.whatsapp', 'contact.viber', 'owner.phone'];
+    const required = PROFILE_FIELDS.filter((field) => field.required).map((field) => field.key);
+    for (const key of contactKeys) expect(required).not.toContain(key);
+  });
+
   it('пока обязательные поля пусты, они перечислены', () => {
     const required = PROFILE_FIELDS.filter((field) => field.required).map((field) => field.key);
     expect(missingRequired({}).map((field) => field.key)).toEqual(required);
