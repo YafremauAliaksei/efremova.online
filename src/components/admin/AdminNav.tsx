@@ -8,6 +8,7 @@ import Link from 'next/link';
 const SECTIONS = [
   { href: '/admin', label: 'Страницы и тексты' },
   { href: '/admin/services', label: 'Услуги и цены' },
+  { href: '/admin/media', label: 'Картинки' },
   { href: '/admin/profile', label: 'Данные владельца' },
 ] as const;
 

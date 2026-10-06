@@ -27,6 +27,13 @@ const nextConfig = {
   // @prisma/client и pg Next.js и так держит внешними.
   serverExternalPackages: ['@prisma/adapter-pg'],
 
+  // Загрузка картинок в админке идёт через server action, а у него предел
+  // тела 1 МБ — фото с телефона весит 3–8. 10 МБ — как client_max_body_size
+  // в nginx: больше всё равно не дойдёт (src/lib/media/image.ts, MAX_UPLOAD_BYTES).
+  experimental: {
+    serverActions: { bodySizeLimit: '10mb' },
+  },
+
   // Автоматический AVIF/WebP. Экономия 60-80 % веса картинок — главный вклад в LCP.
   images: {
     formats: ['image/avif', 'image/webp'],
