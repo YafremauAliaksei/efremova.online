@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { expect, test, type Page } from '@playwright/test';
+import sharp from 'sharp';
 
 /**
  * Админка глазами владельца: вход по одноразовой ссылке, конструктор блоков,
@@ -188,6 +189,65 @@ test('главную нельзя скрыть и убрать в архив', a
   await admin.locator('summary', { hasText: 'Настройки страницы' }).click();
   await expect(admin.locator('input[name=isPublished]')).toBeDisabled();
   await expect(admin.getByRole('button', { name: 'Страницу в архив' })).toHaveCount(0);
+});
+
+test('картинки: загрузка без EXIF, отказ SVG, архив', async () => {
+  // Как фото с телефона: модель и координаты в EXIF
+  const photo = await sharp({
+    create: { width: 1200, height: 800, channels: 3, background: { r: 90, g: 140, b: 120 } },
+  })
+    .withExif({ IFD0: { Make: 'DemoPhone' }, IFD3: { GPSLatitudeRef: 'N' } })
+    // Свой цвет на каждый прогон: иначе второй прогон на той же базе — «уже загружена»
+    .composite([
+      {
+        input: { create: { width: 10, height: 10, channels: 3, background: `#${RUN}` } },
+        left: 0,
+        top: 0,
+      },
+    ])
+    .jpeg()
+    .toBuffer();
+
+  await admin.goto('/admin/media');
+  await admin.locator('input[name=file]').setInputFiles({
+    name: 'IMG_home.jpg',
+    mimeType: 'image/jpeg',
+    buffer: photo,
+  });
+  await admin.locator('input[name=label]').first().fill(`Проверка ${RUN}`);
+  await admin.getByRole('button', { name: 'Загрузить' }).click();
+  await saved(admin, 'Картинка загружена');
+
+  const preview = admin.locator(`img[alt="Проверка ${RUN}"]`);
+  const src = await preview.getAttribute('src');
+  expect(src).toMatch(/^\/media\/[0-9a-f]{64}\.webp$/);
+
+  // Отдаётся со своего домена, кэшируется навсегда, данных о съёмке нет
+  const file = await admin.request.get(src ?? '');
+  expect(file.status()).toBe(200);
+  expect(file.headers()['content-type']).toBe('image/webp');
+  expect(file.headers()['cache-control']).toContain('immutable');
+  expect(file.headers()['x-content-type-options']).toBe('nosniff');
+  const body = await file.body();
+  expect(body.includes('DemoPhone')).toBe(false);
+  expect((await sharp(body).metadata()).exif).toBeUndefined();
+
+  // SVG под видом PNG — отказ
+  await admin.locator('input[name=file]').setInputFiles({
+    name: 'logo.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'),
+  });
+  await admin.getByRole('button', { name: 'Загрузить' }).click();
+  await expect(admin.locator('main [role=alert]')).toContainText('SVG не принимается');
+
+  // В архиве — с сайта пропадает
+  await admin
+    .locator('li', { has: admin.locator(`img[alt="Проверка ${RUN}"]`) })
+    .getByRole('button', { name: 'В архив' })
+    .click();
+  await saved(admin, 'убрана в архив');
+  expect((await admin.request.get(src ?? '')).status()).toBe(404);
 });
 
 test('услуги: создать, назначить цены по регионам, показать, сменить цену', async ({ browser }) => {
