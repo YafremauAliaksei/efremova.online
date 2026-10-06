@@ -38,7 +38,8 @@ import { createThrottle, throttleKey } from '@/lib/security/throttle';
  * cookie; подпись проверяется в самой странице (два независимых рубежа).
  */
 const ADMIN_PREFIX = '/admin';
-const ADMIN_PUBLIC_PATHS = ['/admin/enter', '/admin/denied'] as const;
+// /admin/2fa — до сессии: там вводят код по пропуску из одноразовой ссылки
+const ADMIN_PUBLIC_PATHS = ['/admin/enter', '/admin/denied', '/admin/2fa'] as const;
 const ADMIN_COOKIE =
   process.env.NODE_ENV === 'production' ? '__Host-admin-session' : 'admin-session';
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -68,12 +69,13 @@ const eventThrottle = createThrottle();
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
   const isDev = process.env.NODE_ENV === 'development';
-  const isAdminArea =
-    (pathname === ADMIN_PREFIX || pathname.startsWith(`${ADMIN_PREFIX}/`)) &&
-    !ADMIN_PUBLIC_PATHS.some((allowed) => pathname === allowed);
+  const isUnderAdmin = pathname === ADMIN_PREFIX || pathname.startsWith(`${ADMIN_PREFIX}/`);
+  // Без сессии не пускаем никуда, кроме входа, отказа и страницы кода
+  const isAdminArea = isUnderAdmin && !ADMIN_PUBLIC_PATHS.some((allowed) => pathname === allowed);
 
-  // Единственная закрытая зона на этом домене
-  const isPrivate = isAdminArea;
+  // Закрытая зона для заголовков — вся админка, и страницы до входа тоже:
+  // no-store и noindex нужны и странице ввода кода (CLAUDE.md, правило 4)
+  const isPrivate = isUnderAdmin;
 
   // ────────────────────────────────────────────────────────────────
   // 1. ЛОВУШКИ

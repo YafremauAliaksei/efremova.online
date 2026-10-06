@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { E2E_TOTP_KEY } from './e2e/totp-key';
 
 /**
  * Браузерные тесты: сайт и админка глазами человека, настоящими щелчками.
@@ -32,7 +33,10 @@ export default defineConfig({
     // В Docker-контейнере CI переменная HOSTNAME — имя контейнера, и сервер
     // Next.js слушал бы его адрес, а не localhost. Явно — все адреса,
     // как по умолчанию у самого Next.js
-    env: { HOSTNAME: '0.0.0.0' },
+    //
+    // Второй фактор входа в админку включён и в тестах: вход идёт тем же
+    // путём, что у владельца (ключ — учебный, e2e/totp-key.ts)
+    env: { HOSTNAME: '0.0.0.0', ADMIN_TOTP_SECRET: E2E_TOTP_KEY },
     url: 'http://localhost:3000/api/health',
     reuseExistingServer: process.env.CI === undefined,
     timeout: 120_000,

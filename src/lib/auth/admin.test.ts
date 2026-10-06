@@ -27,7 +27,11 @@ const rows: TokenRow[] = [];
 const jar = new Map<string, { value: string; options: Record<string, unknown> }>();
 
 vi.mock('server-only', () => ({}));
-vi.mock('@/lib/env', () => ({ env: () => ({ AUTH_SECRET: SECRET }) }));
+// Учебный ключ второго фактора (тот же, что в e2e/totp-key.ts)
+const TOTP_KEY = 'JBSWY3DPEHPK3PXP';
+vi.mock('@/lib/env', () => ({
+  env: () => ({ AUTH_SECRET: SECRET, ADMIN_TOTP_SECRET: TOTP_KEY }),
+}));
 vi.mock('next/headers', () => ({
   cookies: () =>
     Promise.resolve({
@@ -67,6 +71,7 @@ vi.mock('@/lib/db', () => ({
 }));
 
 const admin = await import('./admin');
+const { base32Decode, totp } = await import('./totp');
 
 beforeEach(() => {
   rows.length = 0;
@@ -167,6 +172,76 @@ describe('сессия', () => {
   it('выход удаляет cookie', async () => {
     await admin.createAdminSession();
     await admin.destroyAdminSession();
+    expect(await admin.isAdmin()).toBe(false);
+  });
+});
+
+describe('второй фактор', () => {
+  const key = base32Decode(TOTP_KEY) ?? new Uint8Array();
+  // Каждый тест — в своём 30-секундном окне: использованный код не принимается повторно
+  let clock = Date.UTC(2026, 9, 6, 12, 0, 0);
+  const nextWindow = () => {
+    clock += 5 * 60_000;
+    return new Date(clock);
+  };
+
+  it('пропуск после ссылки — ещё не вход в админку', async () => {
+    await admin.createPendingSecondFactor();
+    expect(await admin.pendingSecondFactor()).not.toBeNull();
+    expect(await admin.isAdmin()).toBe(false);
+  });
+
+  it('верный код — сессия, пропуск сгорает', async () => {
+    const now = nextWindow();
+    await admin.createPendingSecondFactor();
+    expect(await admin.completeSecondFactor(totp(key, now), now)).toEqual({ ok: true });
+    expect(await admin.isAdmin()).toBe(true);
+    expect(await admin.pendingSecondFactor()).toBeNull();
+  });
+
+  it('тот же код второй раз не открывает вторую сессию', async () => {
+    const now = nextWindow();
+    await admin.createPendingSecondFactor();
+    const code = totp(key, now);
+    expect(await admin.completeSecondFactor(code, now)).toEqual({ ok: true });
+    jar.clear();
+    await admin.createPendingSecondFactor();
+    expect(await admin.completeSecondFactor(code, now)).toMatchObject({
+      ok: false,
+      reason: 'wrong',
+    });
+  });
+
+  it('пять неверных кодов — пропуск сгорает, нужна новая ссылка', async () => {
+    const now = nextWindow();
+    await admin.createPendingSecondFactor();
+    for (const left of [4, 3, 2, 1]) {
+      expect(await admin.completeSecondFactor('000000', now)).toEqual({
+        ok: false,
+        reason: 'wrong',
+        left,
+      });
+    }
+    expect(await admin.completeSecondFactor('000000', now)).toMatchObject({ reason: 'locked' });
+    // Даже верный код теперь бесполезен
+    expect(await admin.completeSecondFactor(totp(key, now), now)).toMatchObject({
+      reason: 'expired',
+    });
+    expect(await admin.isAdmin()).toBe(false);
+  });
+
+  it('без пропуска код ничего не даёт', async () => {
+    const now = nextWindow();
+    expect(await admin.completeSecondFactor(totp(key, now), now)).toMatchObject({
+      reason: 'expired',
+    });
+    expect(await admin.isAdmin()).toBe(false);
+  });
+
+  it('пропуск — не сессия: подложенный в cookie сессии, он не пускает', async () => {
+    await admin.createPendingSecondFactor();
+    const pending = jar.get(admin.pendingCookieName());
+    jar.set(admin.adminCookieName(), { value: pending?.value ?? '', options: {} });
     expect(await admin.isAdmin()).toBe(false);
   });
 });

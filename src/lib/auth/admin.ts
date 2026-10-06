@@ -1,9 +1,10 @@
 import 'server-only';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { SignJWT, jwtVerify } from 'jose';
 import { db } from '@/lib/db';
 import { env } from '@/lib/env';
+import { base32Decode, verifyTotp } from '@/lib/auth/totp';
 
 /**
  * Вход в админку.
@@ -22,8 +23,10 @@ import { env } from '@/lib/env';
  *   • Cookie с префиксом __Host-: браузер не отдаст её поддомену и разрешит
  *     только по HTTPS. Украсть через соседний поддомен невозможно.
  *
- * ⚠️ До выхода в прод сюда добавляется второй фактор (PROJECT_LOG, шаг A.7).
- * Одной ссылки для боевой админки мало.
+ *   • Второй фактор — код из приложения-аутентификатора (totp.ts), если
+ *     задан ADMIN_TOTP_SECRET. Ссылка тогда даёт не сессию, а пятиминутный
+ *     «пропуск к коду»; сессию даёт только верный код. Без секрета вход —
+ *     по одной ссылке, и админка об этом предупреждает красной плашкой.
  */
 
 const ADMIN_COOKIE = '__Host-admin-session';
@@ -133,4 +136,120 @@ export async function isAdmin(): Promise<boolean> {
 export async function destroyAdminSession(): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.delete(adminCookieName());
+}
+
+// ───────────────────────────── второй фактор ─────────────────────────────
+
+const PENDING_TTL_MINUTES = 5;
+/** Попыток ввести код на одну ссылку: дальше — новая ссылка из терминала */
+export const MAX_CODE_ATTEMPTS = 5;
+
+/**
+ * Память о попытках и использованных кодах — в процессе, а не в базе.
+ *
+ * Пропуск живёт 5 минут и выдаётся только по одноразовой ссылке, сервер —
+ * один процесс. Перезапуск обнуляет счётчик, но новую попытку всё равно
+ * начинает только новая ссылка из терминала. Подписанный cookie счётчик
+ * не хранит намеренно: старую копию cookie можно было бы прислать снова.
+ */
+const attempts = new Map<string, number>();
+let lastUsedStep: number | null = null;
+
+export function pendingCookieName(): string {
+  return process.env.NODE_ENV === 'production' ? '__Host-admin-2fa' : 'admin-2fa';
+}
+
+/** Секрет второго фактора, если он задан и читается; иначе null */
+function totpSecret(): Uint8Array | null {
+  const raw = env().ADMIN_TOTP_SECRET;
+  if (raw === undefined) return null;
+  const secret = base32Decode(raw);
+  // Испорченный секрет — не «2FA выключена», а отказ: входить мимо кода нельзя
+  if (secret === null || secret.length < 10) {
+    throw new Error('ADMIN_TOTP_SECRET задан, но это не base32-секрет из npm run admin:2fa');
+  }
+  return secret;
+}
+
+export function isTotpEnabled(): boolean {
+  return env().ADMIN_TOTP_SECRET !== undefined;
+}
+
+/** После верной ссылки: пропуск к странице кода, не сессия */
+export async function createPendingSecondFactor(): Promise<void> {
+  const jti = randomUUID();
+  const token = await new SignJWT({ stage: 'totp' })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setJti(jti)
+    .setExpirationTime(`${String(PENDING_TTL_MINUTES)}m`)
+    .setSubject('admin')
+    .sign(secretKey());
+  attempts.set(jti, 0);
+
+  const cookieStore = await cookies();
+  cookieStore.set(pendingCookieName(), token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    // strict: пропуск не уходит ни с одним запросом с чужого сайта
+    sameSite: 'strict',
+    path: '/',
+    maxAge: PENDING_TTL_MINUTES * 60,
+  });
+}
+
+/** id пропуска, если он есть, подписан и не просрочен */
+export async function pendingSecondFactor(): Promise<string | null> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(pendingCookieName())?.value;
+  // eslint-disable-next-line security/detect-possible-timing-attacks -- проверяется наличие cookie; подпись сверяет jwtVerify в постоянном времени
+  if (token === undefined) return null;
+  try {
+    const { payload } = await jwtVerify(token, secretKey());
+    if (payload.stage !== 'totp' || payload.jti === undefined) return null;
+    // Пропуск, которого процесс не выдавал (или выдал до перезапуска), не действует
+    return attempts.has(payload.jti) ? payload.jti : null;
+  } catch {
+    return null;
+  }
+}
+
+export type SecondFactorResult =
+  { ok: true } | { ok: false; reason: 'expired' | 'wrong' | 'locked'; left: number };
+
+/**
+ * Проверка кода. Верный — пропуск сгорает, создаётся сессия. Неверный —
+ * попытка списывается; после пятой пропуск сгорает, и нужна новая ссылка.
+ */
+export async function completeSecondFactor(
+  code: string,
+  now = new Date()
+): Promise<SecondFactorResult> {
+  const jti = await pendingSecondFactor();
+  if (jti === null) return { ok: false, reason: 'expired', left: 0 };
+  const secret = totpSecret();
+  // eslint-disable-next-line security/detect-possible-timing-attacks -- проверка «секрет не задан», а не сравнение секретов; код сверяет verifyTotp в постоянном времени
+  if (secret === null) return { ok: false, reason: 'expired', left: 0 };
+
+  const used = attempts.get(jti) ?? MAX_CODE_ATTEMPTS;
+  if (used >= MAX_CODE_ATTEMPTS) return { ok: false, reason: 'locked', left: 0 };
+
+  const step = verifyTotp(secret, code, now, lastUsedStep);
+  const cookieStore = await cookies();
+  if (step === null) {
+    attempts.set(jti, used + 1);
+    const left = MAX_CODE_ATTEMPTS - used - 1;
+    if (left === 0) {
+      attempts.delete(jti);
+      cookieStore.delete(pendingCookieName());
+      return { ok: false, reason: 'locked', left: 0 };
+    }
+    return { ok: false, reason: 'wrong', left };
+  }
+
+  lastUsedStep = step;
+  attempts.delete(jti);
+  cookieStore.delete(pendingCookieName());
+  await createAdminSession();
+  return { ok: true };
 }
