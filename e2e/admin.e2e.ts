@@ -189,3 +189,47 @@ test('главную нельзя скрыть и убрать в архив', a
   await expect(admin.locator('input[name=isPublished]')).toBeDisabled();
   await expect(admin.getByRole('button', { name: 'Страницу в архив' })).toHaveCount(0);
 });
+
+test('контакты: адреса из профиля — кнопками на странице контактов', async () => {
+  const site = await admin.context().newPage();
+
+  // Пока адресов нет, вместо кнопок — честное «скоро появятся»
+  await site.goto('/ru/contacts');
+  await expect(site.locator('main h1')).toHaveText('Контакты');
+
+  await admin.goto('/admin/profile');
+  await admin.locator('input[name="contact.telegram"]').fill('https://t.me/demo_contact');
+  await admin.locator('input[name="contact.whatsapp"]').fill('+48 600 000 000');
+  await admin.locator('input[name="contact.viber"]').fill('600');
+  await admin.locator('input[name="owner.email"]').fill('kontakt@example.pl');
+  await admin.getByRole('button', { name: 'Сохранить', exact: true }).click();
+  // Номер без кода страны не сохраняется, остальное — сохраняется
+  await expect(admin.locator('main [role=alert]')).toContainText('Viber');
+  await expect(admin.locator('input[name="contact.telegram"]')).toHaveValue('demo_contact');
+
+  await site.goto('/ru/contacts');
+  await expect(site.locator('a[data-contact=telegram]')).toHaveAttribute(
+    'href',
+    'https://t.me/demo_contact'
+  );
+  await expect(site.locator('a[data-contact=whatsapp]')).toHaveAttribute(
+    'href',
+    'https://wa.me/48600000000'
+  );
+  await expect(site.locator('a[data-contact=email]')).toHaveAttribute(
+    'href',
+    'mailto:kontakt@example.pl'
+  );
+  await expect(site.locator('a[data-contact=viber]')).toHaveCount(0);
+
+  // На польской странице подписи польские, а адреса те же
+  await site.goto('/pl/contacts');
+  await expect(site.locator('a[data-contact=email]')).toContainText('E-mail');
+  await expect(site.locator('main section').first()).not.toHaveAttribute('lang', 'ru');
+
+  // С главной до контактов — одна кнопка
+  await site.goto('/ru');
+  await site.getByRole('link', { name: 'Связаться' }).click();
+  await expect(site).toHaveURL(/\/ru\/contacts$/);
+  await site.close();
+});
