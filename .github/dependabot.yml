@@ -48,6 +48,11 @@ updates:
     ignore:
       - dependency-name: '*'
         update-types: ['version-update:semver-major']
+      # Браузер для тестов берётся из образа Playwright в CI, закреплённого
+      # по хешу (.github/workflows/ci-security.yml, ворота 8). Образ
+      # Dependabot не обновляет, и пакет без образа роняет браузерные тесты
+      # (так упал PR #64). Обновлять вручную: пакет и образ — в одном PR.
+      - dependency-name: '@playwright/test'
 
     commit-message:
       prefix: deps
