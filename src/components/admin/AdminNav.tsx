@@ -11,6 +11,7 @@ const SECTIONS = [
   { href: '/admin/services', label: 'Услуги и цены' },
   { href: '/admin/media', label: 'Картинки' },
   { href: '/admin/profile', label: 'Данные владельца' },
+  { href: '/admin/journal', label: 'Журнал' },
 ] as const;
 
 const PLANNED = ['Правовые документы'] as const;

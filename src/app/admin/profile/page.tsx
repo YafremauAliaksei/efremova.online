@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { isAdmin, isTotpEnabled } from '@/lib/auth/admin';
 import { SecondFactorWarning } from '@/components/admin/AdminNav';
+import { audit } from '@/lib/audit/log';
 import { db } from '@/lib/db';
 import { getSiteProfile } from '@/lib/site-profile';
 import {
@@ -145,13 +146,24 @@ async function saveProfile(formData: FormData) {
   if (!(await isAdmin())) redirect('/admin/denied');
 
   const invalid: string[] = [];
+  const changed: string[] = [];
+  const before = new Map(
+    (
+      await db.siteSetting.findMany({
+        where: { key: { in: PROFILE_FIELDS.map((field) => field.key) } },
+      })
+    ).map((setting) => [setting.key, setting.value])
+  );
   for (const field of PROFILE_FIELDS) {
     const raw = formData.get(field.key);
     if (typeof raw !== 'string') continue;
     const result = validateField(field.key, raw);
     if (!result.ok) {
       invalid.push(field.key);
-    } else if (result.value === '') {
+      continue;
+    }
+    if ((before.get(field.key) ?? '') !== result.value) changed.push(field.key);
+    if (result.value === '') {
       await db.siteSetting.deleteMany({ where: { key: field.key } });
     } else {
       await db.siteSetting.upsert({
@@ -161,6 +173,9 @@ async function saveProfile(formData: FormData) {
       });
     }
   }
+  // Только имена полей: значения — данные владельца, им не место в журнале,
+  // который нельзя чистить (src/lib/audit/actions.ts)
+  if (changed.length > 0) await audit('profile.save', null, { fields: changed });
 
   // Данные владельца есть на каждой странице — сбрасывается кэш всего сайта
   revalidatePath('/[locale]', 'layout');
@@ -187,6 +202,7 @@ async function setStatus(formData: FormData) {
     create: { key: SITE_STATUS_KEY, value: next },
     update: { value: next },
   });
+  await audit('site.status', null, { status: next });
   revalidatePath('/[locale]', 'layout');
   redirect('/admin/profile?saved=1');
 }

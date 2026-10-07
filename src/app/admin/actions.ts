@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { isAdmin } from '@/lib/auth/admin';
+import { audit } from '@/lib/audit/log';
 import { db } from '@/lib/db';
 import { parseBlockSettingsForm, parseBlockTextForm, withLocaleTexts } from '@/lib/blocks/edit';
 import { insertAfter, moveId, numbered } from '@/lib/blocks/order';
@@ -106,6 +107,7 @@ export async function saveBlockText(formData: FormData): Promise<void> {
       data: { content: withLocaleTexts(block.content, parsed.value.locale, parsed.value.texts) },
     }),
   ]);
+  await audit('block.text', block.id, { page: block.page.slug, locale: parsed.value.locale });
   refresh();
   back(formData, block.page.slug, `&block=${block.id}&saved=text`);
 }
@@ -151,6 +153,7 @@ export async function saveBlockSettings(formData: FormData): Promise<void> {
       data: { style: parsed.value.style, data },
     }),
   ]);
+  await audit('block.settings', block.id, { page: block.page.slug });
   refresh();
   back(formData, block.page.slug, `&block=${block.id}&saved=${saved}`);
 }
@@ -201,6 +204,7 @@ export async function addBlock(formData: FormData): Promise<void> {
     select: { id: true },
   });
   await saveOrder(insertAfter(ids, created.id, after));
+  await audit('block.add', created.id, { page: page.slug, type });
   refresh();
   back(formData, page.slug, `&block=${created.id}&saved=added#block-${created.id}`);
 }
@@ -210,6 +214,7 @@ export async function moveBlock(formData: FormData): Promise<void> {
   const block = await editableBlock(formData);
   const direction = formData.get('direction') === 'up' ? 'up' : 'down';
   await saveOrder(moveId(await pageBlockIds(block.pageId), block.id, direction));
+  await audit('block.move', block.id, { page: block.page.slug, direction });
   refresh();
   back(formData, block.page.slug, `&block=${block.id}&saved=moved#block-${block.id}`);
 }
@@ -218,6 +223,7 @@ export async function toggleBlock(formData: FormData): Promise<void> {
   await requireAdmin();
   const block = await editableBlock(formData);
   await db.pageBlock.update({ where: { id: block.id }, data: { isPublished: !block.isPublished } });
+  await audit(block.isPublished ? 'block.hide' : 'block.show', block.id, { page: block.page.slug });
   refresh();
   back(
     formData,
@@ -231,6 +237,7 @@ export async function archiveBlock(formData: FormData): Promise<void> {
   await requireAdmin();
   const block = await editableBlock(formData);
   await db.pageBlock.update({ where: { id: block.id }, data: { archivedAt: new Date() } });
+  await audit('block.archive', block.id, { page: block.page.slug });
   refresh();
   back(formData, block.page.slug, '&saved=archived');
 }
@@ -253,6 +260,7 @@ export async function restoreBlock(formData: FormData): Promise<void> {
   const ids = await pageBlockIds(block.pageId);
   await db.pageBlock.update({ where: { id: block.id }, data: { archivedAt: null } });
   await saveOrder([...ids, block.id]);
+  await audit('block.restore', block.id, { page: block.page.slug });
   refresh();
   back(formData, block.page.slug, `&block=${block.id}&saved=restored#block-${block.id}`);
 }
@@ -288,6 +296,7 @@ export async function restoreRevision(formData: FormData): Promise<void> {
       },
     }),
   ]);
+  await audit('block.revert', block.id, { page: block.page.slug, revision: revision.id });
   refresh();
   back(formData, block.page.slug, `&block=${block.id}&saved=reverted#block-${block.id}`);
 }
@@ -334,7 +343,8 @@ export async function createPage(formData: FormData): Promise<void> {
   if (taken !== null) back(formData, '', '&newpage=1&error=slugTaken');
 
   const ids = await pageIdsInOrder();
-  await db.page.create({
+  const created = await db.page.create({
+    select: { id: true },
     data: {
       slug: parsed.value.slug,
       titleI18n: { [DEFAULT_LOCALE]: parsed.value.title },
@@ -342,6 +352,7 @@ export async function createPage(formData: FormData): Promise<void> {
       sortOrder: ids.length * 10,
     },
   });
+  await audit('page.create', created.id, { page: parsed.value.slug });
   refresh();
   back(formData, parsed.value.slug, '&saved=pageCreated');
 }
@@ -364,6 +375,7 @@ export async function savePageSettings(formData: FormData): Promise<void> {
       isPublished: page.slug === HOME_SLUG ? true : isPublished,
     },
   });
+  await audit('page.settings', page.id, { page: page.slug });
   refresh();
   back(formData, page.slug, '&saved=pageSettings');
 }
@@ -374,6 +386,7 @@ export async function movePage(formData: FormData): Promise<void> {
   const page = await editablePage(formData);
   const direction = formData.get('direction') === 'up' ? 'up' : 'down';
   await savePageOrder(moveId(await pageIdsInOrder(), page.id, direction));
+  await audit('page.move', page.id, { page: page.slug, direction });
   refresh();
   back(formData, page.slug, '&saved=pageMoved');
 }
@@ -384,6 +397,7 @@ export async function archivePage(formData: FormData): Promise<void> {
   const page = await editablePage(formData);
   if (page.slug === HOME_SLUG) back(formData, page.slug, '&error=homeArchive');
   await db.page.update({ where: { id: page.id }, data: { archivedAt: new Date() } });
+  await audit('page.archive', page.id, { page: page.slug });
   refresh();
   back(formData, HOME_SLUG, '&saved=pageArchived');
 }
@@ -399,6 +413,7 @@ export async function restorePage(formData: FormData): Promise<void> {
   const ids = await pageIdsInOrder();
   await db.page.update({ where: { id: page.id }, data: { archivedAt: null, isPublished: false } });
   await savePageOrder([...ids, page.id]);
+  await audit('page.restore', page.id, { page: page.slug });
   refresh();
   back(formData, page.slug, '&saved=pageRestored');
 }

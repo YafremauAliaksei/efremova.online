@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { isAdmin } from '@/lib/auth/admin';
+import { audit } from '@/lib/audit/log';
 import { db } from '@/lib/db';
 import { moveId, numbered } from '@/lib/blocks/order';
 import { DEFAULT_LOCALE } from '@/lib/i18n';
@@ -85,6 +86,7 @@ export async function createService(formData: FormData): Promise<void> {
     },
     select: { id: true },
   });
+  await audit('service.create', created.id, { service: parsed.value.slug });
   refresh();
   back(created.id, 'saved=created');
 }
@@ -100,6 +102,7 @@ export async function saveService(formData: FormData): Promise<void> {
     where: { id: serviceId },
     data: { titleI18n, descriptionI18n, durationMinutes, isActive },
   });
+  await audit('service.settings', serviceId, { active: isActive });
   refresh();
   back(serviceId, 'saved=settings');
 }
@@ -115,6 +118,7 @@ export async function moveService(formData: FormData): Promise<void> {
       db.service.update({ where: { id }, data: { sortOrder } })
     )
   );
+  await audit('service.move', serviceId, { direction });
   refresh();
   back(serviceId, 'saved=moved');
 }
@@ -147,6 +151,11 @@ export async function setPrice(formData: FormData): Promise<void> {
       },
     }),
   ]);
+  await audit('price.set', serviceId, {
+    region: parsed.value.region,
+    currency: parsed.value.currency,
+    amountMinor: parsed.value.amountMinor,
+  });
   refresh();
   back(serviceId, 'saved=price');
 }
@@ -164,6 +173,7 @@ export async function closePrice(formData: FormData): Promise<void> {
     data: { validTo: now },
   });
   if (count === 0) back(serviceId, 'error=missing');
+  await audit('price.close', serviceId, { price: priceId });
   refresh();
   back(serviceId, 'saved=priceClosed');
 }

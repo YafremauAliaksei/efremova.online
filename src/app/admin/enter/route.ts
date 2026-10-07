@@ -7,6 +7,7 @@ import {
   createPendingSecondFactor,
   isTotpEnabled,
 } from '@/lib/auth/admin';
+import { audit } from '@/lib/audit/log';
 import { recordSecurityEvent } from '@/lib/security/recorder';
 
 /**
@@ -60,6 +61,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     details: { event: 'ADMIN_LOGIN', outcome: 'success', factors: 'link' },
     count: 1,
   });
+  await audit('session.login', null, { factors: 'link' });
 
   // 303: после входа браузер идёт в админку обычным GET
   return relativeRedirect('/admin', 303, { 'Cache-Control': 'no-store' });

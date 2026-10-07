@@ -389,7 +389,12 @@ export default async function AdminPage({ searchParams }: PageProps) {
 
 async function logout() {
   'use server';
-  const { destroyAdminSession } = await import('@/lib/auth/admin');
+  const { destroyAdminSession, isAdmin: signedIn } = await import('@/lib/auth/admin');
+  // Выход без сессии — не действие владельца, в журнал не пишется
+  if (await signedIn()) {
+    const { audit } = await import('@/lib/audit/log');
+    await audit('session.logout');
+  }
   await destroyAdminSession();
   redirect('/');
 }
