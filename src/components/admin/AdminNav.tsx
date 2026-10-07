@@ -10,11 +10,12 @@ const SECTIONS = [
   { href: '/admin', label: 'Страницы и тексты' },
   { href: '/admin/services', label: 'Услуги и цены' },
   { href: '/admin/media', label: 'Картинки' },
+  { href: '/admin/legal', label: 'Правовые документы' },
   { href: '/admin/profile', label: 'Данные владельца' },
   { href: '/admin/journal', label: 'Журнал' },
 ] as const;
 
-const PLANNED = ['Правовые документы'] as const;
+const PLANNED = ['Отзывы'] as const;
 
 export function AdminNav({ current }: { current: (typeof SECTIONS)[number]['href'] }) {
   return (

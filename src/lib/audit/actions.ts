@@ -37,6 +37,9 @@ export const AUDIT_ACTIONS = {
   'media.archive': 'Картинка в архив',
   'media.restore': 'Картинка из архива',
 
+  'legal.publish': 'Новая редакция документа',
+  'legal.restore': 'Документ: возврат редакции',
+
   'profile.save': 'Данные владельца',
   'site.status': 'Режим сайта',
 } as const;

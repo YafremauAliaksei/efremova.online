@@ -139,6 +139,9 @@ model LegalDocument {
   isDraft   Boolean @default(true)
   /// Действующая редакция для этой пары slug+locale
   isCurrent Boolean @default(true)
+  /// Редакция из админки. Документ, который владелец хоть раз правил,
+  /// сид больше не трогает: образец из кода не должен затирать его текст
+  fromAdmin Boolean @default(false)
 
   publishedAt DateTime @default(now()) @db.Timestamptz
   createdAt   DateTime @default(now()) @db.Timestamptz
