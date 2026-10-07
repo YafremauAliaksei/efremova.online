@@ -340,13 +340,24 @@ model Lecture {
   @@map("lectures")
 }
 
-/// Только псевдоним автора: реальное имя клиента психолога — чувствительные данные
+/// Только псевдоним автора: реальное имя клиента психолога — чувствительные данные.
+///
+/// Отзыв сообщает, что человек был клиентом психолога, — это данные о
+/// здоровье (ст. 9 GDPR, docs/13 п.8). Согласие берётся вне сайта, письмом
+/// или на бумаге; здесь — только его дата. Без даты показать отзыв нельзя:
+/// это проверяет база (CHECK в миграции testimonials_consent), а не только
+/// админка. Отзыв согласия — строка удаляется целиком, без истории.
 model Testimonial {
-  id          String  @id @default(uuid()) @db.Uuid
+  id          String    @id @default(uuid()) @db.Uuid
   authorAlias String
   body        String
-  rating      Int     @default(5)
-  isPublished Boolean @default(false)
+  rating      Int       @default(5)
+  isPublished Boolean   @default(false)
+  /// Язык текста отзыва: на сайте он показывается как есть, с верным lang
+  locale      String    @default("ru")
+  /// Дата письменного согласия автора на публикацию
+  consentAt   DateTime? @db.Timestamptz
+  sortOrder   Int       @default(0)
 
   createdAt DateTime @default(now()) @db.Timestamptz
 

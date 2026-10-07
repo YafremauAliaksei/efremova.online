@@ -15,7 +15,14 @@ export const HOME_SLUG = 'home';
  * не видна (код побеждает) или перекрыла бы служебный адрес. Ссылаться
  * на них из блоков можно, создавать страницы с такими slug — нет.
  */
-export const CODE_PAGE_SLUGS = ['services', 'privacy', 'terms', 'site-terms', 'provider'] as const;
+export const CODE_PAGE_SLUGS = [
+  'services',
+  'testimonials',
+  'privacy',
+  'terms',
+  'site-terms',
+  'provider',
+] as const;
 
 // out — страницы-предупреждения перед уходом на чужой сайт; media — картинки
 const RESERVED = new Set<string>([

@@ -44,6 +44,7 @@ const BACKGROUND_LABELS: Record<(typeof BLOCK_BACKGROUNDS)[number], string> = {
 };
 const CODE_PAGE_LABELS: Record<(typeof CODE_PAGE_SLUGS)[number], string> = {
   services: 'Услуги и цены',
+  testimonials: 'Отзывы',
   privacy: 'Политика конфиденциальности',
   terms: 'Условия консультаций',
   'site-terms': 'Положения о сайте',

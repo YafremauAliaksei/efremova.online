@@ -37,6 +37,13 @@ export const AUDIT_ACTIONS = {
   'media.archive': 'Картинка в архив',
   'media.restore': 'Картинка из архива',
 
+  'testimonial.create': 'Новый отзыв',
+  'testimonial.save': 'Отзыв изменён',
+  'testimonial.show': 'Отзыв показан',
+  'testimonial.hide': 'Отзыв скрыт',
+  'testimonial.move': 'Отзыв перемещён',
+  'testimonial.withdraw': 'Отзыв удалён: согласие отозвано',
+
   'legal.publish': 'Новая редакция документа',
   'legal.restore': 'Документ: возврат редакции',
 

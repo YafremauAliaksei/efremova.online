@@ -137,6 +137,13 @@ export const BLOCKS = {
     data: noData,
     withoutText: true,
   },
+  testimonials: {
+    label: 'Отзывы',
+    hint: 'Первые три отзыва и ссылка на все; сами отзывы — в разделе «Отзывы»',
+    fields: [TITLE],
+    data: noData,
+    withoutText: true,
+  },
   contacts: {
     label: 'Контакты',
     hint: 'Кнопки «написать» в мессенджеры и на почту; адреса — в «Данных владельца»',

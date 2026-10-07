@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ContactList } from '@/components/ContactList';
 import { ServiceList } from '@/components/ServiceList';
+import { TestimonialList } from '@/components/TestimonialList';
 import { Picture } from '@/components/blocks/Picture';
 import { contactLinks } from '@/lib/contacts';
 import { getServices } from '@/lib/content';
@@ -11,6 +12,10 @@ import { messages } from '@/lib/messages';
 import { getPageImages } from '@/lib/media/store';
 import { leavePath } from '@/lib/video';
 import { getSiteProfile } from '@/lib/site-profile';
+import { getTestimonials } from '@/lib/testimonials/public';
+
+/** Сколько отзывов в блоке; остальные — на странице отзывов */
+const TESTIMONIALS_IN_BLOCK = 3;
 
 /**
  * Отрисовка блоков страницы.
@@ -85,6 +90,10 @@ export async function PageBlocks({
   // Услуги спрашиваются у базы, только если на странице есть их блок
   const services = blocks.some((block) => block.type === 'services')
     ? await getServices(region, locale)
+    : [];
+  // На один больше, чем покажет блок: так видно, есть ли что-то ещё
+  const testimonials = blocks.some((block) => block.type === 'testimonials')
+    ? await getTestimonials(TESTIMONIALS_IN_BLOCK + 1)
     : [];
   // Фото блоков — одним запросом на страницу, без байтов
   const images = await getPageImages(
@@ -252,6 +261,31 @@ export async function PageBlocks({
                   locale={locale}
                   headingLevel={first ? 'h2' : 'h3'}
                 />
+              </>
+            );
+            break;
+          case 'testimonials':
+            inner = (
+              <>
+                <Heading
+                  first={first}
+                  large={false}
+                  text={title ?? messages(locale).testimonials.title}
+                />
+                <TestimonialList
+                  testimonials={testimonials.slice(0, TESTIMONIALS_IN_BLOCK)}
+                  locale={locale}
+                />
+                {testimonials.length > TESTIMONIALS_IN_BLOCK && (
+                  <p className="mt-6">
+                    <Link
+                      href={localizedPath(locale, '/testimonials')}
+                      className="underline underline-offset-4"
+                    >
+                      {messages(locale).testimonials.all}
+                    </Link>
+                  </p>
+                )}
               </>
             );
             break;
