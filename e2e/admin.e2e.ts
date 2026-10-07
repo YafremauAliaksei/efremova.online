@@ -501,3 +501,20 @@ test('контакты: адреса из профиля — кнопками н
   await expect(site).toHaveURL(/\/ru\/contacts$/);
   await site.close();
 });
+
+test('журнал: действия видны, данные владельца — только именами полей', async () => {
+  await admin.goto('/admin/journal');
+  await expect(admin.locator('main h1')).toHaveText('Журнал действий');
+  await expect(admin.locator('main')).toContainText('Цепочка цела');
+
+  const rows = admin.locator('main tbody tr');
+  // Новые сверху: последним было сохранение контактов
+  await expect(rows.first()).toContainText('Данные владельца');
+  await expect(rows.first()).toContainText('contact.telegram');
+  await expect(admin.locator('main tbody')).toContainText('Вход в админку');
+  await expect(admin.locator('main tbody')).toContainText('Новая цена');
+  await expect(admin.locator('main tbody')).toContainText('Блок: возврат версии');
+  // Значения из профиля в журнал не попадают: его нельзя чистить
+  await expect(admin.locator('main')).not.toContainText('demo_contact');
+  await expect(admin.locator('main')).not.toContainText('kontakt@example.pl');
+});

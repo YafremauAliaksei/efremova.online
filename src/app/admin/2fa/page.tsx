@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { MAX_CODE_ATTEMPTS, completeSecondFactor, pendingSecondFactor } from '@/lib/auth/admin';
+import { audit } from '@/lib/audit/log';
 import { recordSecurityEvent } from '@/lib/security/recorder';
 
 /**
@@ -91,6 +92,7 @@ async function submitCode(formData: FormData) {
       details: { event: 'ADMIN_LOGIN', outcome: 'success', factors: 'link+totp' },
       count: 1,
     });
+    await audit('session.login', null, { factors: 'link+totp' });
     redirect('/admin');
   }
 

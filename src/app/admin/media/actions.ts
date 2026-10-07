@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { isAdmin } from '@/lib/auth/admin';
+import { audit } from '@/lib/audit/log';
 import { textField } from '@/lib/content-schema';
 import { db } from '@/lib/db';
 import { MAX_UPLOAD_BYTES, MEDIA_LABEL_MAX } from '@/lib/media/image';
@@ -48,6 +49,7 @@ export async function uploadImage(formData: FormData): Promise<void> {
 
   const result = await saveUpload(new Uint8Array(await file.arrayBuffer()), parsedLabel.data ?? '');
   if (!result.ok) back(`error=${result.reason}`);
+  await audit('media.upload', result.assetId, { duplicate: result.duplicate });
   refresh();
   back(`saved=${result.duplicate ? 'duplicate' : 'uploaded'}&asset=${result.assetId}`);
 }
@@ -58,6 +60,7 @@ export async function saveLabel(formData: FormData): Promise<void> {
   const parsed = label.safeParse(formData.get('label') ?? '');
   if (!parsed.success) back('error=label');
   await db.mediaAsset.updateMany({ where: { id }, data: { label: parsed.data ?? '' } });
+  await audit('media.label', id);
   back('saved=label');
 }
 
@@ -69,6 +72,7 @@ export async function archiveImage(formData: FormData): Promise<void> {
     where: { id, archivedAt: null },
     data: { archivedAt: new Date() },
   });
+  await audit('media.archive', id);
   refresh();
   back('saved=archived');
 }
@@ -77,6 +81,7 @@ export async function restoreImage(formData: FormData): Promise<void> {
   await requireAdmin();
   const id = assetIdFrom(formData);
   await db.mediaAsset.updateMany({ where: { id }, data: { archivedAt: null } });
+  await audit('media.restore', id);
   refresh();
   back('saved=restored');
 }
