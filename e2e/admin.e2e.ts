@@ -518,3 +518,51 @@ test('журнал: действия видны, данные владельца
   await expect(admin.locator('main')).not.toContainText('demo_contact');
   await expect(admin.locator('main')).not.toContainText('kontakt@example.pl');
 });
+
+test('правовой документ: новая редакция, ошибка не теряет текст, возврат прежней', async () => {
+  await admin.goto('/admin/legal');
+  await admin.getByRole('link', { name: 'Polski' }).first().click();
+  await expect(admin).toHaveURL(/doc=privacy&lang=pl/);
+
+  const text = admin.locator('textarea[name=text]');
+  const original = await text.inputValue();
+  expect(original).toMatch(/^## /);
+
+  // Ошибка разметки: сообщение со строкой, введённый текст на месте
+  await text.fill(`текст до заголовка\n${original}`);
+  await admin.getByRole('button', { name: 'Опубликовать новую редакцию' }).click();
+  await expect(admin.locator('main [role=alert]')).toContainText('Строка 1');
+  await expect(text).toHaveValue(/^текст до заголовка/);
+
+  // Неизвестная метка не проходит: на сайте она была бы «не заполнено»
+  await text.fill(`${original}\n\n## Kontakt\n{{owner.nope}}`);
+  await admin.getByRole('button', { name: 'Опубликовать новую редакцию' }).click();
+  await expect(admin.locator('main [role=alert]')).toContainText('{{owner.nope}}');
+
+  // Без изменений — новой редакции нет
+  await text.fill(original);
+  await admin.getByRole('button', { name: 'Опубликовать новую редакцию' }).click();
+  await expect(admin.locator('main [role=alert]')).toContainText('не изменились');
+
+  await text.fill(`${original}\n\n## Test ${RUN} {#e2e-${RUN}}\nAkapit testowy ${RUN}.`);
+  await admin.getByRole('button', { name: 'Опубликовать новую редакцию' }).click();
+  await saved(admin, 'Новая редакция опубликована');
+
+  const site = await admin.context().newPage();
+  await site.goto(`/pl/privacy#e2e-${RUN}`);
+  await expect(site.locator(`#e2e-${RUN}`)).toContainText(`Akapit testowy ${RUN}`);
+  await expect(site.locator('article')).toContainText(/privacy-\d{4}-\d{2}-\d{2}/);
+
+  // Вернуть прежнюю: её текст публикуется новой редакцией, история растёт
+  const history = admin.locator('main section li');
+  const before = await history.count();
+  await history.nth(1).getByRole('button', { name: 'Вернуть этот текст' }).click();
+  await saved(admin, 'Прежний текст опубликован');
+  await expect(history).toHaveCount(before + 1);
+  await site.reload();
+  await expect(site.locator(`#e2e-${RUN}`)).toHaveCount(0);
+  await site.close();
+
+  await admin.goto('/admin/journal');
+  await expect(admin.locator('main tbody tr').first()).toContainText('Документ: возврат редакции');
+});

@@ -324,7 +324,18 @@ async function main(): Promise<void> {
   // черновик той же версии. Новая редакция = новый version: она становится
   // действующей, прежние остаются в истории, но перестают быть текущими —
   // иначе действующих редакций одного документа оказалось бы две.
+  //
+  // Документ, который владелец хоть раз правил в админке, сид пропускает:
+  // образец из кода не должен затирать текст, проверенный юристом.
+  let skipped = 0;
   for (const doc of LEGAL_DOCUMENTS) {
+    const edited = await db.legalDocument.count({
+      where: { slug: doc.slug, locale: doc.locale, fromAdmin: true },
+    });
+    if (edited > 0) {
+      skipped += 1;
+      continue;
+    }
     await db.$transaction([
       db.legalDocument.updateMany({
         where: { slug: doc.slug, locale: doc.locale, version: { not: doc.version } },
@@ -352,7 +363,8 @@ async function main(): Promise<void> {
     ]);
   }
   console.log(
-    `  ✓ Правовых документов: ${String(LEGAL_DOCUMENTS.length)} (образцы до проверки юристом)`
+    `  ✓ Правовых документов: ${String(LEGAL_DOCUMENTS.length - skipped)} (образцы до проверки юристом)` +
+      (skipped > 0 ? `, ${String(skipped)} правит владелец — не тронуты` : '')
   );
 
   console.log('Готово. Настоящие тексты добавляются через админку, а не сюда.');
