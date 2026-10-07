@@ -14,20 +14,17 @@ import { type ChainCheck, hashEntry, verifyChain } from './chain';
 
 const ACTOR = 'owner';
 
-/**
- * Номер блокировки Postgres для записи в журнал. Две записи одновременно
- * прочитали бы один и тот же «последний хеш» и раздвоили цепочку —
- * блокировка на время транзакции выстраивает их в очередь.
- */
-const CHAIN_LOCK = 0x6a6f75726e616cn; // «journal» в hex
-
 export async function audit(
   action: AuditAction,
   entityId: string | null = null,
   metadata: Record<string, Prisma.InputJsonValue> = {}
 ): Promise<void> {
   await db.$transaction(async (tx) => {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${CHAIN_LOCK})`;
+    // Две записи одновременно прочитали бы один и тот же «последний хеш»
+    // и раздвоили цепочку — блокировка на время транзакции выстраивает их
+    // в очередь. Номер — «journal» в hex; он вписан в запрос, а не передан
+    // параметром: в запросе нет ни одного значения извне
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(29958897753022828)`;
     const last = await tx.auditLog.findFirst({
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       select: { rowHash: true, createdAt: true },
