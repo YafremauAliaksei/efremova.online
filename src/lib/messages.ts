@@ -57,6 +57,14 @@ const ru = {
     leaveBack: 'Вернуться на сайт',
     leavePrivacy: 'Подробнее — в политике конфиденциальности',
   },
+  testimonials: {
+    title: 'Отзывы',
+    description: 'Отзывы клиентов, опубликованные с их письменного согласия.',
+    empty: 'Отзывы скоро появятся.',
+    all: 'Все отзывы',
+    verification:
+      'Каждый отзыв оставил человек, который был на консультации, и опубликован только с его письменного согласия, полученного вне сайта. Имена заменены, детали, по которым можно узнать автора, убраны. Согласие можно отозвать в любой момент — отзыв исчезнет сразу. ⟦ЮРИСТ: формулировка о проверке подлинности отзывов (директива Omnibus)⟧',
+  },
   notFound: {
     title: 'Страница не найдена',
     body: 'Такой страницы нет. Возможно, адрес набран с ошибкой.',
@@ -112,6 +120,14 @@ const pl = {
     leaveBack: 'Wróć do serwisu',
     leavePrivacy: 'Więcej w polityce prywatności',
   },
+  testimonials: {
+    title: 'Opinie',
+    description: 'Opinie klientów opublikowane za ich pisemną zgodą.',
+    empty: 'Opinie wkrótce się pojawią.',
+    all: 'Wszystkie opinie',
+    verification:
+      'Każdą opinię napisała osoba, która uczestniczyła w konsultacji, i jest opublikowana wyłącznie za jej pisemną zgodą uzyskaną poza serwisem. Imiona są zmienione, a szczegóły pozwalające rozpoznać autora — usunięte. Zgodę można wycofać w każdej chwili — opinia zniknie niezwłocznie. ⟦ЮРИСТ: sformułowanie o weryfikacji autentyczności opinii (dyrektywa Omnibus)⟧',
+  },
   notFound: {
     title: 'Nie znaleziono strony',
     body: 'Taka strona nie istnieje. Możliwe, że adres zawiera błąd.',
@@ -164,6 +180,14 @@ const en = {
     leaveGo: 'Go to YouTube',
     leaveBack: 'Back to the website',
     leavePrivacy: 'More in the privacy policy',
+  },
+  testimonials: {
+    title: 'Testimonials',
+    description: 'Client testimonials published with their written consent.',
+    empty: 'Testimonials will appear soon.',
+    all: 'All testimonials',
+    verification:
+      'Each testimonial was written by a person who attended a consultation and is published only with their written consent, obtained outside this website. Names are changed and details that could identify the author are removed. Consent can be withdrawn at any time — the testimonial disappears immediately. ⟦ЮРИСТ: wording on how review authenticity is verified (Omnibus Directive)⟧',
   },
   notFound: {
     title: 'Page not found',

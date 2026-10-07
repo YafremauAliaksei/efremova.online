@@ -16,9 +16,11 @@ import type { LegalDocumentSeed } from './types';
  * Польская версия — основная; русская и английская — переводы.
  */
 
+// 2026-10-07: отзывы клиентов (задача 8) — псевдоним, текст, дата согласия;
+//   основание ст. 9(2)(a), удаление при отзыве согласия
 // 2026-10-05: переход на YouTube из карточки ролика (задача 5) — получатели,
 // передача за пределы ЕЭЗ и «браузер не обращается к другим сервисам»
-const VERSION = 'privacy-2026-10-05-draft';
+const VERSION = 'privacy-2026-10-07-draft';
 
 export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
   // ═══════════════════════ POLITYKA PRYWATNOŚCI (PL) ═══════════════════════
@@ -49,6 +51,7 @@ export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
           'Dziennik bezpieczeństwa — adres IP, typ przeglądarki i adres żądania, gdy żądanie wygląda na próbę ataku lub skanowania. Cel: ochrona serwisu. Podstawa: prawnie uzasadniony interes (art. 6 ust. 1 lit. f RODO). Okres: 60 dni; czasowa blokada adresu — do 60 dni od ostatniego zdarzenia.',
           'Kontakt z nami — dane, które sam(a) podasz w wiadomości e-mail, SMS lub w komunikatorze, oraz treść wiadomości. Cel: odpowiedź na zapytanie i ustalenie terminu konsultacji. Podstawa: działania przed zawarciem umowy na Twoje żądanie (art. 6 ust. 1 lit. b RODO), w pozostałym zakresie prawnie uzasadniony interes (art. 6 ust. 1 lit. f RODO). Okres: do zakończenia sprawy, a następnie ⟦ЮРИСТ: okres przechowywania korespondencji⟧.',
           'Kopie zapasowe — zaszyfrowane kopie bazy danych serwisu. Cel: odtworzenie serwisu po awarii. Podstawa: prawnie uzasadniony interes (art. 6 ust. 1 lit. f RODO). Okres: 30 dni. Dlatego dane z dziennika bezpieczeństwa mogą pozostawać w kopiach do 90 dni.',
+          'Opinie klientów — pseudonim autora, treść opinii i data zgody. Opinia o konsultacji psychologicznej ujawnia, że ktoś był klientem psychologa, dlatego traktujemy ją jak dane o zdrowiu. Publikujemy ją wyłącznie za wyraźną, odrębną zgodą autora, wyrażoną poza serwisem (e-mailem lub na piśmie), bez imienia i szczegółów pozwalających go rozpoznać. Podstawa: wyraźna zgoda (art. 6 ust. 1 lit. a i art. 9 ust. 2 lit. a RODO). Okres: do wycofania zgody — wtedy opinia jest niezwłocznie usuwana z serwisu i z bazy danych, a z kopii zapasowych znika w ciągu 30 dni. Zgodę można wycofać w dowolnym momencie, pisząc na {{owner.privacyEmail}}; nie wpływa to na zgodność z prawem publikacji przed jej wycofaniem. ⟦ЮРИСТ: forma zgody i okres przechowywania jej dowodu poza serwisem⟧',
         ],
         paragraphs: [
           'Prosimy nie przesyłać w pierwszej wiadomości informacji o swoim zdrowiu. Do ustalenia terminu wystarczą imię, preferowany termin i forma kontaktu.',
@@ -151,6 +154,7 @@ export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
           'Журнал безопасности — IP-адрес, тип браузера и адрес запроса, если запрос похож на попытку атаки или сканирования. Цель: защита сайта. Основание: законный интерес (ст. 6(1)(f) GDPR). Срок: 60 дней; временная блокировка адреса — до 60 дней с последнего события.',
           'Обращение к нам — данные, которые вы сами сообщите в письме, SMS или мессенджере, и текст сообщения. Цель: ответ на обращение и согласование времени консультации. Основание: действия до заключения договора по вашему запросу (ст. 6(1)(b) GDPR), в остальном — законный интерес (ст. 6(1)(f)). Срок: до завершения вопроса, затем ⟦ЮРИСТ: срок хранения переписки⟧.',
           'Резервные копии — зашифрованные копии базы данных сайта. Цель: восстановление после сбоя. Основание: законный интерес (ст. 6(1)(f) GDPR). Срок: 30 дней. Поэтому данные журнала безопасности могут оставаться в копиях до 90 дней.',
+          'Отзывы клиентов — псевдоним автора, текст отзыва и дата согласия. Отзыв о консультации психолога сообщает, что человек был клиентом психолога, поэтому мы относимся к нему как к данным о здоровье. Отзыв публикуется только с явного отдельного согласия автора, данного вне сайта (письмом или на бумаге), без имени и деталей, по которым его можно узнать. Основание: явное согласие (ст. 6(1)(a) и 9(2)(a) GDPR). Срок: до отзыва согласия — тогда отзыв сразу удаляется с сайта и из базы данных, а из резервных копий исчезает в течение 30 дней. Отозвать согласие можно в любой момент, написав на {{owner.privacyEmail}}; это не делает незаконной публикацию до отзыва. ⟦ЮРИСТ: форма согласия и срок хранения его подтверждения вне сайта⟧',
         ],
         paragraphs: [
           'Пожалуйста, не пишите в первом сообщении о своём здоровье. Чтобы договориться о встрече, достаточно имени, удобного времени и способа связи.',
@@ -253,6 +257,7 @@ export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
           'Security log — IP address, browser type and request address when a request looks like an attack or a scan. Purpose: protecting the site. Legal basis: legitimate interest (Art. 6(1)(f) GDPR). Retention: 60 days; a temporary address block lasts up to 60 days from the last event.',
           'Contacting us — the data you provide by e-mail, text message or messenger, and the content of your message. Purpose: replying and arranging a consultation. Legal basis: steps taken at your request before entering into a contract (Art. 6(1)(b) GDPR), otherwise legitimate interest (Art. 6(1)(f)). Retention: until the matter is closed, then ⟦ЮРИСТ: correspondence retention period⟧.',
           'Backups — encrypted copies of the site database. Purpose: restoring the site after a failure. Legal basis: legitimate interest (Art. 6(1)(f) GDPR). Retention: 30 days. Security log data may therefore remain in backups for up to 90 days.',
+          'Client testimonials — the author’s pseudonym, the text and the date of consent. A testimonial about a psychological consultation reveals that someone was a client, so we treat it as health data. It is published only with the author’s explicit, separate consent given outside this website (by e-mail or on paper), without their name or details that could identify them. Legal basis: explicit consent (Art. 6(1)(a) and 9(2)(a) GDPR). Retention: until consent is withdrawn — the testimonial is then removed from the site and the database immediately and disappears from backups within 30 days. You can withdraw consent at any time by writing to {{owner.privacyEmail}}; this does not affect the lawfulness of publication before withdrawal. ⟦ЮРИСТ: form of consent and how long proof of it is kept outside the site⟧',
         ],
         paragraphs: [
           'Please do not include information about your health in your first message. Your name, a preferred time and a way to reach you are enough to arrange a meeting.',

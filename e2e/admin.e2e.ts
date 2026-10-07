@@ -566,3 +566,62 @@ test('правовой документ: новая редакция, ошибк
   await admin.goto('/admin/journal');
   await expect(admin.locator('main tbody tr').first()).toContainText('Документ: возврат редакции');
 });
+
+test('отзывы: без даты согласия не показать, на сайте с lang автора, удаление при отзыве', async () => {
+  const text = `Отзыв ${RUN}: стало спокойнее.`;
+  await admin.goto('/admin/testimonials');
+  await admin.getByText('+ Новый отзыв').click();
+  const create = admin
+    .locator('form')
+    .filter({ has: admin.getByRole('button', { name: 'Добавить скрытым' }) });
+  await create.locator('input[name=alias]').fill(`Klientka ${RUN}`);
+  await create.locator('textarea[name=body]').fill(text);
+  await create.locator('select[name=locale]').selectOption('pl');
+  await create.getByRole('button', { name: 'Добавить скрытым' }).click();
+  await saved(admin, 'Отзыв добавлен скрытым');
+
+  // Без даты согласия кнопка показа выключена, а прямой запрос — отказ
+  const card = admin.locator('details[open]').filter({ hasText: `Klientka ${RUN}` });
+  await expect(card.getByRole('button', { name: 'Показать на сайте' })).toBeDisabled();
+
+  await card.locator('input[name=consentAt]').fill(new Date().toISOString().slice(0, 10));
+  await card.getByRole('button', { name: 'Сохранить', exact: true }).click();
+  await saved(admin, 'Отзыв сохранён');
+  await admin.locator('details[open]').getByRole('button', { name: 'Показать на сайте' }).click();
+  await saved(admin, 'Отзыв показан');
+
+  // Страница отзывов: текст на языке автора, с его lang
+  const site = await admin.context().newPage();
+  await site.goto('/ru/testimonials');
+  await expect(site.locator('main h1')).toHaveText('Отзывы');
+  const item = site.locator('main li').filter({ hasText: text });
+  await expect(item).toHaveAttribute('lang', 'pl-PL');
+
+  // Блок «Отзывы» на странице «Обо мне»
+  await admin.goto('/admin?page=about&lang=ru');
+  await admin.getByRole('button', { name: '+ Отзывы', exact: true }).last().click();
+  await saved(admin, 'Блок добавлен');
+  await site.goto('/ru/about');
+  await expect(site.locator('[data-testimonial]').first()).toBeVisible();
+
+  // Согласие отозвано: без галочки — отказ, с галочкой — удалён отовсюду
+  await admin.goto('/admin/testimonials');
+  const ours = admin.locator('li').filter({ hasText: `Klientka ${RUN}` });
+  await ours.locator('summary').click();
+  await ours.getByRole('button', { name: 'Удалить' }).click();
+  await expect(admin.locator('main [role=alert]')).toContainText('отозвал согласие');
+  const again = admin.locator('li').filter({ hasText: `Klientka ${RUN}` });
+  await again.getByLabel(/Автор отозвал согласие/).check();
+  await again.getByRole('button', { name: 'Удалить' }).click();
+  await saved(admin, 'Отзыв удалён из базы');
+  await expect(admin.locator('main')).not.toContainText(`Klientka ${RUN}`);
+
+  await site.goto('/ru/testimonials');
+  await expect(site.locator('main')).not.toContainText(text);
+  await site.close();
+
+  // В журнале — факт удаления, но не текст и не подпись
+  await admin.goto('/admin/journal');
+  await expect(admin.locator('main tbody tr').first()).toContainText('согласие отозвано');
+  await expect(admin.locator('main')).not.toContainText(`Klientka ${RUN}`);
+});

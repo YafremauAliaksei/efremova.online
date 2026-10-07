@@ -1,21 +1,17 @@
 import Link from 'next/link';
 import { isTotpEnabled } from '@/lib/auth/admin';
 
-/**
- * Разделы админки — одна строка на всех её страницах. Будущие разделы
- * видны заранее пунктиром: владелец знает, что они запланированы.
- */
+/** Разделы админки — одна строка на всех её страницах */
 
 const SECTIONS = [
   { href: '/admin', label: 'Страницы и тексты' },
   { href: '/admin/services', label: 'Услуги и цены' },
   { href: '/admin/media', label: 'Картинки' },
+  { href: '/admin/testimonials', label: 'Отзывы' },
   { href: '/admin/legal', label: 'Правовые документы' },
   { href: '/admin/profile', label: 'Данные владельца' },
   { href: '/admin/journal', label: 'Журнал' },
 ] as const;
-
-const PLANNED = ['Отзывы'] as const;
 
 export function AdminNav({ current }: { current: (typeof SECTIONS)[number]['href'] }) {
   return (
@@ -41,14 +37,6 @@ export function AdminNav({ current }: { current: (typeof SECTIONS)[number]['href
             </Link>
           )
         )}
-        {PLANNED.map((label) => (
-          <span
-            key={label}
-            className="rounded border border-dashed border-[var(--color-line)] px-3 py-1 text-[var(--color-ink-soft)]"
-          >
-            {label} — далее
-          </span>
-        ))}
       </nav>
     </>
   );

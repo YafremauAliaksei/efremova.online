@@ -16,6 +16,7 @@ import { getPublishedSlugs } from '@/lib/pages';
 /** Страницы со своим кодом: адрес без языка, частота, вес */
 const CODE_PAGES = [
   ['/services', 'weekly', 0.9],
+  ['/testimonials', 'monthly', 0.6],
   ['/privacy', 'yearly', 0.3],
   ['/terms', 'yearly', 0.3],
   ['/site-terms', 'yearly', 0.2],
