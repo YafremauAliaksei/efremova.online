@@ -1,4 +1,5 @@
 import { Filled } from '@/components/Filled';
+import { env } from '@/lib/env';
 import { localizedPath, type Locale } from '@/lib/i18n';
 import { messages } from '@/lib/messages';
 import { getSiteProfile } from '@/lib/site-profile';
@@ -13,6 +14,19 @@ const CODE_LINKS = [
   ['siteTerms', '/site-terms'],
   ['provider', '/provider'],
 ] as const;
+
+/** Поле профиля → свойство Schema.org Person */
+const SCHEMA_PERSON = [
+  ['owner.fullName', 'name'],
+  ['owner.professionalTitle', 'jobTitle'],
+  ['owner.email', 'email'],
+  ['owner.phone', 'telephone'],
+  ['owner.address', 'address'],
+] as const;
+
+function siteUrl(): string {
+  return `${new URL(env().APP_URL).origin}/`;
+}
 
 /**
  * Общий подвал сайта.
@@ -83,7 +97,16 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
           </a>
         </p>
 
-        <p lang="pl-PL" className="mt-4 text-xs">
+        {/* Микроразметка Schema.org (Person): поисковик узнаёт, чей это сайт.
+            Не JSON-LD — тот был бы тегом <script>, а на публичной странице
+            их нет ни одного (docs/14). Только заполненные поля: пустое
+            значение — не повод выдумывать */}
+        <p lang="pl-PL" className="mt-4 text-xs" itemScope itemType="https://schema.org/Person">
+          {SCHEMA_PERSON.map(([key, prop]) => {
+            const value = values[key]?.trim();
+            return value ? <meta key={key} itemProp={prop} content={value} /> : null;
+          })}
+          {values['owner.fullName']?.trim() && <link itemProp="url" href={siteUrl()} />}
           <Filled
             values={values}
             text="Usługodawca: {{owner.fullName}}, {{owner.address}} · NIP {{owner.nip}} · {{owner.email}} · {{owner.professionalTitle}}, nr prawa wykonywania zawodu {{owner.licenseNumber}}"

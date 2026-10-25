@@ -13,13 +13,14 @@ import type { RenderableBlock } from '@/lib/blocks/registry';
  */
 
 let databaseUp = true;
+let profile: Record<string, string> = {};
 const pages = new Map<string, { title: string | null; blocks: RenderableBlock[] }>();
 
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/env', () => ({ env: () => ({ APP_URL: 'https://efremova.online' }) }));
 vi.mock('@/lib/public/stylesheet', () => ({ stylesheetHref: () => '/site.css?v=test' }));
 vi.mock('@/lib/site-profile', () => ({
-  getSiteProfile: () => Promise.resolve({ values: {}, status: 'live' }),
+  getSiteProfile: () => Promise.resolve({ values: profile, status: 'live' }),
 }));
 vi.mock('@/lib/pages', () => ({
   getNavigation: () =>
@@ -109,6 +110,7 @@ async function page(locale: string, segments: string[], currency: string | null 
 
 beforeEach(() => {
   databaseUp = true;
+  profile = {};
   pages.clear();
   pages.set('home', { title: null, blocks: [textBlock('Witaj', 'Tekst')] });
   pages.set('about', { title: 'O mnie', blocks: [textBlock('O mnie', 'Opis')] });
@@ -165,6 +167,14 @@ describe('публичная страница', () => {
 });
 
 describe('цены и валюты (задача 9a)', () => {
+  it('микроразметка Schema.org: услуга с ценой — без единого <script>', async () => {
+    const { html } = await page('pl', ['services'], 'EUR');
+    expect(html).toContain('itemType="https://schema.org/Service"');
+    expect(html).toContain('<meta itemProp="price" content="45.00"/>');
+    expect(html).toContain('<meta itemProp="priceCurrency" content="EUR"/>');
+    expect(html).not.toContain('<script');
+  });
+
   it('по умолчанию — злотые, рядом выбор валюты ссылками без скриптов', async () => {
     const { html } = await page('pl', ['services']);
     expect(html).toMatch(/200\s*zł/);
@@ -199,6 +209,23 @@ describe('цены и валюты (задача 9a)', () => {
   it('у списка услуг — ссылка на архив цен', async () => {
     const { html } = await page('ru', ['services']);
     expect(html).toContain('href="/ru/services/history"');
+  });
+});
+
+describe('Schema.org: владелец сайта', () => {
+  it('Person — только из заполненных полей профиля, значения экранируются', async () => {
+    profile = { 'owner.fullName': 'Anna "Test" <b>', 'owner.professionalTitle': 'psycholog' };
+    const { html } = await page('pl', ['about']);
+    expect(html).toContain('itemType="https://schema.org/Person"');
+    expect(html).toContain('<meta itemProp="name" content="Anna &quot;Test&quot; &lt;b&gt;"/>');
+    expect(html).toContain('<meta itemProp="jobTitle" content="psycholog"/>');
+    expect(html).toContain('<link itemProp="url" href="https://efremova.online/"/>');
+    expect(html).not.toContain('itemProp="email"');
+  });
+
+  it('профиль пуст — ни одного выдуманного свойства', async () => {
+    const { html } = await page('pl', ['about']);
+    expect(html).not.toMatch(/itemProp="(name|url|email)"/);
   });
 });
 
