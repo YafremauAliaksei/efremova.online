@@ -12,6 +12,8 @@ import { AdminNav } from '@/components/admin/AdminNav';
 import { isAdmin } from '@/lib/auth/admin';
 import { i18nTextSchema } from '@/lib/content-schema';
 import { db } from '@/lib/db';
+import { convertFromPln, roundNicely, type ExchangeRate } from '@/lib/services/rates';
+import { getExchangeRates } from '@/lib/services/rates-fetch';
 import { DEFAULT_LOCALE, LOCALES, LOCALE_NAMES, LOCALE_TAGS, type Locale } from '@/lib/i18n';
 import {
   DEFAULT_CURRENCY,
@@ -97,6 +99,8 @@ export default async function ServicesAdminPage({ searchParams }: PageProps) {
 
   const params = await searchParams;
   const now = new Date();
+  // Подсказка курса — не обязательна: NBP недоступен — пустая таблица, и только
+  const rates = await getExchangeRates();
   const services = await db.service.findMany({
     orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
     include: { prices: { orderBy: [{ currency: 'asc' }, { validFrom: 'desc' }] } },
@@ -320,6 +324,13 @@ export default async function ServicesAdminPage({ searchParams }: PageProps) {
                     валюте, у которой она уже есть, заменяет прежнюю с этого момента; ставьте ровные
                     суммы — 200 zł, 45 €, — пересчитывать по курсу незачем.
                   </p>
+                  <RateHint
+                    pln={current.find((price) => price.currency === DEFAULT_CURRENCY)?.amountMinor}
+                    currencies={current
+                      .map((price) => price.currency)
+                      .filter((currency) => currency !== DEFAULT_CURRENCY)}
+                    rates={rates}
+                  />
 
                   {history.length > 0 && (
                     <details className="mt-4">
@@ -378,5 +389,54 @@ export default async function ServicesAdminPage({ searchParams }: PageProps) {
         </form>
       </details>
     </main>
+  );
+}
+
+/** Валюты, для которых подсказка показывается всегда, даже без цены в них */
+const HINT_CURRENCIES = ['EUR', 'BYN', 'RUB'];
+
+/**
+ * Подсказка курса (задача 9b): цена в злотых по курсу NBP в других валютах
+ * и ровное число рядом. Только подсказка — на сайт попадает лишь то, что
+ * владелец сам впишет в форму цены.
+ */
+function RateHint({
+  pln,
+  currencies,
+  rates,
+}: {
+  pln: number | undefined;
+  currencies: string[];
+  rates: Map<string, ExchangeRate>;
+}) {
+  if (pln === undefined) return null;
+  if (rates.size === 0) {
+    return (
+      <p className="mt-2 text-xs text-[var(--color-ink-soft)]">
+        Курсы NBP сейчас недоступны — подсказки нет, цены ставятся как обычно.
+      </p>
+    );
+  }
+  const shown = [...new Set([...currencies, ...HINT_CURRENCIES])].filter((code) => rates.has(code));
+  return (
+    <div className="mt-3 rounded border border-[var(--color-line)] bg-[var(--color-paper-alt)] p-3 text-xs">
+      <p className="text-[var(--color-ink-soft)]">
+        По курсу NBP {formatPrice(pln, DEFAULT_CURRENCY, 'ru')} — это:
+      </p>
+      <ul className="mt-1 space-y-0.5">
+        {shown.map((code) => {
+          const rate = rates.get(code);
+          if (rate === undefined) return null;
+          const exact = convertFromPln(pln, rate);
+          return (
+            <li key={code}>
+              ≈ {formatPrice(exact, code, 'ru')} → ровно{' '}
+              <strong>{formatPrice(roundNicely(exact), code, 'ru')}</strong>{' '}
+              <span className="text-[var(--color-ink-soft)]">(курс на {rate.date})</span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }

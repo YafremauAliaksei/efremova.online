@@ -1,10 +1,12 @@
+import { readLimited } from '../http/limited';
 import { MAX_UPLOAD_BYTES } from './image';
 import { isVideoId, thumbnailUrls } from '../video';
 
 /**
  * Обложка ролика YouTube — скачивает СЕРВЕР, один раз, при сохранении блока.
  *
- * Это единственный исходящий запрос сайта к чужому домену, и он устроен так,
+ * Один из двух исходящих запросов сайта к чужому домену (второй — курсы валют
+ * для админки, src/lib/services/rates-fetch.ts), и он устроен так,
  * чтобы им нельзя было воспользоваться (SSRF):
  *   • адрес не приходит из формы: в нём только id из 11 проверенных знаков,
  *     хост зашит — i.ytimg.com;
@@ -20,34 +22,6 @@ import { isVideoId, thumbnailUrls } from '../video';
 const TIMEOUT_MS = 10_000;
 
 type Fetch = (input: string, init: RequestInit) => Promise<Response>;
-
-/** Тело ответа, но не больше limit байт; больше — null без дочитывания */
-async function readLimited(response: Response, limit: number): Promise<Uint8Array | null> {
-  const declared = Number(response.headers.get('content-length') ?? '0');
-  if (declared > limit) return null;
-  if (response.body === null) return null;
-
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.length;
-    if (total > limit) {
-      await reader.cancel();
-      return null;
-    }
-    chunks.push(value);
-  }
-  const bytes = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.length;
-  }
-  return bytes;
-}
 
 /**
  * Байты обложки или null: ролика нет, YouTube недоступен, ответ странный.

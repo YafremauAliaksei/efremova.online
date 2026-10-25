@@ -226,7 +226,7 @@ Content-Security-Policy: default-src 'none'; script-src 'none'; style-src 'self'
 | --- | --- | --- |
 | 1 | `static-public-html` | ✅ обработчик публичных адресов на `prerender`, сборка CSS, CSP и кэш для публичной части, адрес `/api/lang`, тест «HTML не зависит от посетителя» |
 | 2 | `currencies` | ✅ злотые по умолчанию и выбор валюты, ровные цены вручную по валютам, публичный архив цен `/services/history`, запрет правки истории цен в базе |
-| 3 | `exchange-rates` | подсказка курса в админке: 1–2 запроса к публичному API с сервера |
+| 3 | `exchange-rates` | ✅ подсказка курса в админке: 2 запроса с сервера к API NBP (таблицы A и B), курсы помнятся 6 часов |
 | 4 | `trim-schema` | миграция: убрать `lectures`, `lecture_categories`, лишние `revalidatePath` (и `ip_blocklist`, если T.6 отменяется) |
 
 Сброс кэша Cloudflare из плана убран — п.6.
