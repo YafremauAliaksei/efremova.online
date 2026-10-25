@@ -102,6 +102,11 @@ export function formatPrice(amountMinor: number, currency: string, locale: Local
   }).format(amountMinor / 100);
 }
 
+/** Цена для Schema.org (Offer.price): точка и два знака — 25050 → «250.50», без округления */
+export function schemaPrice(amountMinor: number): string {
+  return `${String(Math.trunc(amountMinor / 100))}.${String(amountMinor % 100).padStart(2, '0')}`;
+}
+
 export type ServiceFormResult<T> = { ok: true; value: T } | { ok: false; field: string };
 
 const title = textField(SERVICE_TITLE_MAX, true);

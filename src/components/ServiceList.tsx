@@ -2,7 +2,7 @@ import { CurrencySwitcher } from '@/components/CurrencySwitcher';
 import type { PublicServices } from '@/lib/content';
 import { localizedPath, type Locale } from '@/lib/i18n';
 import { messages } from '@/lib/messages';
-import { formatPrice } from '@/lib/services/edit';
+import { formatPrice, schemaPrice } from '@/lib/services/edit';
 
 /**
  * Список услуг с ценой — один на главной и на странице услуг, чтобы
@@ -44,23 +44,40 @@ export function ServiceList({
       />
       <ul className="mt-8 space-y-4">
         {services.map((service) => (
+          // Микроразметка Schema.org (Service + Offer): цена и валюта для
+          // поисковика — та же, что видит посетитель, в формате 250.00
           <li
             key={service.slug}
             className="rounded-lg border border-[var(--color-line)] bg-white p-6"
+            itemScope
+            itemType="https://schema.org/Service"
           >
             <div className="flex flex-wrap items-baseline justify-between gap-3">
-              <Heading className="text-xl font-medium">{service.title}</Heading>
-              <p className="text-lg font-semibold">
-                {service.price === null
-                  ? t.onRequest
-                  : formatPrice(service.price.amountMinor, service.price.currency, locale)}
-              </p>
+              <Heading className="text-xl font-medium" itemProp="name">
+                {service.title}
+              </Heading>
+              {service.price === null ? (
+                <p className="text-lg font-semibold">{t.onRequest}</p>
+              ) : (
+                <p
+                  className="text-lg font-semibold"
+                  itemProp="offers"
+                  itemScope
+                  itemType="https://schema.org/Offer"
+                >
+                  <meta itemProp="price" content={schemaPrice(service.price.amountMinor)} />
+                  <meta itemProp="priceCurrency" content={service.price.currency} />
+                  {formatPrice(service.price.amountMinor, service.price.currency, locale)}
+                </p>
+              )}
             </div>
             <p className="mt-2 text-sm text-[var(--color-ink-soft)]">
               {service.durationMinutes} {t.minutes}
             </p>
             {service.description !== '' && (
-              <p className="mt-3 text-[var(--color-ink-soft)]">{service.description}</p>
+              <p className="mt-3 text-[var(--color-ink-soft)]" itemProp="description">
+                {service.description}
+              </p>
             )}
           </li>
         ))}

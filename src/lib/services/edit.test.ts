@@ -10,6 +10,7 @@ import {
   parseServiceForm,
   planPriceChange,
   priceHistory,
+  schemaPrice,
   visitorCurrency,
   type StoredPrice,
 } from './edit';
@@ -249,5 +250,16 @@ describe('история цен', () => {
     const archive = priceHistory(prices, day(5), ['PLN']);
     expect(archive.map((entry) => entry.currency)).toEqual(['PLN', 'EUR']);
     expect(archive[0]?.periods.map((period) => period.amountMinor)).toEqual([25000, 20000]);
+  });
+});
+
+describe('цена для Schema.org', () => {
+  it.each([
+    [25000, '250.00'],
+    [25050, '250.50'],
+    [5, '0.05'],
+    [100_000_000, '1000000.00'],
+  ])('%i → %s', (minor, text) => {
+    expect(schemaPrice(minor)).toBe(text);
   });
 });
