@@ -6,6 +6,7 @@ import { isTotpEnabled } from '@/lib/auth/admin';
 const SECTIONS = [
   { href: '/admin', label: 'Страницы и тексты' },
   { href: '/admin/services', label: 'Услуги и цены' },
+  { href: '/admin/currencies', label: 'Валюты и курсы' },
   { href: '/admin/media', label: 'Картинки' },
   { href: '/admin/testimonials', label: 'Отзывы' },
   { href: '/admin/legal', label: 'Правовые документы' },

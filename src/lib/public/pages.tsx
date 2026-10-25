@@ -71,7 +71,7 @@ export function notFoundPage(locale: Locale): PublicView {
 }
 
 /**
- * Услуги и цены. Цена — в валюте из адреса, по умолчанию злотые; страна
+ * Услуги и цены. Цена — в валюте из адреса, по умолчанию основная валюта сайта; страна
  * посетителя не читается: страница одна на всех и лежит в общем кэше.
  */
 async function servicesPage(locale: Locale, currency: string | null): Promise<PublicView> {

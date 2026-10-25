@@ -36,28 +36,34 @@ export function isCurrencyCode(value: unknown): value is string {
   return format.resolvedOptions().maximumFractionDigits === 2;
 }
 
-/** Цена по умолчанию — в злотых: страна ведения деятельности */
-export const DEFAULT_CURRENCY = 'PLN';
-
-/** Подсказка в админке; вписать можно и любую другую валюту */
-export const SUGGESTED_CURRENCIES = ['PLN', 'EUR', 'USD', 'GBP', 'RUB', 'BYN', 'UAH', 'CHF', 'CZK'];
-
-/** Злотые первыми, остальные по алфавиту — порядок в переключателе валют */
-export function orderCurrencies(currencies: Iterable<string>): string[] {
-  return [...new Set(currencies)].sort((a, b) =>
-    a === DEFAULT_CURRENCY ? -1 : b === DEFAULT_CURRENCY ? 1 : a.localeCompare(b)
-  );
+/**
+ * Порядок валют в переключателе: как в админке (preferred — основная, затем
+ * включённые по порядку), валюты вне списка — после, по алфавиту.
+ */
+export function orderCurrencies(
+  currencies: Iterable<string>,
+  preferred: readonly string[]
+): string[] {
+  const rank = (code: string) => {
+    const index = preferred.indexOf(code);
+    return index === -1 ? preferred.length : index;
+  };
+  return [...new Set(currencies)].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
 }
 
 /**
  * Валюта, выбранная посетителем в адресе (?currency=EUR). Значение приходит
  * снаружи: принимается только валюта, в которой у услуг есть цена, всё
- * остальное — злотые. В разметку и ключ кэша попадает код из списка, а не
- * то, что прислали.
+ * остальное — основная валюта сайта. В разметку и ключ кэша попадает код
+ * из списка, а не то, что прислали.
  */
-export function visitorCurrency(raw: unknown, available: readonly string[]): string {
+export function visitorCurrency(
+  raw: unknown,
+  available: readonly string[],
+  fallback: string
+): string {
   const code = typeof raw === 'string' ? raw.trim().toUpperCase() : '';
-  return available.includes(code) ? code : DEFAULT_CURRENCY;
+  return available.includes(code) ? code : fallback;
 }
 
 /**
@@ -173,16 +179,30 @@ export interface PriceInput {
   amountMinor: number;
 }
 
-/** Цена в валюте: валюта и сумма */
-export function parsePriceForm(formData: FormData): ServiceFormResult<PriceInput> {
-  const serviceId = z.uuid().safeParse(formData.get('serviceId'));
-  if (!serviceId.success) return { ok: false, field: 'serviceId' };
-  const raw = formData.get('currency');
-  const currency = typeof raw === 'string' ? raw.trim().toUpperCase() : '';
-  if (!isCurrencyCode(currency)) return { ok: false, field: 'currency' };
-  const amountMinor = parseAmount(formData.get('amount'));
-  if (amountMinor === null) return { ok: false, field: 'amount' };
-  return { ok: true, value: { serviceId: serviceId.data, currency, amountMinor } };
+/** Сколько валют одна форма может поменять за раз: больше в списке не бывает */
+export const PRICES_PER_FORM_MAX = 200;
+
+/**
+ * Форма редактора цен: поле amount_EUR — новая цена в евро. Пустое поле —
+ * цена не меняется. Поле с неверной суммой отклоняет всю форму: половина
+ * новых цен без другой половины — не то, что владелец собирался сохранить.
+ */
+export function parsePricesForm(
+  formData: FormData
+): ServiceFormResult<Pick<PriceInput, 'currency' | 'amountMinor'>[]> {
+  const result: Pick<PriceInput, 'currency' | 'amountMinor'>[] = [];
+  for (const [name, raw] of formData.entries()) {
+    const match = /^amount_([A-Z]{3})$/.exec(name);
+    if (match === null || (typeof raw === 'string' && raw.trim() === '')) continue;
+    const currency = match[1] ?? '';
+    if (!isCurrencyCode(currency)) return { ok: false, field: 'currency' };
+    const amountMinor = parseAmount(raw);
+    if (amountMinor === null) return { ok: false, field: `amount_${currency}` };
+    if (result.some((price) => price.currency === currency)) continue;
+    result.push({ currency, amountMinor });
+    if (result.length > PRICES_PER_FORM_MAX) return { ok: false, field: 'currency' };
+  }
+  return { ok: true, value: result };
 }
 
 export interface StoredPrice {
@@ -254,7 +274,8 @@ export interface PricePeriod {
  */
 export function priceHistory(
   prices: readonly PricePeriod[],
-  now: Date
+  now: Date,
+  preferred: readonly string[]
 ): { currency: string; periods: PricePeriod[] }[] {
   const byCurrency = new Map<string, PricePeriod[]>();
   for (const price of prices) {
@@ -263,7 +284,7 @@ export function priceHistory(
     list.push(price);
     byCurrency.set(price.currency, list);
   }
-  return orderCurrencies(byCurrency.keys()).map((currency) => ({
+  return orderCurrencies(byCurrency.keys(), preferred).map((currency) => ({
     currency,
     periods: (byCurrency.get(currency) ?? []).sort(
       (a, b) => b.validFrom.getTime() - a.validFrom.getTime()

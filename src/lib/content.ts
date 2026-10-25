@@ -2,6 +2,7 @@ import 'server-only';
 import { db } from '@/lib/db';
 import { i18nTextSchema } from '@/lib/content-schema';
 import type { Locale } from '@/lib/i18n';
+import { getCurrencySettings } from '@/lib/services/currency-settings';
 import {
   currentPrices,
   orderCurrencies,
@@ -19,7 +20,7 @@ import {
  *
  * Страна посетителя не читается: страница одна на всех и лежит в общем
  * кэше Cloudflare (docs/14). Валюту посетитель выбирает сам — адресом
- * ?currency=EUR, по умолчанию злотые (PROJECT_LOG, задача 9a).
+ * ?currency=EUR, по умолчанию основная валюта из админки (PROJECT_LOG, задача 9a).
  */
 
 export interface PublicService {
@@ -36,14 +37,17 @@ export interface PublicServices {
   currency: string;
   /** Валюты, в которых у видимых услуг есть цена — для переключателя */
   currencies: string[];
+  /** Основная валюта сайта: её адрес — без ?currency */
+  defaultCurrency: string;
 }
 
-/** Активные услуги с ценой в выбранной валюте; валюты нет — злотые */
+/** Активные услуги с ценой в выбранной валюте; валюты нет — основная */
 export async function getServices(
   locale: Locale,
   requestedCurrency: string | null
 ): Promise<PublicServices> {
   const now = new Date();
+  const { defaultCurrency, enabled } = await getCurrencySettings();
   try {
     const services = await db.service.findMany({
       where: { isActive: true },
@@ -56,12 +60,16 @@ export async function getServices(
     });
 
     const current = services.map((service) => currentPrices(service.prices, now));
-    const currencies = orderCurrencies(current.flatMap((prices) => [...prices.keys()]));
-    const currency = visitorCurrency(requestedCurrency, currencies);
+    const currencies = orderCurrencies(
+      current.flatMap((prices) => [...prices.keys()]),
+      enabled
+    );
+    const currency = visitorCurrency(requestedCurrency, currencies, defaultCurrency);
 
     return {
       currency,
       currencies,
+      defaultCurrency,
       services: services.map((service, index) => {
         // JSON из базы — не обещание типа: испорченная запись даёт пустой перевод, а не 500
         const titles = i18nTextSchema.parse(service.titleI18n);
@@ -80,7 +88,7 @@ export async function getServices(
       }),
     };
   } catch {
-    return { services: [], currency: visitorCurrency(requestedCurrency, []), currencies: [] };
+    return { services: [], currency: defaultCurrency, currencies: [], defaultCurrency };
   }
 }
 
@@ -101,6 +109,7 @@ export interface ArchivedService {
  */
 export async function getPriceArchive(locale: Locale): Promise<ArchivedService[]> {
   const now = new Date();
+  const { enabled } = await getCurrencySettings();
   try {
     const services = await db.service.findMany({
       where: { isActive: true, prices: { some: { validFrom: { lte: now } } } },
@@ -112,7 +121,7 @@ export async function getPriceArchive(locale: Locale): Promise<ArchivedService[]
       return {
         slug: service.slug,
         title: titles[locale] ?? titles.ru ?? service.slug,
-        currencies: priceHistory(service.prices, now),
+        currencies: priceHistory(service.prices, now, enabled),
       };
     });
   } catch {

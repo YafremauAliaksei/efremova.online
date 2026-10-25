@@ -41,6 +41,7 @@ vi.mock('@/lib/content', () => ({
     return Promise.resolve({
       currency: chosen,
       currencies: ['PLN', 'EUR'],
+      defaultCurrency: 'PLN',
       services: [
         {
           slug: 'individual-50',

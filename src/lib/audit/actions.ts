@@ -32,6 +32,10 @@ export const AUDIT_ACTIONS = {
   'service.move': 'Услуга перемещена',
   'price.set': 'Новая цена',
   'price.close': 'Цена закрыта',
+  'currency.list': 'Список валют',
+  'currency.add': 'Новая валюта',
+  'currency.main': 'Основная и опорная валюта',
+  'rates.sources': 'Источники курсов',
 
   'media.upload': 'Картинка загружена',
   'media.label': 'Подпись картинки',
