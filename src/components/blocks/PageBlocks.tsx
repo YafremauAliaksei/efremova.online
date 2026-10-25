@@ -80,16 +80,20 @@ function BlockSection({
 export async function PageBlocks({
   blocks,
   locale,
-  region,
+  path,
+  currency,
 }: {
   blocks: RenderableBlock[];
   locale: Locale;
-  region: string;
+  /** Адрес страницы без языка — для ссылок выбора валюты в блоке услуг */
+  path: string;
+  /** Валюта из адреса (?currency=EUR); null — злотые */
+  currency: string | null;
 }) {
   // Услуги спрашиваются у базы, только если на странице есть их блок
   const services = blocks.some((block) => block.type === 'services')
-    ? await getServices(region, locale)
-    : [];
+    ? await getServices(locale, currency)
+    : null;
   // На один больше, чем покажет блок: так видно, есть ли что-то ещё
   const testimonials = blocks.some((block) => block.type === 'testimonials')
     ? await getTestimonials(TESTIMONIALS_IN_BLOCK + 1)
@@ -254,11 +258,14 @@ export async function PageBlocks({
                   large={false}
                   text={title ?? messages(locale).nav.services}
                 />
-                <ServiceList
-                  services={services}
-                  locale={locale}
-                  headingLevel={first ? 'h2' : 'h3'}
-                />
+                {services !== null && (
+                  <ServiceList
+                    list={services}
+                    locale={locale}
+                    path={path}
+                    headingLevel={first ? 'h2' : 'h3'}
+                  />
+                )}
               </>
             );
             break;

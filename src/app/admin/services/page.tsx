@@ -14,13 +14,13 @@ import { i18nTextSchema } from '@/lib/content-schema';
 import { db } from '@/lib/db';
 import { DEFAULT_LOCALE, LOCALES, LOCALE_NAMES, LOCALE_TAGS, type Locale } from '@/lib/i18n';
 import {
-  CURRENCIES,
-  DEFAULT_REGION,
+  DEFAULT_CURRENCY,
   DURATION_MAX,
   DURATION_MIN,
   SERVICE_DESCRIPTION_MAX,
   SERVICE_TITLE_MAX,
   formatPrice,
+  SUGGESTED_CURRENCIES,
   isPriceCurrent,
 } from '@/lib/services/edit';
 
@@ -59,8 +59,7 @@ const ERRORS = {
   slugTaken: 'Услуга с таким служебным именем уже есть.',
   title: `Нужно название по-русски: одна строка до ${String(SERVICE_TITLE_MAX)} знаков.`,
   durationMinutes: `Длительность — целое число минут от ${String(DURATION_MIN)} до ${String(DURATION_MAX)}.`,
-  region: 'Регион — DEFAULT или код страны из двух латинских букв: PL, DE, UA…',
-  currency: 'Валюта — только из списка.',
+  currency: 'Валюта — трёхбуквенный код ISO 4217 с копейками: PLN, EUR, RUB, BYN…',
   amount: 'Сумма — число больше нуля, не больше двух знаков после запятой: 250 или 250,50.',
 } as const;
 
@@ -100,7 +99,7 @@ export default async function ServicesAdminPage({ searchParams }: PageProps) {
   const now = new Date();
   const services = await db.service.findMany({
     orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
-    include: { prices: { orderBy: [{ region: 'asc' }, { validFrom: 'desc' }] } },
+    include: { prices: { orderBy: [{ currency: 'asc' }, { validFrom: 'desc' }] } },
   });
 
   const savedText = known(SAVED, params.saved);
@@ -116,9 +115,10 @@ export default async function ServicesAdminPage({ searchParams }: PageProps) {
       <h1 className="mt-4 text-2xl font-semibold">Услуги и цены</h1>
       <AdminNav current="/admin/services" />
       <p className="mt-6 text-sm text-[var(--color-ink-soft)]">
-        Список виден на странице «Услуги» и в блоке «Список услуг». Цена — итоговая, в валюте
-        региона посетителя: своя для страны или общая (DEFAULT) для остальных. Новая цена не
-        затирает прежнюю: та закрывается сегодняшним числом и остаётся в истории.
+        Список виден на странице «Услуги» и в блоке «Список услуг». Цена — итоговая, в каждой валюте
+        своя и ровная: посетитель видит злотые и может выбрать другую валюту. Новая цена не затирает
+        прежнюю: та закрывается сегодняшним числом и остаётся в публичном архиве цен — менять
+        историю не даст сама база.
       </p>
 
       {savedText !== null && (
@@ -146,7 +146,7 @@ export default async function ServicesAdminPage({ searchParams }: PageProps) {
           const history = service.prices.filter(
             (price) => price.validTo !== null && price.validTo <= now
           );
-          const hasDefault = current.some((price) => price.region === DEFAULT_REGION);
+          const hasDefault = current.some((price) => price.currency === DEFAULT_CURRENCY);
           const name = titles[DEFAULT_LOCALE] ?? service.slug;
 
           return (
@@ -162,10 +162,7 @@ export default async function ServicesAdminPage({ searchParams }: PageProps) {
                     {current.length === 0
                       ? 'без цены'
                       : current
-                          .map(
-                            (price) =>
-                              `${price.region} ${formatPrice(price.amountMinor, price.currency, 'ru')}`
-                          )
+                          .map((price) => formatPrice(price.amountMinor, price.currency, 'ru'))
                           .join(', ')}
                   </span>
                   {!service.isActive && (
@@ -175,7 +172,7 @@ export default async function ServicesAdminPage({ searchParams }: PageProps) {
                   )}
                   {service.isActive && !hasDefault && (
                     <span className="ml-2 rounded-full bg-amber-100 px-2 text-xs text-amber-900">
-                      нет общей цены — посетителям из других стран «по запросу»
+                      нет цены в злотых — посетителям по умолчанию «по запросу»
                     </span>
                   )}
                 </summary>
@@ -250,7 +247,7 @@ export default async function ServicesAdminPage({ searchParams }: PageProps) {
                   </button>
                 </form>
 
-                {/* ── цены по регионам ── */}
+                {/* ── цены по валютам ── */}
                 <section className="mt-6 border-t border-[var(--color-line)] pt-4">
                   <h2 className="font-medium">Цены</h2>
                   {current.length === 0 ? (
@@ -261,7 +258,7 @@ export default async function ServicesAdminPage({ searchParams }: PageProps) {
                     <table className="mt-2 w-full text-left">
                       <thead className="text-xs text-[var(--color-ink-soft)]">
                         <tr>
-                          <th className="py-1 font-normal">Регион</th>
+                          <th className="py-1 font-normal">Валюта</th>
                           <th className="py-1 font-normal">Цена</th>
                           <th className="py-1 font-normal">Действует с</th>
                           <th className="py-1" />
@@ -270,11 +267,7 @@ export default async function ServicesAdminPage({ searchParams }: PageProps) {
                       <tbody>
                         {current.map((price) => (
                           <tr key={price.id} className="border-t border-[var(--color-line)]">
-                            <td className="py-2">
-                              {price.region === DEFAULT_REGION
-                                ? 'DEFAULT — все остальные'
-                                : price.region}
-                            </td>
+                            <td className="py-2">{price.currency}</td>
                             <td className="py-2">
                               {formatPrice(price.amountMinor, price.currency, 'ru')}
                             </td>
@@ -297,23 +290,16 @@ export default async function ServicesAdminPage({ searchParams }: PageProps) {
                   <form action={setPrice} className="mt-4 flex flex-wrap items-end gap-3">
                     <input type="hidden" name="serviceId" value={service.id} />
                     <label className="block">
-                      Регион
-                      <input
-                        name="region"
-                        defaultValue={hasDefault ? '' : DEFAULT_REGION}
-                        placeholder="PL"
-                        maxLength={7}
-                        required
-                        className={`${INPUT} w-32 uppercase`}
-                      />
-                    </label>
-                    <label className="block">
                       Валюта
-                      <select name="currency" className={INPUT} defaultValue="PLN">
-                        {CURRENCIES.map((currency) => (
-                          <option key={currency}>{currency}</option>
-                        ))}
-                      </select>
+                      <input
+                        name="currency"
+                        list="currencies"
+                        defaultValue={hasDefault ? '' : DEFAULT_CURRENCY}
+                        placeholder="EUR"
+                        maxLength={3}
+                        required
+                        className={`${INPUT} w-24 uppercase`}
+                      />
                     </label>
                     <label className="block">
                       Сумма
@@ -330,8 +316,9 @@ export default async function ServicesAdminPage({ searchParams }: PageProps) {
                     </button>
                   </form>
                   <p className="mt-2 text-xs text-[var(--color-ink-soft)]">
-                    Регион — DEFAULT (для всех стран без своей цены) или код страны: PL, DE, UA…
-                    Цена для региона, у которого она уже есть, заменяет прежнюю с этого момента.
+                    Валюта — код ISO 4217: PLN, EUR, RUB, BYN или любая другая с копейками. Цена в
+                    валюте, у которой она уже есть, заменяет прежнюю с этого момента; ставьте ровные
+                    суммы — 200 zł, 45 €, — пересчитывать по курсу незачем.
                   </p>
 
                   {history.length > 0 && (
@@ -342,8 +329,8 @@ export default async function ServicesAdminPage({ searchParams }: PageProps) {
                       <ul className="mt-2 space-y-1 text-xs text-[var(--color-ink-soft)]">
                         {history.map((price) => (
                           <li key={price.id}>
-                            {price.region} · {formatPrice(price.amountMinor, price.currency, 'ru')}{' '}
-                            · {day(price.validFrom)} —{' '}
+                            {formatPrice(price.amountMinor, price.currency, 'ru')} ·{' '}
+                            {day(price.validFrom)} —{' '}
                             {price.validTo === null ? '' : day(price.validTo)}
                           </li>
                         ))}
@@ -356,6 +343,13 @@ export default async function ServicesAdminPage({ searchParams }: PageProps) {
           );
         })}
       </ol>
+
+      {/* Подсказки валют для поля «Валюта»: вписать можно и любую другую */}
+      <datalist id="currencies">
+        {SUGGESTED_CURRENCIES.map((currency) => (
+          <option key={currency} value={currency} />
+        ))}
+      </datalist>
 
       {/* ── новая услуга ── */}
       <details

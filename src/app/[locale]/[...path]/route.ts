@@ -8,9 +8,11 @@ import { publicPageResponse } from '@/lib/public/render';
 export const dynamic = 'force-dynamic';
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ locale: string; path: string[] }> }
 ): Promise<Response> {
   const { locale, path } = await params;
-  return publicPageResponse(locale, path);
+  // Из запроса — только валюта цен: страница лежит в общем кэше (docs/14)
+  const currency = new URL(request.url).searchParams.get('currency');
+  return publicPageResponse(locale, path, currency);
 }

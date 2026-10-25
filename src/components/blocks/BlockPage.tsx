@@ -4,7 +4,6 @@ import { pagePath } from '@/lib/blocks/pages';
 import type { Locale } from '@/lib/i18n';
 import { getPublicPage } from '@/lib/pages';
 import type { PublicView } from '@/lib/public/view';
-import { DEFAULT_REGION } from '@/lib/services/edit';
 
 /**
  * Страница, собранная из блоков в базе: главная и все страницы, которые
@@ -12,7 +11,12 @@ import { DEFAULT_REGION } from '@/lib/services/edit';
  *
  * null — такой страницы нет или она скрыта: обработчик ответит 404.
  */
-export async function blockPage(slug: string, locale: Locale): Promise<PublicView | null> {
+export async function blockPage(
+  slug: string,
+  locale: Locale,
+  /** Валюта из адреса (?currency=EUR) для блока услуг; null — злотые */
+  currency: string | null
+): Promise<PublicView | null> {
   const page = await getPublicPage(slug, locale);
   if (page === null) return null;
   const path = pagePath(slug);
@@ -27,9 +31,7 @@ export async function blockPage(slug: string, locale: Locale): Promise<PublicVie
     body: (
       <>
         <main id="main">
-          {/* Страница одна на всех посетителей и лежит в общем кэше, поэтому
-              цена — общая, а не по стране посетителя (docs/14 п.6) */}
-          <PageBlocks blocks={page.blocks} locale={locale} region={DEFAULT_REGION} />
+          <PageBlocks blocks={page.blocks} locale={locale} path={path} currency={currency} />
         </main>
         <SiteFooter locale={locale} />
       </>

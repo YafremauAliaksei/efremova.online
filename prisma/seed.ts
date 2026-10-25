@@ -227,10 +227,12 @@ const SERVICES = [
     },
     durationMinutes: 50,
     sortOrder: 1,
+    // Демо-цены ровными числами в каждой валюте, как их ставит владелец (задача 9a)
     prices: [
-      { region: 'DEFAULT', currency: 'EUR', amountMinor: 6000 },
-      { region: 'PL', currency: 'PLN', amountMinor: 25000 },
-      { region: 'RU', currency: 'RUB', amountMinor: 500000 },
+      { currency: 'PLN', amountMinor: 25000 },
+      { currency: 'EUR', amountMinor: 6000 },
+      { currency: 'RUB', amountMinor: 500000 },
+      { currency: 'BYN', amountMinor: 20000 },
     ],
   },
   {
@@ -244,9 +246,10 @@ const SERVICES = [
     durationMinutes: 90,
     sortOrder: 2,
     prices: [
-      { region: 'DEFAULT', currency: 'EUR', amountMinor: 9000 },
-      { region: 'PL', currency: 'PLN', amountMinor: 38000 },
-      { region: 'RU', currency: 'RUB', amountMinor: 750000 },
+      { currency: 'PLN', amountMinor: 38000 },
+      { currency: 'EUR', amountMinor: 9000 },
+      { currency: 'RUB', amountMinor: 750000 },
+      { currency: 'BYN', amountMinor: 30000 },
     ],
   },
 ];

@@ -58,14 +58,20 @@ model Service {
   @@map("services")
 }
 
-/// Цена зависит от региона клиента (валюта выбирается по стране или вручную).
+/// Цена услуги в одной валюте. Валют сколько угодно; посетитель выбирает
+/// сам, по умолчанию — злотые (PROJECT_LOG, задача 9a). Суммы владелец
+/// ставит вручную ровными числами, а не пересчётом по курсу.
 /// amountMinor — ЦЕЛОЕ число в центах/копейках: дробные числа дают
 /// расхождения с бухгалтерией на больших объёмах.
+///
+/// История публична и неизменна, как редакции договора: правку, удаление и
+/// цену задним числом запрещает триггер в базе (миграция prices_by_currency).
+/// Разрешено одно — закрыть действующую цену датой (validTo).
 model ServicePrice {
   id        String @id @default(uuid()) @db.Uuid
   serviceId String @db.Uuid
 
-  region      String
+  /// Код ISO 4217: PLN, EUR, RUB, BYN…
   currency    String
   amountMinor Int
 
@@ -74,8 +80,7 @@ model ServicePrice {
 
   service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
 
-  @@unique([serviceId, region, currency, validFrom])
-  @@index([region, currency])
+  @@unique([serviceId, currency, validFrom])
   @@map("service_prices")
 }
 

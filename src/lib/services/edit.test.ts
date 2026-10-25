@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
+  currentPrices,
   formatPrice,
-  normalizeRegion,
+  isCurrencyCode,
+  orderCurrencies,
   parseAmount,
   parseNewServiceForm,
   parsePriceForm,
   parseServiceForm,
-  pickPrice,
   planPriceChange,
+  priceHistory,
+  visitorCurrency,
   type StoredPrice,
 } from './edit';
 
@@ -67,17 +70,42 @@ describe('цена на сайте', () => {
   });
 });
 
-describe('регион', () => {
+describe('валюта', () => {
+  it.each(['PLN', 'EUR', 'USD', 'RUB', 'BYN', 'UAH', 'CHF', 'CZK', 'GBP'])(
+    '%s — валюта с копейками',
+    (code) => {
+      expect(isCurrencyCode(code)).toBe(true);
+    }
+  );
+
   it.each([
-    ['PL', 'PL'],
-    [' pl ', 'PL'],
-    ['default', 'DEFAULT'],
-  ])('%j → %j', (raw, region) => {
-    expect(normalizeRegion(raw)).toBe(region);
+    ['не код ISO', 'BTC'],
+    ['строчными', 'pln'],
+    ['без копеек: иена', 'JPY'],
+    ['три знака после запятой: динар', 'KWD'],
+    ['не строка', 42],
+    ['пусто', ''],
+    ['инъекция', 'PLN<script>'],
+  ])('%s — отказ', (_name, value) => {
+    expect(isCurrencyCode(value)).toBe(false);
   });
 
-  it.each(['POL', 'P', '', 'P1', 'ПЛ', null])('%j — не регион', (raw) => {
-    expect(normalizeRegion(raw)).toBeNull();
+  it('злотые первыми, остальные по алфавиту, без повторов', () => {
+    expect(orderCurrencies(['RUB', 'EUR', 'PLN', 'BYN', 'EUR'])).toEqual([
+      'PLN',
+      'BYN',
+      'EUR',
+      'RUB',
+    ]);
+  });
+
+  it('валюта посетителя — только из валют с ценами, иначе злотые', () => {
+    const available = ['PLN', 'EUR', 'BYN'];
+    expect(visitorCurrency('EUR', available)).toBe('EUR');
+    expect(visitorCurrency(' eur ', available)).toBe('EUR');
+    expect(visitorCurrency('USD', available)).toBe('PLN');
+    expect(visitorCurrency('<script>', available)).toBe('PLN');
+    expect(visitorCurrency(null, available)).toBe('PLN');
   });
 });
 
@@ -135,16 +163,19 @@ describe('формы услуги', () => {
     expect(parseServiceForm(form({ ...base, ...patch }))).toEqual({ ok: false, field });
   });
 
-  it('цена: регион, валюта из списка, сумма', () => {
-    expect(
-      parsePriceForm(form({ serviceId: ID, region: 'pl', currency: 'PLN', amount: '250,50' }))
-    ).toEqual({
+  it('цена: валюта — любой код с копейками, сумма', () => {
+    expect(parsePriceForm(form({ serviceId: ID, currency: ' byn ', amount: '250,50' }))).toEqual({
       ok: true,
-      value: { serviceId: ID, region: 'PL', currency: 'PLN', amountMinor: 25050 },
+      value: { serviceId: ID, currency: 'BYN', amountMinor: 25050 },
     });
-    expect(
-      parsePriceForm(form({ serviceId: ID, region: 'PL', currency: 'BTC', amount: '1' }))
-    ).toEqual({ ok: false, field: 'currency' });
+    expect(parsePriceForm(form({ serviceId: ID, currency: 'BTC', amount: '1' }))).toEqual({
+      ok: false,
+      field: 'currency',
+    });
+    expect(parsePriceForm(form({ serviceId: ID, currency: 'PLN', amount: '0' }))).toEqual({
+      ok: false,
+      field: 'amount',
+    });
   });
 });
 
@@ -152,7 +183,6 @@ describe('история цен', () => {
   const day = (n: number) => new Date(Date.UTC(2026, 9, n));
   const price = (patch: Partial<StoredPrice>): StoredPrice => ({
     id: 'p1',
-    region: 'PL',
     currency: 'PLN',
     amountMinor: 25000,
     validFrom: day(1),
@@ -160,41 +190,54 @@ describe('история цен', () => {
     ...patch,
   });
 
-  it('новая сумма закрывает прежнюю цену, а не правит её', () => {
-    expect(
-      planPriceChange([price({})], { region: 'PL', currency: 'PLN', amountMinor: 26000 }, day(5))
-    ).toEqual({ close: ['p1'], create: true });
+  it('новая сумма закрывает прежнюю цену в той же валюте, а не правит её', () => {
+    expect(planPriceChange([price({})], { currency: 'PLN', amountMinor: 26000 }, day(5))).toEqual({
+      close: ['p1'],
+      create: true,
+    });
   });
 
   it('та же сумма в той же валюте — ничего не меняется', () => {
-    expect(
-      planPriceChange([price({})], { region: 'PL', currency: 'PLN', amountMinor: 25000 }, day(5))
-    ).toEqual({ close: [], create: false });
+    expect(planPriceChange([price({})], { currency: 'PLN', amountMinor: 25000 }, day(5))).toEqual({
+      close: [],
+      create: false,
+    });
   });
 
-  it('закрытая в прошлом цена и цены других регионов не трогаются', () => {
+  it('закрытая в прошлом цена и цены других валют не трогаются', () => {
     const prices = [
       price({ id: 'old', validTo: day(2) }),
-      price({ id: 'de', region: 'DE', currency: 'EUR' }),
+      price({ id: 'eur', currency: 'EUR', amountMinor: 6000 }),
     ];
-    expect(
-      planPriceChange(prices, { region: 'PL', currency: 'PLN', amountMinor: 25000 }, day(5))
-    ).toEqual({ close: [], create: true });
+    expect(planPriceChange(prices, { currency: 'PLN', amountMinor: 25000 }, day(5))).toEqual({
+      close: [],
+      create: true,
+    });
   });
 
-  it('посетитель видит цену своей страны, иначе общую; закрытая не показывается', () => {
+  it('действующая цена в каждой валюте; закрытая и будущая не показываются', () => {
     const prices = [
-      price({ id: 'pl-old', amountMinor: 20000, validTo: day(3) }),
-      price({ id: 'pl', validFrom: day(3) }),
-      price({ id: 'default', region: 'DEFAULT', currency: 'EUR', amountMinor: 6000 }),
+      price({ id: 'pln-old', amountMinor: 20000, validTo: day(3) }),
+      price({ id: 'pln', validFrom: day(3) }),
+      price({ id: 'eur', currency: 'EUR', amountMinor: 6000 }),
+      price({ id: 'byn-future', currency: 'BYN', validFrom: day(10) }),
     ];
-    expect(pickPrice(prices, 'PL', day(5))?.id).toBe('pl');
-    expect(pickPrice(prices, 'PL', day(2))?.id).toBe('pl-old');
-    expect(pickPrice(prices, 'DE', day(5))?.id).toBe('default');
-    expect(pickPrice([price({ validTo: day(2) })], 'PL', day(5))).toBeNull();
+    const now = currentPrices(prices, day(5));
+    expect(now.get('PLN')?.id).toBe('pln');
+    expect(now.get('EUR')?.id).toBe('eur');
+    expect(now.has('BYN')).toBe(false);
+    expect(currentPrices(prices, day(2)).get('PLN')?.id).toBe('pln-old');
   });
 
-  it('цена с будущей датой начала ещё не показывается', () => {
-    expect(pickPrice([price({ validFrom: day(10) })], 'PL', day(5))).toBeNull();
+  it('архив: по валютам, злотые первыми, от новых цен к старым, будущих нет', () => {
+    const prices = [
+      price({ id: 'a', amountMinor: 20000, validTo: day(3) }),
+      price({ id: 'b', validFrom: day(3) }),
+      price({ id: 'c', currency: 'EUR', amountMinor: 6000 }),
+      price({ id: 'd', currency: 'BYN', validFrom: day(10) }),
+    ];
+    const archive = priceHistory(prices, day(5));
+    expect(archive.map((entry) => entry.currency)).toEqual(['PLN', 'EUR']);
+    expect(archive[0]?.periods.map((period) => period.amountMinor)).toEqual([25000, 20000]);
   });
 });

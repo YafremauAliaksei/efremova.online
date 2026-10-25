@@ -402,7 +402,7 @@ test('видео: карточка ведёт на предупреждение,
   await site.close();
 });
 
-test('услуги: создать, назначить цены, показать, сменить цену', async ({ browser }) => {
+test('услуги: цены по валютам, выбор валюты, публичный архив цен', async ({ browser }) => {
   const title = `Проверка услуги ${RUN}`;
   await admin.goto('/admin/services');
   await admin.locator('summary', { hasText: '+ Новая услуга' }).click();
@@ -411,53 +411,60 @@ test('услуги: создать, назначить цены, показат�
   await admin.getByRole('button', { name: 'Создать скрытой' }).click();
   await saved(admin, 'Услуга создана скрытой');
 
-  // Открыта карточка новой услуги; общая цена — в евро с центами
+  // Открыта карточка новой услуги; цена в каждой валюте — своя и ровная
   const card = admin.locator('li details[open]');
   await expect(card.locator('summary')).toContainText(title);
-  await card.locator('input[name=region]').fill('default');
-  await card.locator('select[name=currency]').selectOption('EUR');
-  await card.locator('input[name=amount]').fill('60,50');
+  await card.locator('input[name=currency]').fill('PLN');
+  await card.locator('input[name=amount]').fill('250');
   await card.getByRole('button', { name: 'Назначить цену' }).click();
   await saved(admin, 'Цена назначена');
 
-  await card.locator('input[name=region]').fill('pl');
-  await card.locator('select[name=currency]').selectOption('PLN');
-  await card.locator('input[name=amount]').fill('250');
+  // Любая валюта с копейками, вписанная строчными, — тоже цена
+  await card.locator('input[name=currency]').fill('eur');
+  await card.locator('input[name=amount]').fill('60,50');
   await card.getByRole('button', { name: 'Назначить цену' }).click();
-  // Сообщение то же, что после первой цены: ждём саму цену, а не текст
-  await expect(card.locator('summary')).toContainText('PL 250');
+  await expect(card.locator('summary')).toContainText('60,50');
 
-  await card.locator('input[name=title_pl]').fill(`Konsultacja ${RUN}`);
-  await card.locator('input[name=isActive]').check();
-  await card.getByRole('button', { name: 'Сохранить услугу' }).click();
+  // Не валюта — отказ с объяснением
+  await card.locator('input[name=currency]').fill('BTC');
+  await card.locator('input[name=amount]').fill('1');
+  await card.getByRole('button', { name: 'Назначить цену' }).click();
+  await expect(admin.locator('main [role=alert]')).toContainText('ISO 4217');
+
+  const opened = admin.locator('li details[open]');
+  await opened.locator('input[name=title_pl]').fill(`Konsultacja ${RUN}`);
+  await opened.locator('input[name=isActive]').check();
+  await opened.getByRole('button', { name: 'Сохранить услугу' }).click();
   await saved(admin, 'Услуга сохранена');
 
-  // Страница услуг одна на всех и лежит в общем кэше (docs/14): страна посетителя
-  // на неё не влияет — и из Польши, и из Германии видна общая цена, копейки
-  // не округлены. Выбор валюты посетителем — отдельная задача (PROJECT_LOG, 9a)
-  const poland = await browser.newContext({ extraHTTPHeaders: { 'cf-ipcountry': 'PL' } });
+  // Страница одна на всех (docs/14): страна посетителя на цену не влияет —
+  // по умолчанию злотые, рядом выбор валюты обычными ссылками
+  const poland = await browser.newContext({ extraHTTPHeaders: { 'cf-ipcountry': 'DE' } });
   const site = await poland.newPage();
   await site.goto('/pl/services');
   const item = site.locator('main li', { hasText: `Konsultacja ${RUN}` });
+  await expect(item).toContainText(/250\s?zł/);
+  await site.getByRole('link', { name: 'EUR', exact: true }).click();
+  await expect(site).toHaveURL(/\/pl\/services\?currency=EUR/);
   await expect(item).toContainText(/60,50\s€/);
 
-  const other = await browser.newContext({ extraHTTPHeaders: { 'cf-ipcountry': 'DE' } });
-  const elsewhere = await other.newPage();
-  await elsewhere.goto('/en/services');
-  await expect(elsewhere.locator('main li', { hasText: title })).toContainText('€60.50');
-
-  // Новая цена закрывает прежнюю: на сайте новая, прежняя — в истории
-  await card.locator('input[name=region]').fill('default');
-  await card.locator('select[name=currency]').selectOption('EUR');
-  await card.locator('input[name=amount]').fill('65');
-  await card.getByRole('button', { name: 'Назначить цену' }).click();
+  // Новая цена закрывает прежнюю: на сайте новая, прежняя — в истории и в архиве
+  const card2 = admin.locator('li details[open]');
+  await card2.locator('input[name=currency]').fill('EUR');
+  await card2.locator('input[name=amount]').fill('65');
+  await card2.getByRole('button', { name: 'Назначить цену' }).click();
   await saved(admin, 'Цена назначена');
-  await expect(card.locator('summary', { hasText: 'История цен: 1' })).toBeVisible();
+  await expect(card2.locator('summary', { hasText: 'История цен: 1' })).toBeVisible();
 
   await site.reload();
   await expect(item).toContainText(/65\s€/);
+
+  await site.goto('/pl/services/history');
+  const archived = site.locator('main li', { hasText: `Konsultacja ${RUN}` }).first();
+  await expect(archived).toContainText(/60,50\s€/);
+  await expect(archived).toContainText(/65\s€/);
+  await expect(archived).toContainText('obowiązuje obecnie');
   await poland.close();
-  await other.close();
 });
 
 test('контакты: адреса из профиля — кнопками на странице контактов', async () => {
