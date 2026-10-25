@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { requireAdminWrite } from '@/lib/admin/guard';
 import { isAdmin, isTotpEnabled } from '@/lib/auth/admin';
 import { SecondFactorWarning } from '@/components/admin/AdminNav';
 import { audit } from '@/lib/audit/log';
@@ -143,7 +144,7 @@ export default async function ProfilePage({ searchParams }: PageProps) {
 
 async function saveProfile(formData: FormData) {
   'use server';
-  if (!(await isAdmin())) redirect('/admin/denied');
+  await requireAdminWrite();
 
   const invalid: string[] = [];
   const changed: string[] = [];
@@ -186,7 +187,7 @@ async function saveProfile(formData: FormData) {
 
 async function setStatus(formData: FormData) {
   'use server';
-  if (!(await isAdmin())) redirect('/admin/denied');
+  await requireAdminWrite();
 
   const next = formData.get('status') === 'live' ? 'live' : 'development';
   if (next === 'live') {

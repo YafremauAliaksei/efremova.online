@@ -3,6 +3,7 @@
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { type LegalFormState, publishLegal } from '@/app/admin/legal/actions';
+import { LEGAL_LIMIT_TEXT } from '@/app/admin/legal/limit-text';
 
 /**
  * Форма новой редакции. Клиентская ради одного: при ошибке текст документа
@@ -13,6 +14,7 @@ import { type LegalFormState, publishLegal } from '@/app/admin/legal/actions';
 const ERRORS: Record<string, string> = {
   title: 'Заголовок — одна строка до 300 знаков.',
   same: 'Текст и отметка юриста не изменились — новая редакция не нужна.',
+  limit: LEGAL_LIMIT_TEXT,
   empty: 'Текст пустой.',
   tooLong: 'Текст длиннее 100 000 знаков.',
   chars:

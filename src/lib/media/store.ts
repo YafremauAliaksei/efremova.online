@@ -1,5 +1,6 @@
 import 'server-only';
 import { Prisma } from '@prisma/client';
+import { dayAgo, judgeMedia } from '@/lib/admin/limits';
 import { db } from '@/lib/db';
 import { OUTPUT_TYPES, processImage, type OutputFormat } from '@/lib/media/image';
 
@@ -11,7 +12,7 @@ import { OUTPUT_TYPES, processImage, type OutputFormat } from '@/lib/media/image
 
 export type UploadResult =
   | { ok: true; assetId: string; duplicate: boolean }
-  | { ok: false; reason: 'tooLarge' | 'format' | 'pixels' | 'broken' };
+  | { ok: false; reason: 'tooLarge' | 'format' | 'pixels' | 'broken' | 'quota' };
 
 /**
  * Пересобрать и сохранить картинку одной транзакцией: картинка без
@@ -33,6 +34,14 @@ export async function saveUpload(bytes: Uint8Array, label: string): Promise<Uplo
     await db.mediaAsset.update({ where: { id: existing.id }, data: { archivedAt: null } });
     return { ok: true, assetId: existing.id, duplicate: true };
   }
+
+  // Дубль места не занимает — потолок проверяется только для новой картинки
+  const quota = judgeMedia({
+    storedBytes: await storedMediaBytes(),
+    incomingBytes: image.variants.reduce((sum, variant) => sum + variant.bytes.length, 0),
+    lastDay: await db.mediaAsset.count({ where: { createdAt: { gte: dayAgo(new Date()) } } }),
+  });
+  if (!quota.ok) return quota;
 
   try {
     const created = await db.mediaAsset.create({
@@ -66,6 +75,13 @@ export async function saveUpload(bytes: Uint8Array, label: string): Promise<Uplo
     }
     throw error;
   }
+}
+
+/** Сколько байт занимают все варианты, включая архив */
+async function storedMediaBytes(): Promise<number> {
+  const rows = await db.$queryRaw<{ bytes: bigint | null }[]>`
+    SELECT sum(octet_length(bytes)) AS bytes FROM media_variants`;
+  return Number(rows[0]?.bytes ?? 0);
 }
 
 export interface MediaFile {

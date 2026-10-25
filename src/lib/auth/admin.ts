@@ -5,6 +5,7 @@ import { SignJWT, jwtVerify } from 'jose';
 import { db } from '@/lib/db';
 import { env } from '@/lib/env';
 import { base32Decode, verifyTotp } from '@/lib/auth/totp';
+import { issuedAfterRevocation, parseRevocationMark, revocationMark } from '@/lib/admin/limits';
 
 /**
  * Вход в админку.
@@ -20,6 +21,10 @@ import { base32Decode, verifyTotp } from '@/lib/auth/totp';
  *   • Ссылка живёт 15 минут и срабатывает один раз.
  *   • Сессия — 30 минут (у клиента 15 минут + продление; здесь продления нет:
  *     администратор заходит редко и ненадолго).
+ *   • Сессия — подписанный cookie без строки в базе, но отозвать её можно:
+ *     в настройках лежит отметка «сессии до этого момента недействительны».
+ *     Её ставит выход из админки (унесённая копия cookie умирает вместе
+ *     с настоящей) и авария по пределу записей (src/lib/admin/limits.ts).
  *   • Cookie с префиксом __Host-: браузер не отдаст её поддомену и разрешит
  *     только по HTTPS. Украсть через соседний поддомен невозможно.
  *
@@ -119,18 +124,51 @@ export function adminCookieName(): string {
 }
 
 export async function isAdmin(): Promise<boolean> {
+  return (await adminSessionIssuedAt()) !== null;
+}
+
+/**
+ * Когда выпущена действующая сессия администратора; null — сессии нет.
+ * От этого момента предел записей считает действия (src/lib/admin/limits.ts)
+ */
+export async function adminSessionIssuedAt(): Promise<Date | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(adminCookieName())?.value;
   // eslint-disable-next-line security/detect-possible-timing-attacks -- проверяется наличие cookie; подпись сверяет jwtVerify в постоянном времени
-  if (token === undefined) return false;
+  if (token === undefined) return null;
 
   try {
     const { payload } = await jwtVerify(token, secretKey());
-    return payload.role === 'ADMIN';
+    if (payload.role !== 'ADMIN' || payload.iat === undefined) return null;
+    if (!issuedAfterRevocation(payload.iat, await sessionsValidAfter())) return null;
+    return new Date(payload.iat * 1000);
   } catch {
     // Подпись не сошлась или срок истёк — это не ошибка, а обычный отказ
-    return false;
+    return null;
   }
+}
+
+/** Ключ в site_settings: сессии, выпущенные раньше, недействительны */
+export const SESSIONS_VALID_AFTER_KEY = 'admin.sessions-valid-after';
+
+/** Момент последнего отзыва сессий или null, если отзыва не было */
+export async function sessionsValidAfter(now = new Date()): Promise<Date | null> {
+  const row = await db.siteSetting.findUnique({ where: { key: SESSIONS_VALID_AFTER_KEY } });
+  return parseRevocationMark(row?.value, now);
+}
+
+/**
+ * Отозвать все сессии администратора, включая текущую. Пропуски ко второму
+ * фактору тоже сгорают: войти снова можно только новой ссылкой из терминала.
+ */
+export async function revokeAdminSessions(now = new Date()): Promise<void> {
+  const value = String(revocationMark(now).getTime());
+  await db.siteSetting.upsert({
+    where: { key: SESSIONS_VALID_AFTER_KEY },
+    create: { key: SESSIONS_VALID_AFTER_KEY, value },
+    update: { value },
+  });
+  attempts.clear();
 }
 
 export async function destroyAdminSession(): Promise<void> {

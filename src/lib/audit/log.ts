@@ -47,6 +47,14 @@ export async function audit(
   });
 }
 
+/**
+ * Сколько действий записано с момента from — для предела записей
+ * (src/lib/admin/limits.ts). Условие на actorId — ради индекса (actorId, createdAt)
+ */
+export async function auditCountSince(from: Date): Promise<number> {
+  return db.auditLog.count({ where: { actorId: ACTOR, createdAt: { gte: from } } });
+}
+
 export async function recentAudit(take: number) {
   return db.auditLog.findMany({
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],

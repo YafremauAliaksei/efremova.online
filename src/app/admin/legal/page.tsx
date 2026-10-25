@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { LegalEditor } from '@/app/admin/legal/LegalEditor';
+import { LEGAL_LIMIT_TEXT } from '@/app/admin/legal/limit-text';
 import { restoreLegal } from '@/app/admin/legal/actions';
 import { AdminNav } from '@/components/admin/AdminNav';
 import { isAdmin } from '@/lib/auth/admin';
@@ -36,6 +37,7 @@ const NAMES: Record<LegalSlug, string> = {
 const SAVED = {
   published: 'Новая редакция опубликована. Прежняя — в истории ниже.',
   restored: 'Прежний текст опубликован новой редакцией.',
+  same: 'Этот текст и так действующий — новая редакция не нужна.',
 } as const;
 
 const SMALL_BUTTON =
@@ -71,6 +73,11 @@ export default async function LegalAdminPage({ searchParams }: PageProps) {
       {params.error === 'missing' && (
         <p role="alert" className="mt-6 text-sm text-red-800">
           Документ не найден — обновите страницу.
+        </p>
+      )}
+      {params.error === 'limit' && (
+        <p role="alert" className="mt-6 text-sm text-red-800">
+          {LEGAL_LIMIT_TEXT}
         </p>
       )}
       {slug !== null && locale !== null ? (

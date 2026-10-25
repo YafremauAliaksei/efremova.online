@@ -3,9 +3,10 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import type { Prisma } from '@prisma/client';
+import { STORAGE_LIMITS, countSince, dayAgo } from '@/lib/admin/limits';
 import { canonicalJson } from '@/lib/audit/chain';
 import { audit } from '@/lib/audit/log';
-import { isAdmin } from '@/lib/auth/admin';
+import { requireAdminWrite } from '@/lib/admin/guard';
 import { db } from '@/lib/db';
 import { isLocale } from '@/lib/i18n';
 import { LEGAL_SLUGS, type LegalSlug } from '@/lib/legal';
@@ -28,14 +29,10 @@ function isLegalSlug(value: unknown): value is LegalSlug {
   return typeof value === 'string' && (LEGAL_SLUGS as readonly string[]).includes(value);
 }
 
-async function requireAdmin(): Promise<void> {
-  if (!(await isAdmin())) redirect('/admin/denied');
-}
-
 /** Состояние формы: при ошибке введённый текст возвращается, а не теряется */
 export interface LegalFormState {
   attempt: number;
-  error: LegalTextError | { code: 'title' } | { code: 'same' } | null;
+  error: LegalTextError | { code: 'title' } | { code: 'same' } | { code: 'limit' } | null;
   title?: string;
   text?: string;
   approved?: boolean;
@@ -46,7 +43,7 @@ export async function publishLegal(
   previous: LegalFormState,
   formData: FormData
 ): Promise<LegalFormState> {
-  await requireAdmin();
+  await requireAdminWrite();
   const slug = formData.get('slug');
   const locale = formData.get('locale');
   if (!isLegalSlug(slug) || !isLocale(locale)) redirect('/admin/legal?error=missing');
@@ -68,8 +65,17 @@ export async function publishLegal(
 
   const existing = await db.legalDocument.findMany({
     where: { slug, locale },
-    select: { version: true, title: true, sections: true, isDraft: true, isCurrent: true },
+    select: {
+      version: true,
+      title: true,
+      sections: true,
+      isDraft: true,
+      isCurrent: true,
+      createdAt: true,
+    },
   });
+  // Редакции не удаляются никогда — значит, их число за сутки ограничено
+  if (overDailyLimit(existing)) return { ...kept, error: { code: 'limit' } };
   const current = existing.find((doc) => doc.isCurrent);
   // Та же редакция ещё раз — не новая редакция: история не засоряется копиями
   if (
@@ -101,7 +107,7 @@ export async function publishLegal(
  * и по ней видно, что и когда было на сайте.
  */
 export async function restoreLegal(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireAdminWrite();
   const id = formData.get('documentId');
   const old =
     typeof id === 'string' && UUID.test(id)
@@ -111,8 +117,28 @@ export async function restoreLegal(formData: FormData): Promise<void> {
 
   const taken = await db.legalDocument.findMany({
     where: { slug: old.slug, locale: old.locale },
-    select: { version: true },
+    select: {
+      version: true,
+      title: true,
+      sections: true,
+      isDraft: true,
+      isCurrent: true,
+      createdAt: true,
+    },
   });
+  if (overDailyLimit(taken)) {
+    redirect(`/admin/legal?doc=${old.slug}&lang=${old.locale}&error=limit`);
+  }
+  // Прежняя редакция с тем же текстом, что и действующая, — не новая
+  // редакция: иначе каждое нажатие «вернуть» копило бы одинаковые строки
+  const current = taken.find((doc) => doc.isCurrent);
+  if (
+    current?.title === old.title &&
+    current.isDraft === old.isDraft &&
+    canonicalJson(current.sections) === canonicalJson(old.sections)
+  ) {
+    redirect(`/admin/legal?doc=${old.slug}&lang=${old.locale}&saved=same`);
+  }
   const version = nextVersion(old.slug, new Date(), new Set(taken.map((doc) => doc.version)));
   await createRevision({
     slug: old.slug,
@@ -130,6 +156,14 @@ export async function restoreLegal(formData: FormData): Promise<void> {
   });
   refresh();
   redirect(`/admin/legal?doc=${old.slug}&lang=${old.locale}&saved=restored`);
+}
+
+function overDailyLimit(revisions: readonly { createdAt: Date }[]): boolean {
+  const today = countSince(
+    revisions.map((doc) => doc.createdAt),
+    dayAgo(new Date())
+  );
+  return today >= STORAGE_LIMITS.legalPerDocPerDay;
 }
 
 /** Прежняя действующая перестаёт ею быть, новая становится — одной транзакцией */

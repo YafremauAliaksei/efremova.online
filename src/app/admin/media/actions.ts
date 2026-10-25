@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { isAdmin } from '@/lib/auth/admin';
+import { requireAdminWrite } from '@/lib/admin/guard';
 import { audit } from '@/lib/audit/log';
 import { textField } from '@/lib/content-schema';
 import { db } from '@/lib/db';
@@ -17,10 +17,6 @@ import { saveUpload } from '@/lib/media/store';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const label = textField(MEDIA_LABEL_MAX, true);
-
-async function requireAdmin(): Promise<void> {
-  if (!(await isAdmin())) redirect('/admin/denied');
-}
 
 function back(query: string): never {
   redirect(`/admin/media?${query}`);
@@ -38,7 +34,7 @@ function assetIdFrom(formData: FormData): string {
 }
 
 export async function uploadImage(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireAdminWrite();
   const file = formData.get('file');
   if (!(file instanceof File) || file.size === 0) back('error=noFile');
   // Размер — до чтения содержимого
@@ -55,7 +51,7 @@ export async function uploadImage(formData: FormData): Promise<void> {
 }
 
 export async function saveLabel(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireAdminWrite();
   const id = assetIdFrom(formData);
   const parsed = label.safeParse(formData.get('label') ?? '');
   if (!parsed.success) back('error=label');
@@ -66,7 +62,7 @@ export async function saveLabel(formData: FormData): Promise<void> {
 
 /** «Удалить» = в архив: с сайта картинка пропадает, из базы — нет */
 export async function archiveImage(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireAdminWrite();
   const id = assetIdFrom(formData);
   await db.mediaAsset.updateMany({
     where: { id, archivedAt: null },
@@ -78,7 +74,7 @@ export async function archiveImage(formData: FormData): Promise<void> {
 }
 
 export async function restoreImage(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireAdminWrite();
   const id = assetIdFrom(formData);
   await db.mediaAsset.updateMany({ where: { id }, data: { archivedAt: null } });
   await audit('media.restore', id);
