@@ -27,7 +27,7 @@
 
 # ─── Этап 1: зависимости ───
 # Меняется только когда меняется package-lock.json
-FROM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS deps
+FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS deps
 # Версии пакетов apk не закрепляются (DL3018) — в Alpine это вредный совет:
 # старые версии пропадают из репозитория, и образ перестаёт собираться.
 # Набор пакетов и так определён: базовый образ закреплён по хешу выше.
@@ -50,7 +50,7 @@ RUN --mount=type=cache,target=/root/.npm \
     npm ci --ignore-scripts && npx prisma generate
 
 # ─── Этап 2: сборка приложения ───
-FROM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS builder
+FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS builder
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
@@ -65,7 +65,7 @@ RUN --mount=type=cache,target=/app/.next/cache \
     npm run build
 
 # ─── Этап 3: то, что реально поедет на сервер ───
-FROM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS runner
+FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
