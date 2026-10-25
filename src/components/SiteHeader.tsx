@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { pagePath } from '@/lib/blocks/pages';
 import { localizedPath, type Locale } from '@/lib/i18n';
@@ -12,7 +11,7 @@ import { getNavigation } from '@/lib/pages';
  * (флаг «в шапке» у страницы). «Услуги» — страница со своим кодом, она
  * в меню всегда. Без базы меню короче, но шапка на месте.
  */
-export async function SiteHeader({ locale }: { locale: Locale }) {
+export async function SiteHeader({ locale, path }: { locale: Locale; path: string }) {
   const t = messages(locale);
   const pages = (await getNavigation(locale)).filter((item) => item.inHeader);
   const items = [
@@ -26,17 +25,17 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
         <ul className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
           {items.map((item) => (
             <li key={item.key}>
-              <Link
+              <a
                 href={localizedPath(locale, item.href)}
                 className="underline-offset-4 hover:underline"
               >
                 {item.label}
-              </Link>
+              </a>
             </li>
           ))}
         </ul>
       </nav>
-      <LanguageSwitcher current={locale} label={t.languageNav} />
+      <LanguageSwitcher current={locale} path={path} label={t.languageNav} />
     </header>
   );
 }

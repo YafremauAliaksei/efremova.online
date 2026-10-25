@@ -161,6 +161,19 @@ export default tseslint.config(
     },
   },
 
+  // Публичные страницы — HTML без JavaScript из своего обработчика маршрута,
+  // а не страницы Next.js (docs/14). Правила ниже требуют next/link и next/head,
+  // которые работают только внутри страниц Next и тянут за собой скрипты.
+  // Здесь нужен ровно обычный <a> и обычный <head>
+  {
+    files: ['src/components/**/*.tsx', 'src/lib/public/**/*.tsx'],
+    ignores: ['src/components/admin/**'],
+    rules: {
+      '@next/next/no-html-link-for-pages': 'off',
+      '@next/next/no-head-element': 'off',
+    },
+  },
+
   // Сид базы — консольная утилита, вывод в консоль для неё нормален
   {
     files: ['prisma/seed.ts'],

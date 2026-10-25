@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { Filled } from '@/components/Filled';
 import { getSiteProfile } from '@/lib/site-profile';
 import { LOCALE_NAMES, LOCALE_TAGS, localizedPath, type Locale } from '@/lib/i18n';
@@ -81,7 +80,7 @@ export async function LegalDocument({
               const isCurrent = locale === document.locale;
               return (
                 <li key={locale}>
-                  <Link
+                  <a
                     href={localizedPath(locale, path)}
                     hrefLang={LOCALE_TAGS[locale]}
                     aria-current={isCurrent ? 'true' : undefined}
@@ -92,7 +91,7 @@ export async function LegalDocument({
                     }
                   >
                     {LOCALE_NAMES[locale]}
-                  </Link>
+                  </a>
                 </li>
               );
             })}

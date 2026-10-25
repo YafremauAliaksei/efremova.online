@@ -1,42 +1,38 @@
-import type { Metadata } from 'next';
-import { headers } from 'next/headers';
-import { notFound } from 'next/navigation';
 import { PageBlocks } from '@/components/blocks/PageBlocks';
 import { SiteFooter } from '@/components/SiteFooter';
 import { pagePath } from '@/lib/blocks/pages';
-import { languageAlternates, type Locale } from '@/lib/i18n';
+import type { Locale } from '@/lib/i18n';
 import { getPublicPage } from '@/lib/pages';
+import type { PublicView } from '@/lib/public/view';
+import { DEFAULT_REGION } from '@/lib/services/edit';
 
 /**
  * Страница, собранная из блоков в базе: главная и все страницы, которые
  * владелец завёл в админке. Сколько их и что на них — решает база.
+ *
+ * null — такой страницы нет или она скрыта: обработчик ответит 404.
  */
-
-export async function blockPageMetadata(slug: string, locale: Locale): Promise<Metadata> {
+export async function blockPage(slug: string, locale: Locale): Promise<PublicView | null> {
   const page = await getPublicPage(slug, locale);
-  if (page === null) return {};
+  if (page === null) return null;
+  const path = pagePath(slug);
+
   return {
-    // У главной заголовок — название сайта из макета, а не «Главная · …»
-    ...(page.title !== null && pagePath(slug) !== '/' ? { title: page.title } : {}),
-    ...(page.description !== null ? { description: page.description } : {}),
-    alternates: languageAlternates(locale, pagePath(slug)),
+    meta: {
+      // У главной заголовок — название сайта, а не «Главная · …»
+      title: path === '/' ? null : page.title,
+      description: page.description,
+      path,
+    },
+    body: (
+      <>
+        <main id="main">
+          {/* Страница одна на всех посетителей и лежит в общем кэше, поэтому
+              цена — общая, а не по стране посетителя (docs/14 п.6) */}
+          <PageBlocks blocks={page.blocks} locale={locale} region={DEFAULT_REGION} />
+        </main>
+        <SiteFooter locale={locale} />
+      </>
+    ),
   };
-}
-
-export async function BlockPage({ slug, locale }: { slug: string; locale: Locale }) {
-  const page = await getPublicPage(slug, locale);
-  if (page === null) notFound();
-
-  // Страну сообщает Cloudflare. Никаких сторонних geo-IP сервисов:
-  // иначе IP посетителя утекал бы третьей стороне (docs/03)
-  const region = (await headers()).get('cf-ipcountry') ?? 'DEFAULT';
-
-  return (
-    <>
-      <main id="main">
-        <PageBlocks blocks={page.blocks} locale={locale} region={region} />
-      </main>
-      <SiteFooter locale={locale} />
-    </>
-  );
 }

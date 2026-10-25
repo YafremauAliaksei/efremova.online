@@ -8,7 +8,8 @@
  *   2. Защита от CSRF         — проверка источника для изменяющих запросов
  *   3. Гейт админки           — нет cookie → отказ
  *   4. Язык в адресе          — /about → /ru/about (docs/13, п.3.2)
- *   5. Заголовки безопасности — CSP с nonce на каждый ответ
+ *   5. Заголовки безопасности — у публичных страниц CSP без скриптов вовсе,
+ *                               у остального — CSP с nonce на каждый ответ
  *
  * Личного кабинета на этом домене нет: он уезжает на отдельный поддомен
  * и отдельный сервер (docs/13-site-architecture.md). Поэтому закрытая зона
@@ -22,6 +23,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import {
   buildContentSecurityPolicy,
+  buildPublicContentSecurityPolicy,
   generateNonce,
   getBaseSecurityHeaders,
   getPrivateAreaHeaders,
@@ -227,16 +229,21 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   // ────────────────────────────────────────────────────────────────
   // 5. ЗАГОЛОВКИ БЕЗОПАСНОСТИ
   // ────────────────────────────────────────────────────────────────
+  // Публичная страница (/ru, /pl/about…) — HTML без скриптов из общего кэша
+  // Cloudflare: CSP без nonce и одна на всех (docs/14). Обработчик ставит ту же
+  // политику сам; здесь — чтобы заголовок не зависел от того, кто ответил
+  if (splitLocale(pathname).locale !== null) {
+    const response = NextResponse.next();
+    response.headers.set('Content-Security-Policy', buildPublicContentSecurityPolicy());
+    return withBaseHeaders(response);
+  }
+
   const nonce = generateNonce();
 
   // Передаём nonce внутрь приложения: компоненты возьмут его из заголовка
   // и проставят своим <script nonce={...}>
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-nonce', nonce);
-  // Язык адреса для страниц, которым Next.js не передаёт params (not-found).
-  // Заголовок из запроса посетителя перезаписывается всегда: подставить свой
-  // x-locale снаружи нельзя
-  requestHeaders.set('x-locale', splitLocale(pathname).locale ?? '');
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
 
@@ -275,6 +282,15 @@ function withSecurityHeaders(response: NextResponse, isDev: boolean): NextRespon
     'Content-Security-Policy',
     buildContentSecurityPolicy(generateNonce(), isDev)
   );
+  for (const [key, value] of Object.entries(getBaseSecurityHeaders())) {
+    if (value === '') response.headers.delete(key);
+    else response.headers.set(key, value);
+  }
+  return response;
+}
+
+/** Заголовки, одинаковые для всех ответов (HSTS, nosniff, …) */
+function withBaseHeaders(response: NextResponse): NextResponse {
   for (const [key, value] of Object.entries(getBaseSecurityHeaders())) {
     if (value === '') response.headers.delete(key);
     else response.headers.set(key, value);
@@ -386,6 +402,6 @@ function sleep(ms: number): Promise<void> {
 export const config = {
   // Middleware не трогает статику — иначе теряем скорость на каждой картинке
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|woff2)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|woff2|css)$).*)',
   ],
 };

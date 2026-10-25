@@ -62,3 +62,6 @@ npm-debug.log*
 # Браузерные тесты (npm run test:e2e): отчёты и следы падений
 test-results/
 playwright-report/
+
+# Стили публичных страниц — результат сборки (scripts/build-site-css.mjs)
+/public/site.css

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  NOT_FOUND_CACHE_HEADERS,
+  PUBLIC_CACHE_HEADERS,
   buildContentSecurityPolicy,
+  buildPublicContentSecurityPolicy,
   generateNonce,
   getBaseSecurityHeaders,
   getPrivateAreaHeaders,
@@ -116,5 +119,53 @@ describe('остальные заголовки', () => {
     expect(closed['Cache-Control']).toMatch(/no-store/);
     expect(closed['Cache-Control']).toMatch(/private/);
     expect(closed['X-Robots-Tag']).toMatch(/noindex/);
+  });
+});
+
+describe('CSP публичных страниц (docs/14)', () => {
+  const policy = buildPublicContentSecurityPolicy();
+  const pub = parse(policy);
+
+  it('скрипты запрещены совсем — даже свои', () => {
+    expect(pub.get('script-src')).toEqual(["'none'"]);
+    expect(pub.get('default-src')).toEqual(["'none'"]);
+    expect(pub.get('connect-src')).toEqual(["'self'"]);
+  });
+
+  it('стили только своим файлом, без встроенных', () => {
+    expect(pub.get('style-src')).toEqual(["'self'"]);
+    expect(policy).not.toContain('unsafe-inline');
+    expect(policy).not.toContain('unsafe-eval');
+  });
+
+  it('ни одного чужого домена и ни одного nonce', () => {
+    for (const [, sources] of pub) {
+      for (const source of sources) expect(source).toMatch(/^('self'|'none')$/);
+    }
+  });
+
+  it('одна и та же на каждый вызов: на этом держится общий кэш', () => {
+    expect(buildPublicContentSecurityPolicy()).toBe(policy);
+  });
+
+  it('защита от встраивания и подмены base — как у остального сайта', () => {
+    expect(pub.get('frame-ancestors')).toEqual(["'none'"]);
+    expect(pub.get('object-src')).toEqual(["'none'"]);
+    expect(pub.get('base-uri')).toEqual(["'none'"]);
+  });
+
+  it('кэш: Cloudflare держит час и отдаёт копию при сбое; «не найдено» — короче', () => {
+    const cdn = PUBLIC_CACHE_HEADERS['CDN-Cache-Control'];
+    expect(cdn).toContain('max-age=3600');
+    expect(cdn).toContain('stale-if-error');
+    expect(NOT_FOUND_CACHE_HEADERS['CDN-Cache-Control']).toContain('max-age=300');
+  });
+
+  it('браузер сверяется каждый раз: правка видна без ожидания своей копии', () => {
+    for (const headers of [PUBLIC_CACHE_HEADERS, NOT_FOUND_CACHE_HEADERS]) {
+      expect(headers['Cache-Control']).toContain('public');
+      expect(headers['Cache-Control']).toContain('max-age=0');
+      expect(headers['Cache-Control']).not.toContain('private');
+    }
   });
 });

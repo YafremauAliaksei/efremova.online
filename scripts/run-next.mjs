@@ -21,7 +21,7 @@
  * Использование: node scripts/run-next.mjs dev|build|start
  */
 
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { cpSync, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
@@ -75,6 +75,13 @@ if (useStandalone) {
   console.log('[run-next] запускаю standalone-сервер — тот же, что в Docker-образе');
 } else if (command === 'start') {
   console.warn('[run-next] .next/standalone не найден: сначала `npm run build`');
+}
+
+// Стили публичных страниц собираются отдельно от Next.js (scripts/build-site-css.mjs):
+// публичные страницы — HTML из обработчика маршрута, их стили Next не видит
+if (command === 'dev' || command === 'build') {
+  const css = spawnSync(process.execPath, ['scripts/build-site-css.mjs'], { stdio: 'inherit' });
+  if (css.status !== 0) process.exit(css.status ?? 1);
 }
 
 // Запускаем сам файл Next.js через node, без shell.
