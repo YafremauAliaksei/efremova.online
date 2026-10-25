@@ -110,7 +110,7 @@ export const BLOCKS = {
     data: z
       .object({
         /** id картинки из media_assets; адрес файла собирается при отрисовке */
-        image: z.string().uuid().optional().catch(undefined),
+        image: z.uuid().optional().catch(undefined),
         side: z.enum(IMAGE_SIDES).catch('right'),
       })
       .catch({ side: 'right' }),
@@ -125,7 +125,7 @@ export const BLOCKS = {
         /** id ролика — 11 знаков; адрес на YouTube собирает код */
         video: z.string().refine(isVideoId).optional().catch(undefined),
         /** Обложка, скачанная сервером в «Картинки» */
-        image: z.string().uuid().optional().catch(undefined),
+        image: z.uuid().optional().catch(undefined),
       })
       .catch({}),
     withoutText: false,
@@ -157,7 +157,7 @@ export const BLOCKS = {
     label: string;
     hint: string;
     fields: readonly TextFieldDef[];
-    data: z.ZodType<unknown>;
+    data: z.ZodType;
     /** Рисуется и без своего текста: содержимое приходит не из блока, а из базы */
     withoutText: boolean;
   }
