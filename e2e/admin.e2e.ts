@@ -411,26 +411,35 @@ test('услуги: цены по валютам, выбор валюты, пу�
   await admin.getByRole('button', { name: 'Создать скрытой' }).click();
   await saved(admin, 'Услуга создана скрытой');
 
-  // Открыта карточка новой услуги; цена в каждой валюте — своя и ровная
+  // Цены — в отдельном редакторе: только там сервер спрашивает курс
   const card = admin.locator('li details[open]');
   await expect(card.locator('summary')).toContainText(title);
-  await card.locator('input[name=currency]').fill('PLN');
-  await card.locator('input[name=amount]').fill('250');
-  await card.getByRole('button', { name: 'Назначить цену' }).click();
-  await saved(admin, 'Цена назначена');
+  const serviceUrl = admin.url();
+  await card.getByRole('link', { name: 'Изменить цены' }).click();
+  await expect(admin.locator('main h1')).toContainText(title);
+  const pricesUrl = admin.url().split('?')[0] ?? '';
 
-  // Любая валюта с копейками, вписанная строчными, — тоже цена
-  await card.locator('input[name=currency]').fill('eur');
-  await card.locator('input[name=amount]').fill('60,50');
-  await card.getByRole('button', { name: 'Назначить цену' }).click();
-  await expect(card.locator('summary')).toContainText('60,50');
+  // Курс на экране сразу: свежий или прежний (на новом сайте — примерный из
+  // миграции); источник недоступен — предложение попробовать другой
+  await expect(admin.locator('main')).toContainText(/Курсы: |недоступен|прежние курсы/);
 
-  // Не валюта — отказ с объяснением
-  await card.locator('input[name=currency]').fill('BTC');
-  await card.locator('input[name=amount]').fill('1');
-  await card.getByRole('button', { name: 'Назначить цену' }).click();
-  await expect(admin.locator('main [role=alert]')).toContainText('ISO 4217');
+  // Цена в каждой валюте — своя и ровная; пустое поле — без изменений
+  await admin.getByLabel('Новая цена, PLN').fill('250');
+  await admin.getByLabel('Новая цена, EUR').fill('60,50');
+  await admin.getByRole('button', { name: 'Сохранить цены' }).click();
+  await saved(admin, 'Цены сохранены');
+  await expect(admin.locator('main tbody')).toContainText(/250\s?PLN/);
+  // От цены в опорной валюте (EUR) — подсказка в остальных
+  await expect(admin.locator('main tbody')).toContainText('ровно');
 
+  // Неверная сумма — отказ всей формы с названием валюты
+  await admin.getByLabel('Новая цена, PLN').fill('300');
+  await admin.getByLabel('Новая цена, BYN').fill('сто');
+  await admin.getByRole('button', { name: 'Сохранить цены' }).click();
+  await expect(admin.locator('main [role=alert]').first()).toContainText('BYN: сумма');
+  await expect(admin.locator('main tbody')).toContainText(/250\s?PLN/);
+
+  await admin.goto(serviceUrl);
   const opened = admin.locator('li details[open]');
   await opened.locator('input[name=title_pl]').fill(`Konsultacja ${RUN}`);
   await opened.locator('input[name=isActive]').check();
@@ -438,7 +447,7 @@ test('услуги: цены по валютам, выбор валюты, пу�
   await saved(admin, 'Услуга сохранена');
 
   // Страница одна на всех (docs/14): страна посетителя на цену не влияет —
-  // по умолчанию злотые, рядом выбор валюты обычными ссылками
+  // по умолчанию основная валюта, рядом выбор валюты обычными ссылками
   const poland = await browser.newContext({ extraHTTPHeaders: { 'cf-ipcountry': 'DE' } });
   const site = await poland.newPage();
   await site.goto('/pl/services');
@@ -449,12 +458,11 @@ test('услуги: цены по валютам, выбор валюты, пу�
   await expect(item).toContainText(/60,50\s€/);
 
   // Новая цена закрывает прежнюю: на сайте новая, прежняя — в истории и в архиве
-  const card2 = admin.locator('li details[open]');
-  await card2.locator('input[name=currency]').fill('EUR');
-  await card2.locator('input[name=amount]').fill('65');
-  await card2.getByRole('button', { name: 'Назначить цену' }).click();
-  await saved(admin, 'Цена назначена');
-  await expect(card2.locator('summary', { hasText: 'История цен: 1' })).toBeVisible();
+  await admin.goto(pricesUrl);
+  await admin.getByLabel('Новая цена, EUR').fill('65');
+  await admin.getByRole('button', { name: 'Сохранить цены' }).click();
+  await saved(admin, 'Цены сохранены');
+  await expect(admin.locator('main section', { hasText: 'История цен' })).toContainText(/60,50\s€/);
 
   await site.reload();
   await expect(item).toContainText(/65\s€/);
@@ -464,7 +472,52 @@ test('услуги: цены по валютам, выбор валюты, пу�
   await expect(archived).toContainText(/60,50\s€/);
   await expect(archived).toContainText(/65\s€/);
   await expect(archived).toContainText('obowiązuje obecnie');
+
+  // Основная валюта — настройка в админке, не в коде: сменили — и у
+  // посетителя по умолчанию евро, адрес без параметра
+  await admin.goto('/admin/currencies');
+  await admin.locator('select[name=defaultCurrency]').selectOption('EUR');
+  await admin.getByRole('button', { name: 'Сохранить', exact: true }).click();
+  await saved(admin, 'Основная и опорная валюта сохранены');
+  await site.goto('/pl/services');
+  await expect(item).toContainText(/65\s€/);
+  await admin.locator('select[name=defaultCurrency]').selectOption('PLN');
+  await admin.getByRole('button', { name: 'Сохранить', exact: true }).click();
+  await saved(admin, 'Основная и опорная валюта сохранены');
+  await site.reload();
+  await expect(item).toContainText(/250\s?zł/);
   await poland.close();
+});
+
+test('валюты и курсы: новая валюта — строка в редакторе цен, снятая — нет', async () => {
+  await admin.goto('/admin/currencies');
+  await admin.locator('input[name=code]').fill('jpy');
+  await admin.getByRole('button', { name: 'Добавить' }).click();
+  await expect(admin.locator('main [role=alert]')).toContainText('без копеек');
+
+  await admin.locator('input[name=code]').fill('kzt');
+  await admin.getByRole('button', { name: 'Добавить' }).click();
+  await saved(admin, 'Валюта добавлена');
+  await expect(admin.locator('main ol').first()).toContainText('KZT');
+
+  // Порядок — кнопками; основную и опорную снять нельзя
+  await admin.getByRole('button', { name: 'KZT выше' }).click();
+  await saved(admin, 'Порядок изменён');
+  await expect(admin.locator('input[name=enabled][value=PLN]')).toBeDisabled();
+
+  await admin.locator('input[name=enabled][value=KZT]').uncheck();
+  await admin.getByRole('button', { name: 'Сохранить список' }).click();
+  await saved(admin, 'Список валют сохранён');
+  await expect(admin.locator('input[name=enabled][value=KZT]')).not.toBeChecked();
+
+  // Источники: выключенный не пробуется, порядок — кнопками
+  await admin.locator('input[name=source][value=floatrates]').uncheck();
+  await admin.getByRole('button', { name: 'Сохранить источники' }).click();
+  await saved(admin, 'Источники курсов сохранены');
+  await expect(admin.locator('input[name=source][value=floatrates]')).not.toBeChecked();
+  await admin.locator('input[name=source][value=floatrates]').check();
+  await admin.getByRole('button', { name: 'Сохранить источники' }).click();
+  await saved(admin, 'Источники курсов сохранены');
 });
 
 test('контакты: адреса из профиля — кнопками на странице контактов', async () => {

@@ -39,6 +39,7 @@ export function ServiceList({
         path={localizedPath(locale, path)}
         currencies={list.currencies}
         current={list.currency}
+        defaultCurrency={list.defaultCurrency}
         label={t.currencyNav}
       />
       <ul className="mt-8 space-y-4">

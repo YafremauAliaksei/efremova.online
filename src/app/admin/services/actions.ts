@@ -9,7 +9,7 @@ import { moveId, numbered } from '@/lib/blocks/order';
 import { DEFAULT_LOCALE } from '@/lib/i18n';
 import {
   parseNewServiceForm,
-  parsePriceForm,
+  parsePricesForm,
   parseServiceForm,
   planPriceChange,
 } from '@/lib/services/edit';
@@ -36,9 +36,10 @@ function back(serviceId: string | null, query: string): never {
 }
 
 /** Услуги видны на /services и в блоке «Список услуг» на любой странице */
-function refresh(): void {
+function refresh(serviceId?: string): void {
   revalidatePath('/[locale]', 'layout');
   revalidatePath('/admin/services');
+  if (serviceId !== undefined) revalidatePath(`/admin/services/${serviceId}/prices`);
 }
 
 async function existingService(formData: FormData): Promise<string> {
@@ -119,39 +120,52 @@ export async function moveService(formData: FormData): Promise<void> {
   back(serviceId, 'saved=moved');
 }
 
+/** Назад в редактор цен услуги: итог действия — только известным кодом */
+function backToPrices(serviceId: string, query: string): never {
+  redirect(`/admin/services/${serviceId}/prices?${query}`);
+}
+
 /**
- * Новая цена для региона. Прежняя действующая закрывается этим же моментом,
- * новая с него начинается — одной транзакцией: ни мгновения без цены и ни
- * мгновения с двумя.
+ * Новые цены сразу в нескольких валютах — форма редактора цен. Пустое поле —
+ * цена в этой валюте не меняется. Прежняя действующая цена закрывается этим
+ * же моментом, новая с него начинается — одной транзакцией на все валюты:
+ * ни мгновения без цены и ни мгновения с двумя.
  */
-export async function setPrice(formData: FormData): Promise<void> {
+export async function setPrices(formData: FormData): Promise<void> {
   await requireAdminWrite();
   const serviceId = await existingService(formData);
-  const parsed = parsePriceForm(formData);
-  if (!parsed.ok) back(serviceId, `error=${parsed.field}`);
+  const parsed = parsePricesForm(formData);
+  if (!parsed.ok) backToPrices(serviceId, `error=${parsed.field}`);
 
   const now = new Date();
   const prices = await db.servicePrice.findMany({ where: { serviceId } });
-  const plan = planPriceChange(prices, parsed.value, now);
-  if (!plan.create) back(serviceId, 'saved=priceSame');
+  const changes = parsed.value
+    .map((next) => ({ next, plan: planPriceChange(prices, next, now) }))
+    .filter(({ plan }) => plan.create);
+  if (changes.length === 0) backToPrices(serviceId, 'saved=priceSame');
 
   await db.$transaction([
-    db.servicePrice.updateMany({ where: { id: { in: plan.close } }, data: { validTo: now } }),
-    db.servicePrice.create({
-      data: {
+    db.servicePrice.updateMany({
+      where: { id: { in: changes.flatMap(({ plan }) => plan.close) } },
+      data: { validTo: now },
+    }),
+    db.servicePrice.createMany({
+      data: changes.map(({ next }) => ({
         serviceId,
-        currency: parsed.value.currency,
-        amountMinor: parsed.value.amountMinor,
+        currency: next.currency,
+        amountMinor: next.amountMinor,
         validFrom: now,
-      },
+      })),
     }),
   ]);
-  await audit('price.set', serviceId, {
-    currency: parsed.value.currency,
-    amountMinor: parsed.value.amountMinor,
-  });
-  refresh();
-  back(serviceId, 'saved=price');
+  for (const { next } of changes) {
+    await audit('price.set', serviceId, {
+      currency: next.currency,
+      amountMinor: next.amountMinor,
+    });
+  }
+  refresh(serviceId);
+  backToPrices(serviceId, 'saved=price');
 }
 
 /**
@@ -162,15 +176,15 @@ export async function closePrice(formData: FormData): Promise<void> {
   await requireAdminWrite();
   const serviceId = await existingService(formData);
   const priceId = formData.get('priceId');
-  if (typeof priceId !== 'string' || !UUID.test(priceId)) back(serviceId, 'error=missing');
+  if (typeof priceId !== 'string' || !UUID.test(priceId)) backToPrices(serviceId, 'error=missing');
 
   const now = new Date();
   const { count } = await db.servicePrice.updateMany({
     where: { id: priceId, serviceId, validTo: null },
     data: { validTo: now },
   });
-  if (count === 0) back(serviceId, 'error=missing');
+  if (count === 0) backToPrices(serviceId, 'error=missing');
   await audit('price.close', serviceId, { price: priceId });
-  refresh();
-  back(serviceId, 'saved=priceClosed');
+  refresh(serviceId);
+  backToPrices(serviceId, 'saved=priceClosed');
 }

@@ -1,9 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { convertFromPln, parseNbpTables, roundNicely } from './rates';
+import {
+  RATE_SOURCES,
+  convert,
+  parseErApi,
+  parseFloatRates,
+  parseNbp,
+  parseStoredTable,
+  roundNicely,
+} from './rates';
 
 /**
  * Курс — только подсказка владельцу (задача 9b), но ответ чужого сервера
- * читается строго: всё, что не похоже на таблицу NBP, отбрасывается.
+ * читается строго: всё, что не похоже на курсы, отбрасывается. Ответы
+ * разных источников сводятся к одной таблице — «единиц за одну базу».
  */
 
 const tableA = [
@@ -12,8 +21,8 @@ const tableA = [
     no: '206/A/NBP/2026',
     effectiveDate: '2026-10-23',
     rates: [
-      { currency: 'euro', code: 'EUR', mid: 4.2512 },
-      { currency: 'rubel rosyjski', code: 'RUB', mid: 0.0451 },
+      { currency: 'euro', code: 'EUR', mid: 4.25 },
+      { currency: 'rubel rosyjski', code: 'RUB', mid: 0.05 },
     ],
   },
 ];
@@ -23,23 +32,24 @@ const tableB = [
     no: '043/B/NBP/2026',
     effectiveDate: '2026-10-21',
     rates: [
-      { currency: 'rubel białoruski', code: 'BYN', mid: 1.2203 },
+      { currency: 'rubel białoruski', code: 'BYN', mid: 1.25 },
       { currency: 'euro (stary kurs)', code: 'EUR', mid: 9.99 },
     ],
   },
 ];
 
-describe('таблицы NBP', () => {
-  it('две таблицы — один словарь курсов к злотому', () => {
-    const rates = parseNbpTables([tableA, tableB]);
-    expect(rates.get('EUR')).toEqual({ plnPerUnit: 4.2512, date: '2026-10-23' });
-    expect(rates.get('BYN')).toEqual({ plnPerUnit: 1.2203, date: '2026-10-21' });
-    expect(rates.get('RUB')?.plnPerUnit).toBe(0.0451);
+describe('NBP', () => {
+  it('две таблицы — одна таблица к злотому, дата — самая свежая', () => {
+    const table = parseNbp([tableA, tableB]);
+    expect(table?.base).toBe('PLN');
+    expect(table?.date).toBe('2026-10-23');
+    expect(table?.rates.PLN).toBe(1);
+    expect(table?.rates.BYN).toBe(0.8);
   });
 
   it('валюта в обеих таблицах — побеждает таблица A, в каком бы порядке ни пришли', () => {
-    expect(parseNbpTables([tableA, tableB]).get('EUR')?.plnPerUnit).toBe(4.2512);
-    expect(parseNbpTables([tableB, tableA]).get('EUR')?.plnPerUnit).toBe(4.2512);
+    expect(parseNbp([tableA, tableB])?.rates.EUR).toBeCloseTo(1 / 4.25);
+    expect(parseNbp([tableB, tableA])?.rates.EUR).toBeCloseTo(1 / 4.25);
   });
 
   it.each([
@@ -49,19 +59,99 @@ describe('таблицы NBP', () => {
     ['отрицательный курс', [{ ...tableA[0], rates: [{ code: 'EUR', mid: -1 }] }]],
     ['код не валюты', [{ ...tableA[0], rates: [{ code: '<b>', mid: 1 }] }]],
     ['дата не дата', [{ ...tableA[0], effectiveDate: 'вчера' }]],
-  ])('%s — ответ отбрасывается', (_name, body) => {
-    expect(parseNbpTables([body]).size).toBe(0);
+  ])('%s — курса нет', (_name, body) => {
+    expect(parseNbp([body])).toBeNull();
   });
 
   it('испорченная таблица не портит исправную', () => {
-    expect(parseNbpTables(['мусор', tableB]).has('BYN')).toBe(true);
+    expect(parseNbp(['мусор', tableB])?.rates.BYN).toBe(0.8);
   });
 });
 
-describe('пересчёт и ровное число', () => {
-  it('из злотых по курсу, в минорных единицах', () => {
-    // 250 zł / 4.2512 = 58,81 €
-    expect(convertFromPln(25000, { plnPerUnit: 4.2512, date: '2026-10-23' })).toBe(5881);
+describe('ExchangeRate-API', () => {
+  const body = {
+    result: 'success',
+    base_code: 'EUR',
+    time_last_update_unix: Date.UTC(2026, 9, 24) / 1000,
+    rates: { EUR: 1, PLN: 4.25, KZT: 560, '<b>': 1, BAD: -3, NAN: 'x' },
+  };
+
+  it('курсы к евро, мусорные строки пропускаются', () => {
+    expect(parseErApi([body])).toEqual({
+      base: 'EUR',
+      date: '2026-10-24',
+      rates: { EUR: 1, PLN: 4.25, KZT: 560 },
+    });
+  });
+
+  it.each([
+    ['ошибка источника', { ...body, result: 'error' }],
+    ['другая база', { ...body, base_code: 'USD' }],
+    ['без курсов', { ...body, rates: {} }],
+    ['не объект', 'мусор'],
+  ])('%s — курса нет', (_name, broken) => {
+    expect(parseErApi([broken])).toBeNull();
+  });
+});
+
+describe('FloatRates', () => {
+  it('курсы к евро из записей по валютам', () => {
+    const body = {
+      pln: { code: 'PLN', rate: 4.25, date: 'Fri, 24 Oct 2026 23:55:01 GMT', inverseRate: 0.23 },
+      byn: { code: 'BYN', rate: 3.6, date: 'Fri, 24 Oct 2026 23:55:01 GMT' },
+      bad: { code: 'xx', rate: 1, date: '' },
+    };
+    expect(parseFloatRates([body])).toEqual({
+      base: 'EUR',
+      date: '2026-10-24',
+      rates: { PLN: 4.25, BYN: 3.6, EUR: 1 },
+    });
+  });
+
+  it.each([
+    ['массив', []],
+    ['пусто', {}],
+    ['null', null],
+  ])('%s — курса нет', (_name, body) => {
+    expect(parseFloatRates([body])).toBeNull();
+  });
+});
+
+describe('источники', () => {
+  it('у каждого — свой id и адреса только https, без параметров из вне', () => {
+    expect(new Set(RATE_SOURCES.map((source) => source.id)).size).toBe(RATE_SOURCES.length);
+    for (const source of RATE_SOURCES) {
+      expect(source.urls.length).toBeGreaterThan(0);
+      for (const url of source.urls) expect(new URL(url).protocol).toBe('https:');
+    }
+  });
+
+  it('хосты — ровно те, что записаны в docs/03 (SSRF)', () => {
+    const hosts = new Set(
+      RATE_SOURCES.flatMap((source) => source.urls.map((url) => new URL(url).host))
+    );
+    expect([...hosts].sort()).toEqual(['api.nbp.pl', 'open.er-api.com', 'www.floatrates.com']);
+  });
+});
+
+describe('пересчёт', () => {
+  const rates = { base: 'EUR', date: '2026-10-24', rates: { EUR: 1, PLN: 4.25, BYN: 3.6 } };
+
+  it('из любой валюты в любую через базу, в минорных единицах', () => {
+    expect(convert(6000, 'EUR', 'PLN', rates)).toBe(25500);
+    expect(convert(25500, 'PLN', 'EUR', rates)).toBe(6000);
+    expect(convert(25500, 'PLN', 'BYN', rates)).toBe(21600);
+  });
+
+  it('нет курса одной из валют — null, а не выдуманное число', () => {
+    expect(convert(100, 'EUR', 'KZT', rates)).toBeNull();
+  });
+
+  it('таблица из базы проверяется заново', () => {
+    expect(parseStoredTable(rates)).toEqual(rates);
+    expect(parseStoredTable({ ...rates, rates: { PLN: 4 } })).toBeNull();
+    expect(parseStoredTable({ ...rates, rates: { EUR: 1, PLN: 0 } })).toBeNull();
+    expect(parseStoredTable('мусор')).toBeNull();
   });
 
   it.each([
@@ -71,7 +161,7 @@ describe('пересчёт и ровное число', () => {
     [1240, 1200], // 12,40 → 12
     [20487, 20000], // 204,87 BYN → 200 BYN
     [50, 50], // меньше единицы — как есть
-  ])('%i → %i', (exact, nice) => {
+  ])('ровное число: %i → %i', (exact, nice) => {
     expect(roundNicely(exact)).toBe(nice);
   });
 });

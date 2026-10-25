@@ -14,7 +14,7 @@ import type { PublicView } from '@/lib/public/view';
 export async function blockPage(
   slug: string,
   locale: Locale,
-  /** Валюта из адреса (?currency=EUR) для блока услуг; null — злотые */
+  /** Валюта из адреса (?currency=EUR) для блока услуг; null — основная валюта сайта */
   currency: string | null
 ): Promise<PublicView | null> {
   const page = await getPublicPage(slug, locale);

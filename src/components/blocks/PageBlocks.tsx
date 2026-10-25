@@ -87,7 +87,7 @@ export async function PageBlocks({
   locale: Locale;
   /** Адрес страницы без языка — для ссылок выбора валюты в блоке услуг */
   path: string;
-  /** Валюта из адреса (?currency=EUR); null — злотые */
+  /** Валюта из адреса (?currency=EUR); null — основная валюта сайта */
   currency: string | null;
 }) {
   // Услуги спрашиваются у базы, только если на странице есть их блок

@@ -1,28 +1,19 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import {
-  closePrice,
-  createService,
-  moveService,
-  saveService,
-  setPrice,
-} from '@/app/admin/services/actions';
+import { createService, moveService, saveService } from '@/app/admin/services/actions';
 import { AdminNav } from '@/components/admin/AdminNav';
 import { isAdmin } from '@/lib/auth/admin';
 import { i18nTextSchema } from '@/lib/content-schema';
 import { db } from '@/lib/db';
-import { convertFromPln, roundNicely, type ExchangeRate } from '@/lib/services/rates';
-import { getExchangeRates } from '@/lib/services/rates-fetch';
+import { getCurrencySettings } from '@/lib/services/currency-settings';
 import { DEFAULT_LOCALE, LOCALES, LOCALE_NAMES, LOCALE_TAGS, type Locale } from '@/lib/i18n';
 import {
-  DEFAULT_CURRENCY,
   DURATION_MAX,
   DURATION_MIN,
   SERVICE_DESCRIPTION_MAX,
   SERVICE_TITLE_MAX,
   formatPrice,
-  SUGGESTED_CURRENCIES,
   isPriceCurrent,
 } from '@/lib/services/edit';
 
@@ -30,9 +21,8 @@ import {
  * Услуги и цены (задача 6, бывш. A.4).
  *
  * Услуга — название и описание на трёх языках, длительность, показ на сайте
- * и место в списке. Цена назначается по региону: своя для страны (код из
- * заголовка Cloudflare) и общая DEFAULT для всех остальных. Новая цена не
- * затирает прежнюю, а закрывает её датой — история остаётся.
+ * и место в списке. Цены — отдельно, в редакторе цен услуги
+ * (services/[id]/prices): только там сервер спрашивает курс валют.
  */
 
 export const metadata: Metadata = {
@@ -48,10 +38,6 @@ const SAVED = {
     'Услуга создана скрытой. Назначьте цену и переводы, затем включите «показывать на сайте».',
   settings: 'Услуга сохранена.',
   moved: 'Порядок изменён.',
-  price:
-    'Цена назначена. Прежняя цена этого региона закрыта сегодняшним числом и осталась в истории.',
-  priceSame: 'Такая цена уже действует — ничего не изменилось.',
-  priceClosed: 'Цена убрана с сайта и осталась в истории.',
 } as const;
 
 const ERRORS = {
@@ -61,8 +47,6 @@ const ERRORS = {
   slugTaken: 'Услуга с таким служебным именем уже есть.',
   title: `Нужно название по-русски: одна строка до ${String(SERVICE_TITLE_MAX)} знаков.`,
   durationMinutes: `Длительность — целое число минут от ${String(DURATION_MIN)} до ${String(DURATION_MAX)}.`,
-  currency: 'Валюта — трёхбуквенный код ISO 4217 с копейками: PLN, EUR, RUB, BYN…',
-  amount: 'Сумма — число больше нуля, не больше двух знаков после запятой: 250 или 250,50.',
 } as const;
 
 function known<T extends Record<string, string>>(table: T, code: string | undefined) {
@@ -85,11 +69,6 @@ const SMALL_BUTTON =
 const BUTTON =
   'rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50';
 
-/** Дата для владельца: день в UTC — время в базе хранится в UTC */
-function day(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
 interface PageProps {
   searchParams: Promise<{ open?: string; saved?: string; error?: string; newservice?: string }>;
 }
@@ -99,8 +78,7 @@ export default async function ServicesAdminPage({ searchParams }: PageProps) {
 
   const params = await searchParams;
   const now = new Date();
-  // Подсказка курса — не обязательна: NBP недоступен — пустая таблица, и только
-  const rates = await getExchangeRates();
+  const { defaultCurrency } = await getCurrencySettings();
   const services = await db.service.findMany({
     orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
     include: { prices: { orderBy: [{ currency: 'asc' }, { validFrom: 'desc' }] } },
@@ -120,9 +98,8 @@ export default async function ServicesAdminPage({ searchParams }: PageProps) {
       <AdminNav current="/admin/services" />
       <p className="mt-6 text-sm text-[var(--color-ink-soft)]">
         Список виден на странице «Услуги» и в блоке «Список услуг». Цена — итоговая, в каждой валюте
-        своя и ровная: посетитель видит злотые и может выбрать другую валюту. Новая цена не затирает
-        прежнюю: та закрывается сегодняшним числом и остаётся в публичном архиве цен — менять
-        историю не даст сама база.
+        своя и ровная: посетитель видит цены в основной валюте ({defaultCurrency}) и может выбрать
+        другую. Цены меняются кнопкой «Изменить цены» в карточке услуги.
       </p>
 
       {savedText !== null && (
@@ -147,10 +124,7 @@ export default async function ServicesAdminPage({ searchParams }: PageProps) {
           const titles = i18nTextSchema.parse(service.titleI18n);
           const descriptions = i18nTextSchema.parse(service.descriptionI18n);
           const current = service.prices.filter((price) => isPriceCurrent(price, now));
-          const history = service.prices.filter(
-            (price) => price.validTo !== null && price.validTo <= now
-          );
-          const hasDefault = current.some((price) => price.currency === DEFAULT_CURRENCY);
+          const hasDefault = current.some((price) => price.currency === defaultCurrency);
           const name = titles[DEFAULT_LOCALE] ?? service.slug;
 
           return (
@@ -176,7 +150,7 @@ export default async function ServicesAdminPage({ searchParams }: PageProps) {
                   )}
                   {service.isActive && !hasDefault && (
                     <span className="ml-2 rounded-full bg-amber-100 px-2 text-xs text-amber-900">
-                      нет цены в злотых — посетителям по умолчанию «по запросу»
+                      нет цены в {defaultCurrency} — посетителям по умолчанию «по запросу»
                     </span>
                   )}
                 </summary>
@@ -251,116 +225,28 @@ export default async function ServicesAdminPage({ searchParams }: PageProps) {
                   </button>
                 </form>
 
-                {/* ── цены по валютам ── */}
+                {/* ── цены: отдельный редактор, только там запрашивается курс ── */}
                 <section className="mt-6 border-t border-[var(--color-line)] pt-4">
                   <h2 className="font-medium">Цены</h2>
-                  {current.length === 0 ? (
-                    <p className="mt-2 text-[var(--color-ink-soft)]">
-                      Цены нет — на сайте «по запросу».
-                    </p>
-                  ) : (
-                    <table className="mt-2 w-full text-left">
-                      <thead className="text-xs text-[var(--color-ink-soft)]">
-                        <tr>
-                          <th className="py-1 font-normal">Валюта</th>
-                          <th className="py-1 font-normal">Цена</th>
-                          <th className="py-1 font-normal">Действует с</th>
-                          <th className="py-1" />
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {current.map((price) => (
-                          <tr key={price.id} className="border-t border-[var(--color-line)]">
-                            <td className="py-2">{price.currency}</td>
-                            <td className="py-2">
-                              {formatPrice(price.amountMinor, price.currency, 'ru')}
-                            </td>
-                            <td className="py-2">{day(price.validFrom)}</td>
-                            <td className="py-2 text-right">
-                              <form action={closePrice}>
-                                <input type="hidden" name="serviceId" value={service.id} />
-                                <input type="hidden" name="priceId" value={price.id} />
-                                <button type="submit" className={SMALL_BUTTON}>
-                                  Убрать
-                                </button>
-                              </form>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-
-                  <form action={setPrice} className="mt-4 flex flex-wrap items-end gap-3">
-                    <input type="hidden" name="serviceId" value={service.id} />
-                    <label className="block">
-                      Валюта
-                      <input
-                        name="currency"
-                        list="currencies"
-                        defaultValue={hasDefault ? '' : DEFAULT_CURRENCY}
-                        placeholder="EUR"
-                        maxLength={3}
-                        required
-                        className={`${INPUT} w-24 uppercase`}
-                      />
-                    </label>
-                    <label className="block">
-                      Сумма
-                      <input
-                        name="amount"
-                        inputMode="decimal"
-                        placeholder="250 или 250,50"
-                        required
-                        className={`${INPUT} w-40`}
-                      />
-                    </label>
-                    <button type="submit" className={BUTTON}>
-                      Назначить цену
-                    </button>
-                  </form>
-                  <p className="mt-2 text-xs text-[var(--color-ink-soft)]">
-                    Валюта — код ISO 4217: PLN, EUR, RUB, BYN или любая другая с копейками. Цена в
-                    валюте, у которой она уже есть, заменяет прежнюю с этого момента; ставьте ровные
-                    суммы — 200 zł, 45 €, — пересчитывать по курсу незачем.
+                  <p className="mt-2 text-[var(--color-ink-soft)]">
+                    {current.length === 0
+                      ? 'Цены нет — на сайте «по запросу».'
+                      : current
+                          .map((price) => formatPrice(price.amountMinor, price.currency, 'ru'))
+                          .join(' · ')}
                   </p>
-                  <RateHint
-                    pln={current.find((price) => price.currency === DEFAULT_CURRENCY)?.amountMinor}
-                    currencies={current
-                      .map((price) => price.currency)
-                      .filter((currency) => currency !== DEFAULT_CURRENCY)}
-                    rates={rates}
-                  />
-
-                  {history.length > 0 && (
-                    <details className="mt-4">
-                      <summary className="cursor-pointer text-xs text-[var(--color-ink-soft)]">
-                        История цен: {history.length}
-                      </summary>
-                      <ul className="mt-2 space-y-1 text-xs text-[var(--color-ink-soft)]">
-                        {history.map((price) => (
-                          <li key={price.id}>
-                            {formatPrice(price.amountMinor, price.currency, 'ru')} ·{' '}
-                            {day(price.validFrom)} —{' '}
-                            {price.validTo === null ? '' : day(price.validTo)}
-                          </li>
-                        ))}
-                      </ul>
-                    </details>
-                  )}
+                  <Link
+                    href={`/admin/services/${service.id}/prices`}
+                    className={`${BUTTON} mt-3 inline-block`}
+                  >
+                    Изменить цены
+                  </Link>
                 </section>
               </details>
             </li>
           );
         })}
       </ol>
-
-      {/* Подсказки валют для поля «Валюта»: вписать можно и любую другую */}
-      <datalist id="currencies">
-        {SUGGESTED_CURRENCIES.map((currency) => (
-          <option key={currency} value={currency} />
-        ))}
-      </datalist>
 
       {/* ── новая услуга ── */}
       <details
@@ -389,54 +275,5 @@ export default async function ServicesAdminPage({ searchParams }: PageProps) {
         </form>
       </details>
     </main>
-  );
-}
-
-/** Валюты, для которых подсказка показывается всегда, даже без цены в них */
-const HINT_CURRENCIES = ['EUR', 'BYN', 'RUB'];
-
-/**
- * Подсказка курса (задача 9b): цена в злотых по курсу NBP в других валютах
- * и ровное число рядом. Только подсказка — на сайт попадает лишь то, что
- * владелец сам впишет в форму цены.
- */
-function RateHint({
-  pln,
-  currencies,
-  rates,
-}: {
-  pln: number | undefined;
-  currencies: string[];
-  rates: Map<string, ExchangeRate>;
-}) {
-  if (pln === undefined) return null;
-  if (rates.size === 0) {
-    return (
-      <p className="mt-2 text-xs text-[var(--color-ink-soft)]">
-        Курсы NBP сейчас недоступны — подсказки нет, цены ставятся как обычно.
-      </p>
-    );
-  }
-  const shown = [...new Set([...currencies, ...HINT_CURRENCIES])].filter((code) => rates.has(code));
-  return (
-    <div className="mt-3 rounded border border-[var(--color-line)] bg-[var(--color-paper-alt)] p-3 text-xs">
-      <p className="text-[var(--color-ink-soft)]">
-        По курсу NBP {formatPrice(pln, DEFAULT_CURRENCY, 'ru')} — это:
-      </p>
-      <ul className="mt-1 space-y-0.5">
-        {shown.map((code) => {
-          const rate = rates.get(code);
-          if (rate === undefined) return null;
-          const exact = convertFromPln(pln, rate);
-          return (
-            <li key={code}>
-              ≈ {formatPrice(exact, code, 'ru')} → ровно{' '}
-              <strong>{formatPrice(roundNicely(exact), code, 'ru')}</strong>{' '}
-              <span className="text-[var(--color-ink-soft)]">(курс на {rate.date})</span>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
   );
 }

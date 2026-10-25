@@ -6,7 +6,7 @@ import {
   orderCurrencies,
   parseAmount,
   parseNewServiceForm,
-  parsePriceForm,
+  parsePricesForm,
   parseServiceForm,
   planPriceChange,
   priceHistory,
@@ -90,22 +90,25 @@ describe('валюта', () => {
     expect(isCurrencyCode(value)).toBe(false);
   });
 
-  it('злотые первыми, остальные по алфавиту, без повторов', () => {
-    expect(orderCurrencies(['RUB', 'EUR', 'PLN', 'BYN', 'EUR'])).toEqual([
+  it('порядок — как в админке, валюты вне списка — после, по алфавиту, без повторов', () => {
+    expect(orderCurrencies(['USD', 'RUB', 'EUR', 'PLN', 'BYN', 'EUR'], ['PLN', 'EUR'])).toEqual([
       'PLN',
-      'BYN',
       'EUR',
+      'BYN',
       'RUB',
+      'USD',
     ]);
+    // Основная валюта сменилась в админке — она и первая
+    expect(orderCurrencies(['PLN', 'EUR'], ['EUR', 'PLN'])).toEqual(['EUR', 'PLN']);
   });
 
-  it('валюта посетителя — только из валют с ценами, иначе злотые', () => {
+  it('валюта посетителя — только из валют с ценами, иначе основная', () => {
     const available = ['PLN', 'EUR', 'BYN'];
-    expect(visitorCurrency('EUR', available)).toBe('EUR');
-    expect(visitorCurrency(' eur ', available)).toBe('EUR');
-    expect(visitorCurrency('USD', available)).toBe('PLN');
-    expect(visitorCurrency('<script>', available)).toBe('PLN');
-    expect(visitorCurrency(null, available)).toBe('PLN');
+    expect(visitorCurrency('EUR', available, 'PLN')).toBe('EUR');
+    expect(visitorCurrency(' eur ', available, 'PLN')).toBe('EUR');
+    expect(visitorCurrency('USD', available, 'PLN')).toBe('PLN');
+    expect(visitorCurrency('<script>', available, 'EUR')).toBe('EUR');
+    expect(visitorCurrency(null, available, 'PLN')).toBe('PLN');
   });
 });
 
@@ -163,19 +166,26 @@ describe('формы услуги', () => {
     expect(parseServiceForm(form({ ...base, ...patch }))).toEqual({ ok: false, field });
   });
 
-  it('цена: валюта — любой код с копейками, сумма', () => {
-    expect(parsePriceForm(form({ serviceId: ID, currency: ' byn ', amount: '250,50' }))).toEqual({
+  it('цены: поле amount_КОД, пустое — без изменений, повтор не считается', () => {
+    const data = form({ serviceId: ID, amount_BYN: '250,50', amount_EUR: ' ', amount_PLN: '200' });
+    data.append('amount_PLN', '300');
+    expect(parsePricesForm(data)).toEqual({
       ok: true,
-      value: { serviceId: ID, currency: 'BYN', amountMinor: 25050 },
+      value: [
+        { currency: 'BYN', amountMinor: 25050 },
+        { currency: 'PLN', amountMinor: 20000 },
+      ],
     });
-    expect(parsePriceForm(form({ serviceId: ID, currency: 'BTC', amount: '1' }))).toEqual({
+    expect(parsePricesForm(form({ amount_EUR: '' }))).toEqual({ ok: true, value: [] });
+  });
+
+  it('цены: неверная сумма или не валюта — отказ всей формы', () => {
+    expect(parsePricesForm(form({ amount_PLN: '200', amount_EUR: '0' }))).toEqual({
       ok: false,
-      field: 'currency',
+      field: 'amount_EUR',
     });
-    expect(parsePriceForm(form({ serviceId: ID, currency: 'PLN', amount: '0' }))).toEqual({
-      ok: false,
-      field: 'amount',
-    });
+    expect(parsePricesForm(form({ amount_BTC: '1' }))).toEqual({ ok: false, field: 'currency' });
+    expect(parsePricesForm(form({ amount_JPY: '100' }))).toEqual({ ok: false, field: 'currency' });
   });
 });
 
@@ -236,7 +246,7 @@ describe('история цен', () => {
       price({ id: 'c', currency: 'EUR', amountMinor: 6000 }),
       price({ id: 'd', currency: 'BYN', validFrom: day(10) }),
     ];
-    const archive = priceHistory(prices, day(5));
+    const archive = priceHistory(prices, day(5), ['PLN']);
     expect(archive.map((entry) => entry.currency)).toEqual(['PLN', 'EUR']);
     expect(archive[0]?.periods.map((period) => period.amountMinor)).toEqual([25000, 20000]);
   });

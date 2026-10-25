@@ -1,23 +1,23 @@
-import { DEFAULT_CURRENCY } from '@/lib/services/edit';
-
 /**
  * Выбор валюты цен — обычные ссылки, без JavaScript (PROJECT_LOG, задача 9a).
  *
  * Валюта — в адресе: /pl/services?currency=EUR. Cloudflare кэширует каждый
  * такой адрес отдельно, поэтому страница по-прежнему одна на всех, кто
- * выбрал евро. Злотые — адрес без параметра. Поисковику по этим ссылкам
+ * выбрал евро. Основная валюта — адрес без параметра. Поисковику по этим ссылкам
  * ходить незачем: canonical у страницы один — без валюты.
  */
 export function CurrencySwitcher({
   path,
   currencies,
   current,
+  defaultCurrency,
   label,
 }: {
   /** Адрес страницы с языком: /pl/services */
   path: string;
   currencies: readonly string[];
   current: string;
+  defaultCurrency: string;
   label: string;
 }) {
   if (currencies.length < 2) return null;
@@ -27,7 +27,7 @@ export function CurrencySwitcher({
         {currencies.map((currency) => (
           <li key={currency}>
             <a
-              href={`${currency === DEFAULT_CURRENCY ? path : `${path}?currency=${currency}`}#prices`}
+              href={`${currency === defaultCurrency ? path : `${path}?currency=${currency}`}#prices`}
               rel="nofollow"
               aria-current={currency === current ? 'true' : undefined}
               className={
