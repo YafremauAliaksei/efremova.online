@@ -87,6 +87,70 @@ export function buildContentSecurityPolicy(nonce: string, isDev: boolean): strin
 }
 
 /**
+ * CSP публичных страниц: /ru, /pl/about… (docs/14).
+ *
+ * Страница — HTML без единого скрипта, поэтому скрипты запрещены совсем:
+ * script-src 'none' строже nonce — внедрённому <script> нечего обходить,
+ * даже своему. Встроенных стилей нет: стили — один файл со своего домена.
+ *
+ * Политика одна на всех посетителей и не меняется от запроса к запросу.
+ * На этом держится кэш Cloudflare: в кэше нет ничьего nonce.
+ */
+export function buildPublicContentSecurityPolicy(): string {
+  const directives: Record<string, string[]> = {
+    'default-src': ["'none'"],
+    'script-src': ["'none'"],
+    'style-src': ["'self'"],
+    'img-src': ["'self'"],
+    'font-src': ["'self'"],
+    // 'self', а не 'none': Lighthouse и подобные проверки читают robots.txt
+    // запросом изнутри страницы. Скриптов на странице нет — запросов
+    // посетителю делать нечем, чужие домены закрыты по-прежнему
+    'connect-src': ["'self'"],
+    'frame-src': ["'none'"],
+    'object-src': ["'none'"],
+    'base-uri': ["'none'"],
+    // Форм на публичных страницах нет; 'self' — на случай, если появятся
+    'form-action': ["'self'"],
+    'frame-ancestors': ["'none'"],
+    'manifest-src': ["'self'"],
+  };
+  const policy = Object.entries(directives)
+    .map(([key, values]) => `${key} ${values.join(' ')}`)
+    .join('; ');
+  return `${policy}; upgrade-insecure-requests`;
+}
+
+/**
+ * Кэш публичной страницы: разный для браузера и для Cloudflare (RFC 9213).
+ *
+ * Cloudflare (CDN-Cache-Control) держит страницу час: тексты и цены меняются
+ * редко, устаревание на час владелец назвал приемлемым (docs/13 п.6). Пока
+ * обновляет — отдаёт прежнюю; ноутбук выключен — ещё сутки отдаёт последнюю
+ * копию (stale-if-error).
+ *
+ * Браузер (Cache-Control) каждый раз сверяется с Cloudflare: ответ оттуда —
+ * миллисекунды, а своя копия в браузере на пять минут показывала бы владельцу
+ * старый текст сразу после правки в админке — сверх часа Cloudflare.
+ */
+export const PUBLIC_CACHE_HEADERS = {
+  'Cache-Control': 'public, max-age=0, must-revalidate',
+  'CDN-Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400, stale-if-error=86400',
+} as const;
+
+/** Страница на заглушках без базы: показать можно, в кэш — нельзя */
+export const DEGRADED_CACHE_HEADERS = {
+  'Cache-Control': 'no-store',
+  'CDN-Cache-Control': 'no-store',
+} as const;
+
+/** «Не найдено» — короче: страница, заведённая позже, не должна час оставаться 404 */
+export const NOT_FOUND_CACHE_HEADERS = {
+  'Cache-Control': 'public, max-age=0, must-revalidate',
+  'CDN-Cache-Control': 'public, max-age=300',
+} as const;
+
+/**
  * Заголовки, одинаковые для всех ответов.
  * Каждый закрывает конкретный класс атак.
  */

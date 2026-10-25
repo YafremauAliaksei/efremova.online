@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { Filled } from '@/components/Filled';
 import { localizedPath, type Locale } from '@/lib/i18n';
 import { messages } from '@/lib/messages';
@@ -44,12 +43,9 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
           <ul className="flex flex-wrap gap-x-6 gap-y-2">
             {links.map((link) => (
               <li key={link.key}>
-                <Link
-                  href={localizedPath(locale, link.path)}
-                  className="underline underline-offset-4"
-                >
+                <a href={localizedPath(locale, link.path)} className="underline underline-offset-4">
                   {link.label}
-                </Link>
+                </a>
               </li>
             ))}
           </ul>
@@ -60,21 +56,21 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
             в один клик, а не через автоопределение языка */}
         <p lang="pl-PL" className="mt-4 text-xs">
           Dokumenty prawne:{' '}
-          <Link href="/pl/privacy" hrefLang="pl-PL" className="underline underline-offset-4">
+          <a href="/pl/privacy" hrefLang="pl-PL" className="underline underline-offset-4">
             Polityka prywatności (PL)
-          </Link>
+          </a>
           {' · '}
-          <Link href="/pl/terms" hrefLang="pl-PL" className="underline underline-offset-4">
+          <a href="/pl/terms" hrefLang="pl-PL" className="underline underline-offset-4">
             Warunki konsultacji (PL)
-          </Link>
+          </a>
           {' · '}
-          <Link href="/pl/site-terms" hrefLang="pl-PL" className="underline underline-offset-4">
+          <a href="/pl/site-terms" hrefLang="pl-PL" className="underline underline-offset-4">
             Regulamin serwisu (PL)
-          </Link>
+          </a>
           {' · '}
-          <Link href="/pl/provider" hrefLang="pl-PL" className="underline underline-offset-4">
+          <a href="/pl/provider" hrefLang="pl-PL" className="underline underline-offset-4">
             Informacje o usługodawcy (PL)
-          </Link>
+          </a>
         </p>
 
         {/* Сайт психолога может открыть человек, которому помощь нужна сейчас,
@@ -82,9 +78,9 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
         <p lang="pl-PL" className="mt-4 text-xs">
           W kryzysie lub zagrożeniu życia: <strong>112</strong> · całodobowo{' '}
           <strong>800 70 2222</strong> ·{' '}
-          <Link href="/pl/site-terms#kryzys" className="underline underline-offset-4">
+          <a href="/pl/site-terms#kryzys" className="underline underline-offset-4">
             więcej numerów
-          </Link>
+          </a>
         </p>
 
         <p lang="pl-PL" className="mt-4 text-xs">

@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { ContactList } from '@/components/ContactList';
 import { ServiceList } from '@/components/ServiceList';
 import { TestimonialList } from '@/components/TestimonialList';
@@ -158,9 +157,9 @@ export async function PageBlocks({
                 )}
                 {link !== null && button !== null && button !== undefined && (
                   <div className={title === null && body === null ? '' : 'mt-8'}>
-                    <Link href={localizedPath(locale, pagePath(link))} className={BUTTON_CLASS}>
+                    <a href={localizedPath(locale, pagePath(link))} className={BUTTON_CLASS}>
                       {button}
-                    </Link>
+                    </a>
                   </div>
                 )}
               </>
@@ -221,9 +220,8 @@ export async function PageBlocks({
                 {video !== null && (
                   // Не на YouTube, а на свою страницу-предупреждение: Google узнает
                   // о посетителе, только если тот нажмёт второй раз
-                  <Link
+                  <a
                     href={localizedPath(locale, leavePath(video))}
-                    prefetch={false}
                     data-video={video}
                     className="group relative mt-8 block overflow-hidden rounded-lg bg-[var(--color-paper-alt)]"
                   >
@@ -242,7 +240,7 @@ export async function PageBlocks({
                         ▶ {messages(locale).video.watch}
                       </span>
                     </span>
-                  </Link>
+                  </a>
                 )}
               </>
             );
@@ -278,12 +276,12 @@ export async function PageBlocks({
                 />
                 {testimonials.length > TESTIMONIALS_IN_BLOCK && (
                   <p className="mt-6">
-                    <Link
+                    <a
                       href={localizedPath(locale, '/testimonials')}
                       className="underline underline-offset-4"
                     >
                       {messages(locale).testimonials.all}
-                    </Link>
+                    </a>
                   </p>
                 )}
               </>

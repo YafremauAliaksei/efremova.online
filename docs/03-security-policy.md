@@ -143,21 +143,30 @@ nginx на адрес (5 запросов в минуту на `/admin`) от б
 
 ```
 Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
-Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{RANDOM}' 'strict-dynamic';
-                         frame-ancestors 'none'; base-uri 'none'; form-action 'self';
-                         object-src 'none'; upgrade-insecure-requests
 X-Content-Type-Options: nosniff
 X-Frame-Options: DENY
 Referrer-Policy: strict-origin-when-cross-origin
 Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), interest-cohort=()
 Cross-Origin-Opener-Policy: same-origin
-Cross-Origin-Embedder-Policy: require-corp
 Cross-Origin-Resource-Policy: same-origin
 ```
 
-Nonce генерируется заново на каждый запрос: вставленный в страницу `<script>`
-без него браузер не выполнит. Поэтому запрещены inline-скрипты без nonce,
-`eval()` и любые виджеты, требующие `unsafe-inline`. Сборка: `src/lib/security/headers.ts`.
+CSP — двух видов (`src/lib/security/headers.ts`):
+
+| Где | Content-Security-Policy |
+| --- | --- |
+| Публичные страницы (`/ru`, `/pl/about`…) — HTML без JavaScript из кэша Cloudflare (docs/14) | `default-src 'none'; script-src 'none'; style-src 'self'; img-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; form-action 'self'` |
+| Админка и служебные ответы | `default-src 'self'; script-src 'self' 'nonce-{RANDOM}' 'strict-dynamic'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; form-action 'self'` |
+
+На публичных страницах скрипты запрещены совсем: внедрённому `<script>`
+обходить нечего, nonce не нужен, и политика одна на всех посетителей — на
+этом держится общий кэш. В админке nonce генерируется заново на каждый
+запрос: вставленный `<script>` без него браузер не выполнит. Inline-скрипты
+без nonce, `eval()` и виджеты, требующие `unsafe-inline`, запрещены везде.
+
+Скрипт `scripts/check-security-headers.mjs` в CI проверяет обе: у публичной
+страницы — `script-src 'none'`, общий кэш, ни одной cookie и ни одного
+`<script>` в HTML.
 
 ---
 

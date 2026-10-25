@@ -25,7 +25,10 @@ const RULES = [
       if (v.includes('script-src') && v.includes("'unsafe-inline'") && !v.includes('nonce-')) {
         return "script-src содержит 'unsafe-inline' без nonce — защита от XSS не работает";
       }
-      if (!v.includes('nonce-')) return 'нет nonce в script-src';
+      // Публичные страницы — без скриптов вовсе (docs/14), остальное — с nonce
+      if (!v.includes('nonce-') && !v.includes("script-src 'none'")) {
+        return "в script-src нет ни nonce, ни 'none'";
+      }
       return null;
     },
   },
@@ -121,6 +124,47 @@ async function checkPrivateArea(baseUrl) {
   return problems;
 }
 
+/**
+ * Публичная страница лежит в общем кэше Cloudflare (docs/14): в ней не должно
+ * быть ни скриптов, ни cookie, ни чего-либо от посетителя. Проверка падает,
+ * если страницы нет, — по тому же правилу, что и проверка закрытой зоны.
+ */
+async function checkPublicPage(baseUrl) {
+  const path = '/ru';
+  const response = await fetch(new URL(path, baseUrl), { redirect: 'manual' });
+  const problems = [];
+
+  if (response.status !== 200) {
+    problems.push(
+      `${path}: статус ${String(response.status)} — проверять нечего, почините проверку`
+    );
+    return problems;
+  }
+
+  const csp = response.headers.get('content-security-policy') ?? '';
+  if (!csp.includes("script-src 'none'")) {
+    problems.push(
+      `${path}: CSP без script-src 'none' — на публичной странице скриптов быть не должно`
+    );
+  }
+  if (csp.includes('nonce-')) {
+    problems.push(`${path}: nonce в CSP — страница не может лежать в общем кэше`);
+  }
+
+  const cacheControl = response.headers.get('cache-control') ?? '';
+  if (!cacheControl.includes('public') || cacheControl.includes('private')) {
+    problems.push(`${path}: Cache-Control="${cacheControl}" — ожидается public`);
+  }
+  if (response.headers.get('set-cookie') !== null) {
+    problems.push(`${path}: Set-Cookie в ответе для общего кэша — cookie досталась бы всем`);
+  }
+  if ((await response.text()).includes('<script')) {
+    problems.push(`${path}: в HTML есть <script>`);
+  }
+
+  return problems;
+}
+
 async function main() {
   console.log(`\n🔍 Проверка заголовков безопасности: ${target}\n`);
 
@@ -156,6 +200,17 @@ async function main() {
     console.log('  ✅ Кэширование и индексация закрыты');
   } else {
     for (const problem of privateProblems) {
+      console.log(`  ❌ ${problem}`);
+      failures.push(problem);
+    }
+  }
+
+  console.log('\n🌍 Проверка публичной страницы\n');
+  const publicProblems = await checkPublicPage(target);
+  if (publicProblems.length === 0) {
+    console.log('  ✅ Без скриптов, без cookie, кэш публичный');
+  } else {
+    for (const problem of publicProblems) {
       console.log(`  ❌ ${problem}`);
       failures.push(problem);
     }
