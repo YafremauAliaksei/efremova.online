@@ -27,14 +27,26 @@ const ru = {
   },
   services: {
     title: 'Услуги и цены',
-    description: 'Форматы консультаций, длительность и стоимость в валюте вашего региона.',
+    description: 'Форматы консультаций, длительность и стоимость.',
     introBefore:
-      'Указана итоговая цена в валюте вашего региона. Порядок оплаты, переноса и отмены — в ',
+      'Указана итоговая цена; валюту можно выбрать. Порядок оплаты, переноса и отмены — в ',
     introLink: 'условиях консультаций',
     introAfter: '.',
     empty: 'Список услуг пока не заполнен.',
     onRequest: 'по запросу',
     minutes: 'минут',
+    currencyNav: 'Валюта цен',
+    archiveLink: 'Архив цен',
+  },
+  priceArchive: {
+    title: 'Архив цен',
+    description: 'Все цены на услуги с датами: какая цена действовала в какой период.',
+    intro:
+      'Цены не переписываются задним числом: новая цена закрывает прежнюю датой, и обе остаются здесь.',
+    since: 'с',
+    until: 'по',
+    now: 'действует сейчас',
+    empty: 'Цен пока нет.',
   },
   contacts: {
     title: 'Контакты',
@@ -90,14 +102,26 @@ const pl = {
   },
   services: {
     title: 'Usługi i ceny',
-    description: 'Formy konsultacji, czas trwania i cena w walucie Twojego regionu.',
+    description: 'Formy konsultacji, czas trwania i cena.',
     introBefore:
-      'Podana jest cena końcowa w walucie Twojego regionu. Zasady płatności, zmiany terminu i odwołania — w ',
+      'Podana jest cena końcowa; walutę można wybrać. Zasady płatności, zmiany terminu i odwołania — w ',
     introLink: 'warunkach konsultacji',
     introAfter: '.',
     empty: 'Lista usług nie została jeszcze uzupełniona.',
     onRequest: 'na zapytanie',
     minutes: 'minut',
+    currencyNav: 'Waluta cen',
+    archiveLink: 'Archiwum cen',
+  },
+  priceArchive: {
+    title: 'Archiwum cen',
+    description: 'Wszystkie ceny usług z datami: jaka cena obowiązywała w jakim okresie.',
+    intro:
+      'Ceny nie są zmieniane wstecz: nowa cena zamyka poprzednią datą, a obie pozostają tutaj.',
+    since: 'od',
+    until: 'do',
+    now: 'obowiązuje obecnie',
+    empty: 'Nie ma jeszcze cen.',
   },
   contacts: {
     title: 'Kontakt',
@@ -151,14 +175,26 @@ const en = {
   },
   services: {
     title: 'Services and prices',
-    description: 'Session formats, duration and price in your regional currency.',
+    description: 'Session formats, duration and price.',
     introBefore:
-      'Prices are final and shown in your regional currency. Payment, rescheduling and cancellation are described in the ',
+      'Prices are final; you can choose the currency. Payment, rescheduling and cancellation are described in the ',
     introLink: 'terms of sessions',
     introAfter: '.',
     empty: 'The list of services has not been filled in yet.',
     onRequest: 'on request',
     minutes: 'minutes',
+    currencyNav: 'Price currency',
+    archiveLink: 'Price archive',
+  },
+  priceArchive: {
+    title: 'Price archive',
+    description: 'All service prices with dates: which price applied in which period.',
+    intro:
+      'Prices are never rewritten retroactively: a new price closes the previous one with a date, and both stay here.',
+    since: 'from',
+    until: 'to',
+    now: 'current',
+    empty: 'No prices yet.',
   },
   contacts: {
     title: 'Contact',

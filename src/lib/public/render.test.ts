@@ -33,7 +33,52 @@ vi.mock('@/lib/pages', () => ({
     );
   },
 }));
-vi.mock('@/lib/content', () => ({ getServices: () => Promise.resolve([]) }));
+vi.mock('@/lib/content', () => ({
+  // Как настоящая: цена в запрошенной валюте, незнакомая валюта — злотые
+  getServices: (_locale: string, currency: string | null) => {
+    const prices: Record<string, number> = { PLN: 20000, EUR: 4500 };
+    const chosen = currency !== null && currency in prices ? currency : 'PLN';
+    return Promise.resolve({
+      currency: chosen,
+      currencies: ['PLN', 'EUR'],
+      services: [
+        {
+          slug: 'individual-50',
+          title: 'Konsultacja',
+          description: '',
+          durationMinutes: 50,
+          price: { amountMinor: prices[chosen], currency: chosen },
+        },
+      ],
+    });
+  },
+  getPriceArchive: () =>
+    Promise.resolve([
+      {
+        slug: 'individual-50',
+        title: 'Konsultacja',
+        currencies: [
+          {
+            currency: 'PLN',
+            periods: [
+              {
+                currency: 'PLN',
+                amountMinor: 20000,
+                validFrom: new Date('2027-09-01T00:00:00Z'),
+                validTo: null,
+              },
+              {
+                currency: 'PLN',
+                amountMinor: 18000,
+                validFrom: new Date('2026-06-01T00:00:00Z'),
+                validTo: new Date('2027-09-01T00:00:00Z'),
+              },
+            ],
+          },
+        ],
+      },
+    ]),
+}));
 vi.mock('@/lib/testimonials/public', () => ({ getTestimonials: () => Promise.resolve([]) }));
 vi.mock('@/lib/legal', () => ({ getLegalDocument: () => Promise.resolve(null) }));
 vi.mock('@/lib/db', () => ({
@@ -56,8 +101,8 @@ function textBlock(title: string, body: string): RenderableBlock {
   };
 }
 
-async function page(locale: string, segments: string[]) {
-  const response = await publicPageResponse(locale, segments);
+async function page(locale: string, segments: string[], currency: string | null = null) {
+  const response = await publicPageResponse(locale, segments, currency);
   return { response, html: await response.text() };
 }
 
@@ -115,6 +160,44 @@ describe('публичная страница', () => {
     const { html } = await page('pl', ['about']);
     expect(html).toContain('href="/api/lang?to=%2Fru%2Fabout"');
     expect(html).toContain('rel="nofollow"');
+  });
+});
+
+describe('цены и валюты (задача 9a)', () => {
+  it('по умолчанию — злотые, рядом выбор валюты ссылками без скриптов', async () => {
+    const { html } = await page('pl', ['services']);
+    expect(html).toMatch(/200\s*zł/);
+    expect(html).toContain('href="/pl/services?currency=EUR#prices"');
+    expect(html).toContain('href="/pl/services#prices"');
+    expect(html).not.toContain('<script');
+  });
+
+  it('валюта из адреса: та же страница в евро, canonical — без валюты', async () => {
+    const { response, html } = await page('pl', ['services'], 'EUR');
+    expect(response.status).toBe(200);
+    expect(html).toMatch(/45\s*€/);
+    expect(html).toContain('<link rel="canonical" href="https://efremova.online/pl/services"/>');
+  });
+
+  it('чужая валюта в адресе не попадает в страницу — злотые', async () => {
+    const { html } = await page('pl', ['services'], '<script>alert(1)</script>');
+    expect(html).toMatch(/200\s*zł/);
+    expect(html).not.toContain('alert(1)');
+  });
+
+  it('архив цен: все периоды с датами, текущая цена отмечена', async () => {
+    const { response, html } = await page('pl', ['services', 'history']);
+    expect(response.status).toBe(200);
+    expect(html).toContain('Archiwum cen');
+    expect(html).toMatch(/180\s*zł/);
+    expect(html).toContain('1 czerwca 2026');
+    expect(html).toContain('obowiązuje obecnie');
+    expect(html).toContain('<time dateTime="2026-06-01T00:00:00.000Z">');
+  });
+
+  it('у списка услуг — ссылка на архив цен', async () => {
+    const { html } = await page('ru', ['services']);
+    expect(html).toContain('href="/ru/services/history"');
   });
 });
 

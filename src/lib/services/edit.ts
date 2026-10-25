@@ -24,29 +24,40 @@ export const DURATION_MAX = 600;
 export const AMOUNT_MAX_MINOR = 100_000_000;
 
 /**
- * Валюты, в которых можно назначить цену. У всех ровно две цифры после
+ * Валюта цены — любой код ISO 4217, который знает Intl, с двумя знаками после
  * запятой: на этом держится перевод «250,50» ↔ 25050. Валюта без копеек
  * (иена) или с тремя знаками (динар) требует другой арифметики — её здесь нет.
+ * Список не закрытый: владелец добавляет любую валюту (PROJECT_LOG, задача 9a).
  */
-export const CURRENCIES = ['PLN', 'EUR', 'USD', 'GBP', 'RUB', 'UAH'] as const;
-export type Currency = (typeof CURRENCIES)[number];
-
-export function isCurrency(value: unknown): value is Currency {
-  return typeof value === 'string' && (CURRENCIES as readonly string[]).includes(value);
+export function isCurrencyCode(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^[A-Z]{3}$/.test(value)) return false;
+  if (!Intl.supportedValuesOf('currency').includes(value)) return false;
+  const format = new Intl.NumberFormat('en', { style: 'currency', currency: value });
+  return format.resolvedOptions().maximumFractionDigits === 2;
 }
 
-/** Цена для всех стран, у которых нет своей */
-export const DEFAULT_REGION = 'DEFAULT';
+/** Цена по умолчанию — в злотых: страна ведения деятельности */
+export const DEFAULT_CURRENCY = 'PLN';
+
+/** Подсказка в админке; вписать можно и любую другую валюту */
+export const SUGGESTED_CURRENCIES = ['PLN', 'EUR', 'USD', 'GBP', 'RUB', 'BYN', 'UAH', 'CHF', 'CZK'];
+
+/** Злотые первыми, остальные по алфавиту — порядок в переключателе валют */
+export function orderCurrencies(currencies: Iterable<string>): string[] {
+  return [...new Set(currencies)].sort((a, b) =>
+    a === DEFAULT_CURRENCY ? -1 : b === DEFAULT_CURRENCY ? 1 : a.localeCompare(b)
+  );
+}
 
 /**
- * Регион — код страны из заголовка CF-IPCountry (две латинские буквы, как
- * в ISO 3166-1) или DEFAULT. Владелец может ввести «pl» — сохраняется «PL».
+ * Валюта, выбранная посетителем в адресе (?currency=EUR). Значение приходит
+ * снаружи: принимается только валюта, в которой у услуг есть цена, всё
+ * остальное — злотые. В разметку и ключ кэша попадает код из списка, а не
+ * то, что прислали.
  */
-export function normalizeRegion(raw: unknown): string | null {
-  if (typeof raw !== 'string') return null;
-  const value = raw.trim().toUpperCase();
-  if (value === DEFAULT_REGION) return value;
-  return /^[A-Z]{2}$/.test(value) ? value : null;
+export function visitorCurrency(raw: unknown, available: readonly string[]): string {
+  const code = typeof raw === 'string' ? raw.trim().toUpperCase() : '';
+  return available.includes(code) ? code : DEFAULT_CURRENCY;
 }
 
 /**
@@ -158,27 +169,24 @@ export function parseServiceForm(formData: FormData): ServiceFormResult<ServiceS
 
 export interface PriceInput {
   serviceId: string;
-  region: string;
-  currency: Currency;
+  currency: string;
   amountMinor: number;
 }
 
-/** Цена для региона: регион, валюта и сумма */
+/** Цена в валюте: валюта и сумма */
 export function parsePriceForm(formData: FormData): ServiceFormResult<PriceInput> {
   const serviceId = z.uuid().safeParse(formData.get('serviceId'));
   if (!serviceId.success) return { ok: false, field: 'serviceId' };
-  const region = normalizeRegion(formData.get('region'));
-  if (region === null) return { ok: false, field: 'region' };
-  const currency = formData.get('currency');
-  if (!isCurrency(currency)) return { ok: false, field: 'currency' };
+  const raw = formData.get('currency');
+  const currency = typeof raw === 'string' ? raw.trim().toUpperCase() : '';
+  if (!isCurrencyCode(currency)) return { ok: false, field: 'currency' };
   const amountMinor = parseAmount(formData.get('amount'));
   if (amountMinor === null) return { ok: false, field: 'amount' };
-  return { ok: true, value: { serviceId: serviceId.data, region, currency, amountMinor } };
+  return { ok: true, value: { serviceId: serviceId.data, currency, amountMinor } };
 }
 
 export interface StoredPrice {
   id: string;
-  region: string;
   currency: string;
   amountMinor: number;
   validFrom: Date;
@@ -191,49 +199,74 @@ export function isPriceCurrent(price: Pick<StoredPrice, 'validFrom' | 'validTo'>
 }
 
 /**
- * Что сделать с ценами при новой цене для региона.
+ * Что сделать с ценами при новой цене в валюте.
  *
  * Цена не правится на месте: прежняя закрывается (validTo = сейчас), новая
  * начинается с этого момента. Так остаётся история — какую цену видел
- * посетитель в какой день; при споре важна она, а не сегодняшняя.
- * Та же сумма в той же валюте — ничего не меняется.
+ * посетитель в какой день; при споре важна она, а не сегодняшняя. Правку на
+ * месте к тому же запрещает база. Та же сумма — ничего не меняется.
  */
 export function planPriceChange(
   prices: readonly StoredPrice[],
-  next: Pick<PriceInput, 'region' | 'currency' | 'amountMinor'>,
+  next: Pick<PriceInput, 'currency' | 'amountMinor'>,
   now: Date
 ): { close: string[]; create: boolean } {
   const current = prices.filter(
-    (price) => price.region === next.region && isPriceCurrent(price, now)
+    (price) => price.currency === next.currency && isPriceCurrent(price, now)
   );
   const [only, ...rest] = current;
-  if (
-    only !== undefined &&
-    rest.length === 0 &&
-    only.currency === next.currency &&
-    only.amountMinor === next.amountMinor
-  ) {
+  if (only !== undefined && rest.length === 0 && only.amountMinor === next.amountMinor) {
     return { close: [], create: false };
   }
   return { close: current.map((price) => price.id), create: true };
 }
 
 /**
- * Цена для посетителя из региона: своя страны, иначе общая; из нескольких
- * действующих — начавшаяся последней. Нет ни той, ни другой — null
- * («по запросу»).
+ * Действующая цена в каждой валюте; из нескольких действующих в одной
+ * валюте — начавшаяся последней.
  */
-export function pickPrice<T extends Pick<StoredPrice, 'region' | 'validFrom' | 'validTo'>>(
+export function currentPrices<T extends Pick<StoredPrice, 'currency' | 'validFrom' | 'validTo'>>(
   prices: readonly T[],
-  region: string,
   now: Date
-): T | null {
-  const current = prices
-    .filter((price) => isPriceCurrent(price, now))
-    .sort((a, b) => b.validFrom.getTime() - a.validFrom.getTime());
-  return (
-    current.find((price) => price.region === region) ??
-    current.find((price) => price.region === DEFAULT_REGION) ??
-    null
-  );
+): Map<string, T> {
+  const result = new Map<string, T>();
+  for (const price of prices) {
+    if (!isPriceCurrent(price, now)) continue;
+    const known = result.get(price.currency);
+    if (known === undefined || known.validFrom < price.validFrom) {
+      result.set(price.currency, price);
+    }
+  }
+  return result;
+}
+
+export interface PricePeriod {
+  currency: string;
+  amountMinor: number;
+  validFrom: Date;
+  /** null — действует до сих пор */
+  validTo: Date | null;
+}
+
+/**
+ * Архив цен услуги: по валютам, от новых к старым. Цена, которая ещё не
+ * началась, в архив не попадает — её посетитель ещё не видел.
+ */
+export function priceHistory(
+  prices: readonly PricePeriod[],
+  now: Date
+): { currency: string; periods: PricePeriod[] }[] {
+  const byCurrency = new Map<string, PricePeriod[]>();
+  for (const price of prices) {
+    if (price.validFrom > now) continue;
+    const list = byCurrency.get(price.currency) ?? [];
+    list.push(price);
+    byCurrency.set(price.currency, list);
+  }
+  return orderCurrencies(byCurrency.keys()).map((currency) => ({
+    currency,
+    periods: (byCurrency.get(currency) ?? []).sort(
+      (a, b) => b.validFrom.getTime() - a.validFrom.getTime()
+    ),
+  }));
 }

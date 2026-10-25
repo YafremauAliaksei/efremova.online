@@ -35,12 +35,14 @@ export async function renderView(locale: Locale, view: PublicView): Promise<stri
 
 export async function publicPageResponse(
   rawLocale: string,
-  segments: readonly string[]
+  segments: readonly string[],
+  /** Валюта цен из адреса (?currency=EUR); проверяется по списку валют с ценами */
+  currency: string | null = null
 ): Promise<Response> {
   // Обработчик стоит под [locale], но язык всё равно из адреса: middleware
   // перебрасывает незнакомые языки, а сюда он мог прийти и в обход
   const locale = isLocale(rawLocale) ? rawLocale : null;
-  const view = locale === null ? null : await resolvePublicPage(locale, segments);
+  const view = locale === null ? null : await resolvePublicPage(locale, segments, currency);
   const found = view !== null;
   const shownLocale = locale ?? DEFAULT_LOCALE;
 

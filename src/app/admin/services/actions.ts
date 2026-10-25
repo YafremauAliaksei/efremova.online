@@ -140,7 +140,6 @@ export async function setPrice(formData: FormData): Promise<void> {
     db.servicePrice.create({
       data: {
         serviceId,
-        region: parsed.value.region,
         currency: parsed.value.currency,
         amountMinor: parsed.value.amountMinor,
         validFrom: now,
@@ -148,7 +147,6 @@ export async function setPrice(formData: FormData): Promise<void> {
     }),
   ]);
   await audit('price.set', serviceId, {
-    region: parsed.value.region,
     currency: parsed.value.currency,
     amountMinor: parsed.value.amountMinor,
   });
@@ -156,7 +154,10 @@ export async function setPrice(formData: FormData): Promise<void> {
   back(serviceId, 'saved=price');
 }
 
-/** «Убрать» цену региона = закрыть её сегодняшним числом; в истории она остаётся */
+/**
+ * «Убрать» цену в валюте = закрыть её сегодняшним числом; в истории она
+ * остаётся. Закрыть можно только действующую: закрытую база менять не даст
+ */
 export async function closePrice(formData: FormData): Promise<void> {
   await requireAdminWrite();
   const serviceId = await existingService(formData);
@@ -165,7 +166,7 @@ export async function closePrice(formData: FormData): Promise<void> {
 
   const now = new Date();
   const { count } = await db.servicePrice.updateMany({
-    where: { id: priceId, serviceId, OR: [{ validTo: null }, { validTo: { gt: now } }] },
+    where: { id: priceId, serviceId, validTo: null },
     data: { validTo: now },
   });
   if (count === 0) back(serviceId, 'error=missing');

@@ -6,11 +6,11 @@ import { ServiceList } from '@/components/ServiceList';
 import { SiteFooter } from '@/components/SiteFooter';
 import { TestimonialList } from '@/components/TestimonialList';
 import { HOME_SLUG, isFreePageSlug } from '@/lib/blocks/pages';
-import { getServices } from '@/lib/content';
-import { localizedPath, type Locale } from '@/lib/i18n';
+import { getPriceArchive, getServices } from '@/lib/content';
+import { LOCALE_TAGS, localizedPath, type Locale } from '@/lib/i18n';
 import { messages } from '@/lib/messages';
 import type { PublicView } from '@/lib/public/view';
-import { DEFAULT_REGION } from '@/lib/services/edit';
+import { formatPrice } from '@/lib/services/edit';
 import { getSiteProfile } from '@/lib/site-profile';
 import { getTestimonials } from '@/lib/testimonials/public';
 import { isVideoId, youtubeWatchUrl } from '@/lib/video';
@@ -23,26 +23,34 @@ import { isVideoId, youtubeWatchUrl } from '@/lib/video';
  * обработчик отвечает 404 на языке адреса.
  *
  * Адрес из двух и более частей (/pl/a/b) и /ru/home (дубль главной) — 404.
+ *
+ * currency — валюта цен из адреса (?currency=EUR, задача 9a). Кроме языка,
+ * пути и этой валюты отрисовка не знает о запросе ничего: страница лежит
+ * в общем кэше, и Cloudflare кэширует адрес вместе с параметром.
  */
 export async function resolvePublicPage(
   locale: Locale,
-  segments: readonly string[]
+  segments: readonly string[],
+  currency: string | null = null
 ): Promise<PublicView | null> {
   const [first, ...rest] = segments;
-  if (first === undefined) return blockPage(HOME_SLUG, locale);
+  if (first === undefined) return blockPage(HOME_SLUG, locale, currency);
 
   if (first === 'out' && rest[0] === 'youtube' && rest.length === 2) {
     return leaveForYoutube(locale, rest[1] ?? '');
   }
+  if (first === 'services' && rest[0] === 'history' && rest.length === 1) {
+    return priceArchivePage(locale);
+  }
   if (rest.length > 0) return null;
 
-  if (first === 'services') return servicesPage(locale);
+  if (first === 'services') return servicesPage(locale, currency);
   if (first === 'testimonials') return testimonialsPage(locale);
   const legal = LEGAL_PAGES.find((page) => page.path === `/${first}`);
   if (legal !== undefined) return legalPage(legal, locale);
 
   if (!isFreePageSlug(first) || first === HOME_SLUG) return null;
-  return blockPage(first, locale);
+  return blockPage(first, locale, currency);
 }
 
 /** «Страница не найдена» на языке адреса */
@@ -63,12 +71,12 @@ export function notFoundPage(locale: Locale): PublicView {
 }
 
 /**
- * Услуги и цены. Страница одна на всех посетителей и лежит в общем кэше,
- * поэтому цена — общая, а не по стране посетителя (docs/14 п.6).
+ * Услуги и цены. Цена — в валюте из адреса, по умолчанию злотые; страна
+ * посетителя не читается: страница одна на всех и лежит в общем кэше.
  */
-async function servicesPage(locale: Locale): Promise<PublicView> {
+async function servicesPage(locale: Locale, currency: string | null): Promise<PublicView> {
   const t = messages(locale).services;
-  const services = await getServices(DEFAULT_REGION, locale);
+  const services = await getServices(locale, currency);
   return {
     meta: { title: t.title, description: t.description, path: '/services' },
     body: (
@@ -82,7 +90,86 @@ async function servicesPage(locale: Locale): Promise<PublicView> {
             </a>
             {t.introAfter}
           </p>
-          <ServiceList services={services} locale={locale} headingLevel="h2" />
+          <ServiceList list={services} locale={locale} path="/services" headingLevel="h2" />
+        </main>
+        <SiteFooter locale={locale} />
+      </>
+    ),
+  };
+}
+
+/** Дата в архиве цен: «1 czerwca 2026» — по-человечески, на языке страницы */
+function archiveDate(date: Date, locale: Locale): string {
+  return new Intl.DateTimeFormat(LOCALE_TAGS[locale], {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(date);
+}
+
+/**
+ * Публичный архив цен (задача 9a): все цены всех услуг с датами — «с 1 июня
+ * 2026 по 14 сентября 2027 — 200 zł». Историю нельзя переписать: правку
+ * и удаление цен запрещает база, новая цена закрывает прежнюю датой.
+ */
+async function priceArchivePage(locale: Locale): Promise<PublicView> {
+  const t = messages(locale).priceArchive;
+  const archive = await getPriceArchive(locale);
+  return {
+    meta: { title: t.title, description: t.description, path: '/services/history' },
+    body: (
+      <>
+        <main id="main" className="mx-auto max-w-3xl px-6 py-16">
+          <h1 className="text-3xl font-semibold">{t.title}</h1>
+          <p className="mt-4 text-[var(--color-ink-soft)]">{t.intro}</p>
+          {archive.length === 0 ? (
+            <p className="mt-8 text-[var(--color-ink-soft)]">{t.empty}</p>
+          ) : (
+            <ul className="mt-8 space-y-6">
+              {archive.map((service) => (
+                <li
+                  key={service.slug}
+                  className="rounded-lg border border-[var(--color-line)] bg-white p-6"
+                >
+                  <h2 className="text-xl font-medium">{service.title}</h2>
+                  {service.currencies.map(({ currency, periods }) => (
+                    <section key={currency} className="mt-4">
+                      <h3 className="text-sm font-medium">{currency}</h3>
+                      <ul className="mt-2 space-y-1 text-sm">
+                        {periods.map((period) => (
+                          <li
+                            key={period.validFrom.toISOString()}
+                            className="flex flex-wrap gap-x-3"
+                          >
+                            <span className="font-medium">
+                              {formatPrice(period.amountMinor, period.currency, locale)}
+                            </span>
+                            <span className="text-[var(--color-ink-soft)]">
+                              {t.since}{' '}
+                              <time dateTime={period.validFrom.toISOString()}>
+                                {archiveDate(period.validFrom, locale)}
+                              </time>{' '}
+                              {period.validTo === null ? (
+                                <>— {t.now}</>
+                              ) : (
+                                <>
+                                  {t.until}{' '}
+                                  <time dateTime={period.validTo.toISOString()}>
+                                    {archiveDate(period.validTo, locale)}
+                                  </time>
+                                </>
+                              )}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  ))}
+                </li>
+              ))}
+            </ul>
+          )}
         </main>
         <SiteFooter locale={locale} />
       </>
