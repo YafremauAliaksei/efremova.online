@@ -88,6 +88,9 @@
     "qs": "^6.16.0",
     "@puppeteer/browsers": "3.2.2",
     "proxy-agent": "^8.0.2",
-    "basic-ftp": "6.2.1"
+    "basic-ftp": "6.2.1",
+    "chromium-bidi": {
+      "zod": "^4.6.7"
+    }
   }
 }

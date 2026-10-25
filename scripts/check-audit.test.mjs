@@ -92,4 +92,13 @@ describe('переопределения в package.json', () => {
     // и может разойтись. Разошлась — поправить обе строки вместе
     expect(pkg.overrides.postcss).toBe(pkg.devDependencies.postcss);
   });
+
+  it('chromium-bidi получает ту же zod 4, что и сайт', () => {
+    // chromium-bidi 14 (puppeteer-core → lighthouse → @lhci/cli) просит
+    // zod 3, а у zod 3 уязвимость GHSA-mrhx-c7xc-m3w5 без патча. Lighthouse
+    // говорит с Chrome по CDP, код chromium-bidi не вызывается; работу
+    // проверяют ворота Lighthouse в CI. Убрать, когда puppeteer-core
+    // перейдёт на chromium-bidi с zod 4
+    expect(pkg.overrides['chromium-bidi'].zod).toBe(pkg.dependencies.zod);
+  });
 });
