@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { isAdmin } from '@/lib/auth/admin';
+import { requireAdminWrite } from '@/lib/admin/guard';
 import { audit } from '@/lib/audit/log';
 import { db } from '@/lib/db';
 import { moveId, numbered } from '@/lib/blocks/order';
@@ -28,10 +28,6 @@ import {
  */
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-
-async function requireAdmin(): Promise<void> {
-  if (!(await isAdmin())) redirect('/admin/denied');
-}
 
 /** Назад в раздел: открытая услуга и итог действия — только известным кодом */
 function back(serviceId: string | null, query: string): never {
@@ -65,7 +61,7 @@ async function serviceIdsInOrder(): Promise<string[]> {
 
 /** Новая услуга — скрытая и в конце списка: сначала цена и переводы, потом показ */
 export async function createService(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireAdminWrite();
   const parsed = parseNewServiceForm(formData);
   if (!parsed.ok) back(null, `newservice=1&error=${parsed.field}`);
 
@@ -92,7 +88,7 @@ export async function createService(formData: FormData): Promise<void> {
 }
 
 export async function saveService(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireAdminWrite();
   const serviceId = await existingService(formData);
   const parsed = parseServiceForm(formData);
   if (!parsed.ok) back(serviceId, `error=${parsed.field}`);
@@ -109,7 +105,7 @@ export async function saveService(formData: FormData): Promise<void> {
 
 /** Порядок услуг — порядок на сайте */
 export async function moveService(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireAdminWrite();
   const serviceId = await existingService(formData);
   const direction = formData.get('direction') === 'up' ? 'up' : 'down';
   const ids = moveId(await serviceIdsInOrder(), serviceId, direction);
@@ -129,7 +125,7 @@ export async function moveService(formData: FormData): Promise<void> {
  * мгновения с двумя.
  */
 export async function setPrice(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireAdminWrite();
   const serviceId = await existingService(formData);
   const parsed = parsePriceForm(formData);
   if (!parsed.ok) back(serviceId, `error=${parsed.field}`);
@@ -162,7 +158,7 @@ export async function setPrice(formData: FormData): Promise<void> {
 
 /** «Убрать» цену региона = закрыть её сегодняшним числом; в истории она остаётся */
 export async function closePrice(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireAdminWrite();
   const serviceId = await existingService(formData);
   const priceId = formData.get('priceId');
   if (typeof priceId !== 'string' || !UUID.test(priceId)) back(serviceId, 'error=missing');

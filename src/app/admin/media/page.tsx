@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { archiveImage, restoreImage, saveLabel, uploadImage } from '@/app/admin/media/actions';
 import { AdminNav } from '@/components/admin/AdminNav';
 import { UploadButton } from '@/components/admin/UploadButton';
+import { STORAGE_LIMITS } from '@/lib/admin/limits';
 import { isAdmin } from '@/lib/auth/admin';
 import { db } from '@/lib/db';
 import { MAX_INPUT_PIXELS, MAX_UPLOAD_BYTES, MEDIA_LABEL_MAX } from '@/lib/media/image';
@@ -43,6 +44,7 @@ const ERRORS = {
   pixels: `Слишком много пикселей: больше ${String(MAX_INPUT_PIXELS / 1_000_000)} мегапикселей.`,
   broken: 'Файл повреждён или не читается как картинка.',
   label: `Подпись — одна строка до ${String(MEDIA_LABEL_MAX)} знаков.`,
+  quota: `Место для картинок кончилось: не больше ${String(STORAGE_LIMITS.mediaPerDay)} новых в сутки и ${String(STORAGE_LIMITS.mediaBytes / MB)} МБ всего, включая архив.`,
 } as const;
 
 function known<T extends Record<string, string>>(table: T, code: string | undefined) {

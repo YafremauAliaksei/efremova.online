@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { isAdmin } from '@/lib/auth/admin';
+import { requireAdminWrite } from '@/lib/admin/guard';
 import { audit } from '@/lib/audit/log';
 import { db } from '@/lib/db';
 import { parseBlockSettingsForm, parseBlockTextForm, withLocaleTexts } from '@/lib/blocks/edit';
@@ -27,10 +27,6 @@ import { DEFAULT_LOCALE, isLocale } from '@/lib/i18n';
  */
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-
-async function requireAdmin(): Promise<void> {
-  if (!(await isAdmin())) redirect('/admin/denied');
-}
 
 function uuidFrom(formData: FormData, name: string): string | null {
   const value = formData.get(name);
@@ -85,7 +81,7 @@ async function pageBlockIds(pageId: string): Promise<string[]> {
 // ───────────────────────────── тексты ─────────────────────────────
 
 export async function saveBlockText(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireAdminWrite();
   const block = await editableBlock(formData);
 
   const parsed = parseBlockTextForm(formData, block.type);
@@ -115,7 +111,7 @@ export async function saveBlockText(formData: FormData): Promise<void> {
 // ───────────────────────────── оформление ─────────────────────────────
 
 export async function saveBlockSettings(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireAdminWrite();
   const block = await editableBlock(formData);
 
   const parsed = parseBlockSettingsForm(formData, block.type);
@@ -183,7 +179,7 @@ async function videoCover(previous: unknown, video: string): Promise<string | nu
 
 /** Новый пустой блок: в конец страницы или сразу после выбранного */
 export async function addBlock(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireAdminWrite();
   const pageId = uuidFrom(formData, 'pageId');
   const type = formData.get('type');
   const page =
@@ -210,7 +206,7 @@ export async function addBlock(formData: FormData): Promise<void> {
 }
 
 export async function moveBlock(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireAdminWrite();
   const block = await editableBlock(formData);
   const direction = formData.get('direction') === 'up' ? 'up' : 'down';
   await saveOrder(moveId(await pageBlockIds(block.pageId), block.id, direction));
@@ -220,7 +216,7 @@ export async function moveBlock(formData: FormData): Promise<void> {
 }
 
 export async function toggleBlock(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireAdminWrite();
   const block = await editableBlock(formData);
   await db.pageBlock.update({ where: { id: block.id }, data: { isPublished: !block.isPublished } });
   await audit(block.isPublished ? 'block.hide' : 'block.show', block.id, { page: block.page.slug });
@@ -234,7 +230,7 @@ export async function toggleBlock(formData: FormData): Promise<void> {
 
 /** «Удалить» = в архив: с сайта блок исчезает, из базы — нет */
 export async function archiveBlock(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireAdminWrite();
   const block = await editableBlock(formData);
   await db.pageBlock.update({ where: { id: block.id }, data: { archivedAt: new Date() } });
   await audit('block.archive', block.id, { page: block.page.slug });
@@ -244,7 +240,7 @@ export async function archiveBlock(formData: FormData): Promise<void> {
 
 /** Из архива — в конец страницы, в том же состоянии, в каком убран */
 export async function restoreBlock(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireAdminWrite();
   const id = uuidFrom(formData, 'blockId');
   const block =
     id === null
@@ -269,7 +265,7 @@ export async function restoreBlock(formData: FormData): Promise<void> {
 
 /** Вернуть версию из истории. Текущая версия сама уходит в историю — откат обратим */
 export async function restoreRevision(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireAdminWrite();
   const block = await editableBlock(formData);
   const revisionId = uuidFrom(formData, 'revisionId');
   const revision =
@@ -332,7 +328,7 @@ async function savePageOrder(ids: string[]): Promise<void> {
  * из архива), — отказ, а не перезапись.
  */
 export async function createPage(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireAdminWrite();
   const parsed = parseNewPageForm(formData);
   if (!parsed.ok) back(formData, '', `&newpage=1&error=${parsed.field}`);
 
@@ -358,7 +354,7 @@ export async function createPage(formData: FormData): Promise<void> {
 }
 
 export async function savePageSettings(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireAdminWrite();
   const page = await editablePage(formData);
   const parsed = parsePageSettingsForm(formData);
   if (!parsed.ok) back(formData, page.slug, `&error=${parsed.field}`);
@@ -382,7 +378,7 @@ export async function savePageSettings(formData: FormData): Promise<void> {
 
 /** Порядок страниц — это порядок пунктов в шапке и подвале */
 export async function movePage(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireAdminWrite();
   const page = await editablePage(formData);
   const direction = formData.get('direction') === 'up' ? 'up' : 'down';
   await savePageOrder(moveId(await pageIdsInOrder(), page.id, direction));
@@ -393,7 +389,7 @@ export async function movePage(formData: FormData): Promise<void> {
 
 /** «Удалить» страницу = в архив, вместе с блоками; главную — нельзя */
 export async function archivePage(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireAdminWrite();
   const page = await editablePage(formData);
   if (page.slug === HOME_SLUG) back(formData, page.slug, '&error=homeArchive');
   await db.page.update({ where: { id: page.id }, data: { archivedAt: new Date() } });
@@ -404,7 +400,7 @@ export async function archivePage(formData: FormData): Promise<void> {
 
 /** Из архива — скрытой и в конец меню: владелец сам решит, когда показать */
 export async function restorePage(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireAdminWrite();
   const id = uuidFrom(formData, 'pageId');
   const page =
     id === null ? null : await db.page.findFirst({ where: { id, archivedAt: { not: null } } });

@@ -9,6 +9,7 @@
 export const AUDIT_ACTIONS = {
   'session.login': 'Вход в админку',
   'session.logout': 'Выход из админки',
+  'session.lockdown': 'Авария: слишком много действий, все сессии отозваны',
 
   'block.text': 'Текст блока',
   'block.settings': 'Оформление блока',

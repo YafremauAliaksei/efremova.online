@@ -24,6 +24,8 @@ interface TokenRow {
 }
 
 const rows: TokenRow[] = [];
+/** site_settings: здесь живёт отметка отзыва сессий */
+const settings = new Map<string, string>();
 const jar = new Map<string, { value: string; options: Record<string, unknown> }>();
 
 vi.mock('server-only', () => ({}));
@@ -43,6 +45,16 @@ vi.mock('next/headers', () => ({
 }));
 vi.mock('@/lib/db', () => ({
   db: {
+    siteSetting: {
+      findUnique: ({ where }: { where: { key: string } }) =>
+        Promise.resolve(
+          settings.has(where.key) ? { key: where.key, value: settings.get(where.key) } : null
+        ),
+      upsert: ({ create }: { create: { key: string; value: string } }) => {
+        settings.set(create.key, create.value);
+        return Promise.resolve();
+      },
+    },
     adminLoginToken: {
       create: ({ data }: { data: Omit<TokenRow, 'id' | 'usedAt' | 'usedIp'> }) => {
         rows.push({ id: String(rows.length + 1), usedAt: null, usedIp: null, ...data });
@@ -75,6 +87,7 @@ const { base32Decode, totp } = await import('./totp');
 
 beforeEach(() => {
   rows.length = 0;
+  settings.clear();
   jar.clear();
 });
 afterEach(() => {
@@ -173,6 +186,61 @@ describe('сессия', () => {
     await admin.createAdminSession();
     await admin.destroyAdminSession();
     expect(await admin.isAdmin()).toBe(false);
+  });
+});
+
+describe('отзыв сессий', () => {
+  it('отозванная сессия не действует, хоть подпись и срок в порядке', async () => {
+    await admin.createAdminSession();
+    expect(await admin.isAdmin()).toBe(true);
+    await admin.revokeAdminSessions();
+    expect(await admin.isAdmin()).toBe(false);
+  });
+
+  it('унесённая копия cookie умирает вместе с настоящей', async () => {
+    await admin.createAdminSession();
+    const stolen = jar.get(admin.adminCookieName())?.value ?? '';
+    await admin.revokeAdminSessions();
+    jar.set(admin.adminCookieName(), { value: stolen, options: {} });
+    expect(await admin.isAdmin()).toBe(false);
+  });
+
+  it('новая сессия после отзыва действует', async () => {
+    vi.useFakeTimers({ now: Date.UTC(2026, 9, 25, 12, 0, 0, 400) });
+    await admin.revokeAdminSessions();
+    vi.setSystemTime(Date.UTC(2026, 9, 25, 12, 0, 1, 0));
+    await admin.createAdminSession();
+    expect(await admin.isAdmin()).toBe(true);
+  });
+
+  it('отметка хранится миллисекундами и читается обратно', async () => {
+    const now = new Date(Date.UTC(2026, 9, 25, 12, 0, 0, 400));
+    await admin.revokeAdminSessions(now);
+    expect(settings.get(admin.SESSIONS_VALID_AFTER_KEY)).toBe(
+      String(Date.UTC(2026, 9, 25, 12, 0, 1))
+    );
+    expect(await admin.sessionsValidAfter(now)).toEqual(new Date(Date.UTC(2026, 9, 25, 12, 0, 1)));
+  });
+
+  it('время выпуска сессии — для предела записей', async () => {
+    vi.useFakeTimers({ now: Date.UTC(2026, 9, 25, 12, 0, 7, 300) });
+    await admin.createAdminSession();
+    expect(await admin.adminSessionIssuedAt()).toEqual(new Date(Date.UTC(2026, 9, 25, 12, 0, 7)));
+    await admin.revokeAdminSessions();
+    expect(await admin.adminSessionIssuedAt()).toBeNull();
+  });
+
+  it('испорченная отметка в базе не воскрешает сессии', async () => {
+    await admin.createAdminSession();
+    settings.set(admin.SESSIONS_VALID_AFTER_KEY, 'not-a-number');
+    expect(await admin.isAdmin()).toBe(false);
+  });
+
+  it('отзыв сжигает и пропуски ко второму фактору', async () => {
+    await admin.createPendingSecondFactor();
+    expect(await admin.pendingSecondFactor()).not.toBeNull();
+    await admin.revokeAdminSessions();
+    expect(await admin.pendingSecondFactor()).toBeNull();
   });
 });
 

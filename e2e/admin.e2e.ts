@@ -625,3 +625,26 @@ test('отзывы: без даты согласия не показать, на
   await expect(admin.locator('main tbody tr').first()).toContainText('согласие отозвано');
   await expect(admin.locator('main')).not.toContainText(`Klientka ${RUN}`);
 });
+
+// Последним: выход отзывает все сессии, включая сессию остальных тестов
+test('выход убивает и унесённую копию cookie', async ({ browser }) => {
+  const owner = await browser.newContext({ locale: 'ru-RU' });
+  const page = await owner.newPage();
+  await signIn(page);
+  const stolen = await owner.cookies();
+
+  // Тот, кто унёс cookie, открывает админку из своего браузера
+  const thief = await browser.newContext({ locale: 'ru-RU' });
+  await thief.addCookies(stolen);
+  const thiefPage = await thief.newPage();
+  await thiefPage.goto('/admin');
+  await expect(thiefPage).toHaveURL(/\/admin$/);
+
+  await page.getByRole('button', { name: 'Выйти' }).click();
+  await page.waitForURL((url) => !url.pathname.startsWith('/admin'));
+
+  await thiefPage.goto('/admin');
+  await expect(thiefPage).toHaveURL(/\/admin\/denied/);
+  await owner.close();
+  await thief.close();
+});

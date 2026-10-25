@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { audit } from '@/lib/audit/log';
-import { isAdmin } from '@/lib/auth/admin';
+import { requireAdminWrite } from '@/lib/admin/guard';
 import { moveId, numbered } from '@/lib/blocks/order';
 import { db } from '@/lib/db';
 import { parseTestimonialForm } from '@/lib/testimonials/edit';
@@ -21,10 +21,6 @@ import { parseTestimonialForm } from '@/lib/testimonials/edit';
  */
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-
-async function requireAdmin(): Promise<void> {
-  if (!(await isAdmin())) redirect('/admin/denied');
-}
 
 function back(open: string | null, query: string): never {
   redirect(`/admin/testimonials?${open === null ? '' : `open=${open}&`}${query}`);
@@ -59,7 +55,7 @@ async function idsInOrder(): Promise<string[]> {
 
 /** Новый отзыв — скрытый и в конце: показать — отдельным шагом */
 export async function createTestimonial(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireAdminWrite();
   const parsed = parseTestimonialForm(formData, new Date());
   if (!parsed.ok) back(null, `new=1&error=${parsed.field}`);
 
@@ -74,7 +70,7 @@ export async function createTestimonial(formData: FormData): Promise<void> {
 }
 
 export async function saveTestimonial(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireAdminWrite();
   const row = await existing(formData);
   const parsed = parseTestimonialForm(formData, new Date());
   if (!parsed.ok) back(row.id, `error=${parsed.field}`);
@@ -92,7 +88,7 @@ export async function saveTestimonial(formData: FormData): Promise<void> {
 }
 
 export async function toggleTestimonial(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireAdminWrite();
   const row = await existing(formData);
   if (!row.isPublished && row.consentAt === null) back(row.id, 'error=noConsent');
   await db.testimonial.update({
@@ -105,7 +101,7 @@ export async function toggleTestimonial(formData: FormData): Promise<void> {
 }
 
 export async function moveTestimonial(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireAdminWrite();
   const row = await existing(formData);
   const direction = formData.get('direction') === 'up' ? 'up' : 'down';
   await db.$transaction(
@@ -124,7 +120,7 @@ export async function moveTestimonial(formData: FormData): Promise<void> {
  * а вернуть удалённое нечем.
  */
 export async function withdrawTestimonial(formData: FormData): Promise<void> {
-  await requireAdmin();
+  await requireAdminWrite({ deletes: true });
   const row = await existing(formData);
   if (formData.get('confirm') !== 'on') back(row.id, 'error=confirm');
   await db.testimonial.delete({ where: { id: row.id } });

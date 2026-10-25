@@ -389,11 +389,18 @@ export default async function AdminPage({ searchParams }: PageProps) {
 
 async function logout() {
   'use server';
-  const { destroyAdminSession, isAdmin: signedIn } = await import('@/lib/auth/admin');
-  // Выход без сессии — не действие владельца, в журнал не пишется
+  const {
+    destroyAdminSession,
+    isAdmin: signedIn,
+    revokeAdminSessions,
+  } = await import('@/lib/auth/admin');
+  // Выход без сессии — не действие владельца: ни журнала, ни отзыва сессий.
+  // Иначе любой запрос с мусорным cookie выкидывал бы владельца из админки
   if (await signedIn()) {
     const { audit } = await import('@/lib/audit/log');
     await audit('session.logout');
+    // Вместе с этой сессией умирают и её копии, если cookie кто-то унёс
+    await revokeAdminSessions();
   }
   await destroyAdminSession();
   redirect('/');
