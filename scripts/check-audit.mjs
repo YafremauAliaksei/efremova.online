@@ -27,6 +27,11 @@ import { pathToFileURL } from 'node:url';
  * «а почему это не опасно именно у нас». Ссылка на план исправления
  * обязательна: исключение — это отсрочка, а не решение.
  */
+// Сейчас исключений нет.
+//
+// До 2026-10-25 здесь жил zod 3 (GHSA-mrhx-c7xc-m3w5): исправление было только
+// в zod 4, переход — отдельным PR.
+//
 // До 2026-09-25 здесь жил extract-zip (GHSA-7pqw-9j4j-h8q3, GHSA-jmr9-qjv8-65gv):
 // патча нет, пакет заброшен с 2020 года. Его тянул @puppeteer/browsers 2.x
 // через цепочку @lhci/cli → lighthouse → puppeteer-core. Версия 3 распаковывает
@@ -47,22 +52,7 @@ import { pathToFileURL } from 'node:url';
 // Переопределения @puppeteer/browsers и proxy-agent убрать, когда @lhci/cli перейдёт на lighthouse
 // с puppeteer-core 25 и новее.
 /** @type {{id: string, package: string, until: string, reason: string}[]} */
-const ACCEPTED = [
-  {
-    // Исправление есть только в zod 4 — это мажорное обновление, отдельный PR
-    // (PROJECT_LOG, T.4). Уязвимость — память при проверке огромной коллекции
-    // с ограничением размера: zod 3 разбирает все элементы и только потом
-    // сверяет длину. У нас z.array нет нигде; z.record разбирает JSON из своей
-    // базы и тело внутреннего маршрута событий (src/app/api/internal/security,
-    // закрыт internal-auth и пределом тела nginx). Посетитель коллекцию в zod
-    // передать не может, а формы админки разбираются по полям, без коллекций.
-    id: 'GHSA-mrhx-c7xc-m3w5',
-    package: 'zod',
-    until: '2026-11-25',
-    reason:
-      'исправление только в zod 4; коллекций от посетителя zod не разбирает — перейти на zod 4 (T.4)',
-  },
-];
+const ACCEPTED = [];
 
 /**
  * Делит находки high/critical на принятые и блокирующие.

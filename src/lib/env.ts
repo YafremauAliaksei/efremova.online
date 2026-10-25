@@ -34,10 +34,10 @@ const optionalSecret = z
 
 const serverSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  APP_URL: z.string().url().default('http://localhost:3000'),
+  APP_URL: z.url().default('http://localhost:3000'),
   APP_ENV: z.enum(['development', 'staging', 'production']).default('development'),
 
-  DATABASE_URL: z.string().url().optional(),
+  DATABASE_URL: z.url().optional(),
 
   /**
    * Подписывает сессию администратора. Ни для чего другого не используется:

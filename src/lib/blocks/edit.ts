@@ -28,7 +28,7 @@ export type BlockEditResult =
   | { ok: true; value: { blockId: string; locale: Locale; texts: BlockTexts } }
   | { ok: false; field: string };
 
-const baseSchema = z.object({ blockId: z.string().uuid(), locale: z.enum(LOCALES) });
+const baseSchema = z.object({ blockId: z.uuid(), locale: z.enum(LOCALES) });
 
 export function parseBlockTextForm(formData: FormData, type: BlockType): BlockEditResult {
   const base = baseSchema.safeParse({
@@ -82,7 +82,7 @@ export type BlockSettingsResult =
   | { ok: false; field: string };
 
 const settingsSchema = z.object({
-  blockId: z.string().uuid(),
+  blockId: z.uuid(),
   width: z.enum(BLOCK_WIDTHS),
   align: z.enum(BLOCK_ALIGNS),
   background: z.enum(BLOCK_BACKGROUNDS),
@@ -113,7 +113,7 @@ export function parseBlockSettingsForm(formData: FormData, type: BlockType): Blo
     // Существует ли картинка и не в архиве ли она — проверяет действие, у него есть база
     const image = formData.get('image');
     if (image !== null && image !== '') {
-      if (!z.string().uuid().safeParse(image).success) return { ok: false, field: 'image' };
+      if (!z.uuid().safeParse(image).success) return { ok: false, field: 'image' };
       data.image = image as string;
     }
     const side = z.enum(IMAGE_SIDES).safeParse(formData.get('side') ?? 'right');

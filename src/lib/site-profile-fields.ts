@@ -32,7 +32,7 @@ const normalized = (normalize: (raw: string) => string | null) =>
   z.string().transform((raw, ctx) => {
     const value = normalize(raw);
     if (value === null) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom });
+      ctx.addIssue({ code: 'custom' });
       return z.NEVER;
     }
     return value;
@@ -76,14 +76,14 @@ export const PROFILE_FIELDS: readonly ProfileField[] = [
     key: 'owner.email',
     label: 'E-mail для связи',
     required: true,
-    schema: z.string().trim().email(),
+    schema: z.string().trim().pipe(z.email()),
   },
   {
     key: 'owner.privacyEmail',
     label: 'E-mail по вопросам персональных данных',
     hint: 'Может совпадать с основным',
     required: true,
-    schema: z.string().trim().email(),
+    schema: z.string().trim().pipe(z.email()),
   },
   {
     key: 'owner.phone',

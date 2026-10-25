@@ -118,7 +118,7 @@ export interface ServiceSettings {
  * и сайт показывает русское.
  */
 export function parseServiceForm(formData: FormData): ServiceFormResult<ServiceSettings> {
-  const serviceId = z.string().uuid().safeParse(formData.get('serviceId'));
+  const serviceId = z.uuid().safeParse(formData.get('serviceId'));
   if (!serviceId.success) return { ok: false, field: 'serviceId' };
 
   const titleI18n: Record<string, string> = {};
@@ -165,7 +165,7 @@ export interface PriceInput {
 
 /** Цена для региона: регион, валюта и сумма */
 export function parsePriceForm(formData: FormData): ServiceFormResult<PriceInput> {
-  const serviceId = z.string().uuid().safeParse(formData.get('serviceId'));
+  const serviceId = z.uuid().safeParse(formData.get('serviceId'));
   if (!serviceId.success) return { ok: false, field: 'serviceId' };
   const region = normalizeRegion(formData.get('region'));
   if (region === null) return { ok: false, field: 'region' };

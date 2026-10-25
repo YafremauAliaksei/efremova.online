@@ -50,7 +50,7 @@ export interface PageSettings {
  * пустые переводы не хранятся, и сайт показывает русское.
  */
 export function parsePageSettingsForm(formData: FormData): PageFormResult<PageSettings> {
-  const pageId = z.string().uuid().safeParse(formData.get('pageId'));
+  const pageId = z.uuid().safeParse(formData.get('pageId'));
   if (!pageId.success) return { ok: false, field: 'pageId' };
 
   const titleI18n: Record<string, string> = {};
