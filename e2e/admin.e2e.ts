@@ -626,12 +626,14 @@ test('отзывы: без даты согласия не показать, на
   await expect(admin.locator('main')).not.toContainText(`Klientka ${RUN}`);
 });
 
-// Последним: выход отзывает все сессии, включая сессию остальных тестов
+// Последним: выход отзывает все сессии, включая сессию остальных тестов.
+//
+// Копия cookie — из уже открытой сессии, а не из нового входа: сервер не
+// принимает код того же или прошлого 30-секундного шага повторно, и третий
+// вход за полминуты (beforeAll, тест второго фактора, этот) падал бы
+// в зависимости от того, на какую секунду пришёлся прогон
 test('выход убивает и унесённую копию cookie', async ({ browser }) => {
-  const owner = await browser.newContext({ locale: 'ru-RU' });
-  const page = await owner.newPage();
-  await signIn(page);
-  const stolen = await owner.cookies();
+  const stolen = await admin.context().cookies();
 
   // Тот, кто унёс cookie, открывает админку из своего браузера
   const thief = await browser.newContext({ locale: 'ru-RU' });
@@ -640,11 +642,11 @@ test('выход убивает и унесённую копию cookie', async 
   await thiefPage.goto('/admin');
   await expect(thiefPage).toHaveURL(/\/admin$/);
 
-  await page.getByRole('button', { name: 'Выйти' }).click();
-  await page.waitForURL((url) => !url.pathname.startsWith('/admin'));
+  await admin.goto('/admin');
+  await admin.getByRole('button', { name: 'Выйти' }).click();
+  await admin.waitForURL((url) => !url.pathname.startsWith('/admin'));
 
   await thiefPage.goto('/admin');
   await expect(thiefPage).toHaveURL(/\/admin\/denied/);
-  await owner.close();
   await thief.close();
 });
