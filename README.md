@@ -35,7 +35,7 @@
 
 ## ⚡ Быстрый старт
 
-Нужны Node.js 22+, Docker, Git. Внешние ключи не нужны.
+Нужны Node.js 24+ (версия — в `.nvmrc`), Docker, Git. Внешние ключи не нужны.
 
 ```bash
 npm install
