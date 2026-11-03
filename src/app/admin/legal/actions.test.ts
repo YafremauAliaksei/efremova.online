@@ -54,6 +54,10 @@ vi.mock('@/lib/db', () => ({
     $transaction: (ops: Promise<unknown>[]) => Promise.all(ops),
   },
 }));
+let profile: Record<string, string> = {};
+vi.mock('@/lib/site-profile', () => ({
+  getSiteProfile: () => Promise.resolve({ values: profile, status: 'live' }),
+}));
 
 const { publishLegal, restoreLegal } = await import('./actions');
 
@@ -93,6 +97,48 @@ async function urlOf(run: Promise<unknown>): Promise<string> {
 beforeEach(() => {
   docs.length = 0;
   created = 0;
+  profile = {};
+});
+
+describe('отметка «проверено юристом»', () => {
+  const base = { slug: 'privacy', locale: 'pl', title: 'Polityka', approved: 'on' };
+
+  it('с пометкой ⟦ЮРИСТ⟧ — отказ: посетитель увидел бы её в окончательном тексте', async () => {
+    const state = await publishLegal(
+      { attempt: 0, error: null },
+      form({ ...base, text: '## A\n\nOkres ⟦ЮРИСТ: срок?⟧ lat' })
+    );
+    expect(state.error).toEqual({ code: 'lawyerMarks' });
+    expect(created).toBe(0);
+  });
+
+  it('с незаполненным полем владельца — отказ с именем поля', async () => {
+    const state = await publishLegal(
+      { attempt: 0, error: null },
+      form({ ...base, text: '## A\n\nAdministrator: {{owner.fullName}}' })
+    );
+    expect(state.error).toEqual({ code: 'unfilled', key: 'owner.fullName' });
+  });
+
+  it('поле заполнено — публикуется; черновик с пометками — тоже можно', async () => {
+    profile = { 'owner.fullName': 'Jan Kowalski' };
+    const text = '## A\n\nAdministrator: {{owner.fullName}}';
+    expect(
+      await urlOf(publishLegal({ attempt: 0, error: null }, form({ ...base, text })))
+    ).toContain('saved=published');
+    const draft = { slug: 'privacy', locale: 'pl', title: 'Polityka', text: '## A\n\n⟦ЮРИСТ: x⟧' };
+    expect(await urlOf(publishLegal({ attempt: 0, error: null }, form(draft)))).toContain(
+      'saved=published'
+    );
+  });
+
+  it('прежняя «проверенная» редакция с пометками не возвращается проверенной', async () => {
+    docs.push(doc({ isCurrent: true }));
+    const old = doc({ isDraft: false, sections: [{ heading: 'A', paragraphs: ['⟦ЮРИСТ: x⟧'] }] });
+    docs.push(old);
+    expect(await urlOf(restoreLegal(form({ documentId: old.id })))).toContain('error=unapprovable');
+    expect(created).toBe(0);
+  });
 });
 
 describe('новая редакция', () => {

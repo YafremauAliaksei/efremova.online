@@ -10,7 +10,15 @@ import { requireAdminWrite } from '@/lib/admin/guard';
 import { db } from '@/lib/db';
 import { isLocale } from '@/lib/i18n';
 import { LEGAL_SLUGS, type LegalSlug } from '@/lib/legal';
-import { type LegalTextError, legalTitle, nextVersion, parseLegalText } from '@/lib/legal-text';
+import {
+  type LegalTextError,
+  approvalProblems,
+  legalTitle,
+  nextVersion,
+  parseLegalText,
+} from '@/lib/legal-text';
+import { getSiteProfile } from '@/lib/site-profile';
+import type { LegalSection } from '../../../../prisma/legal-content';
 
 /**
  * Действия раздела «Правовые документы» (задача 10).
@@ -32,7 +40,14 @@ function isLegalSlug(value: unknown): value is LegalSlug {
 /** Состояние формы: при ошибке введённый текст возвращается, а не теряется */
 export interface LegalFormState {
   attempt: number;
-  error: LegalTextError | { code: 'title' } | { code: 'same' } | { code: 'limit' } | null;
+  error:
+    | LegalTextError
+    | { code: 'title' }
+    | { code: 'same' }
+    | { code: 'limit' }
+    | { code: 'lawyerMarks' }
+    | { code: 'unfilled'; key: string }
+    | null;
   title?: string;
   text?: string;
   approved?: boolean;
@@ -62,6 +77,10 @@ export async function publishLegal(
   if (!title.success || title.data === null) return { ...kept, error: { code: 'title' } };
   const parsed = parseLegalText(rawText);
   if (!parsed.ok) return { ...kept, error: parsed.error };
+  if (approved) {
+    const problem = await approvalBlocker(title.data, parsed.sections);
+    if (problem !== null) return { ...kept, error: problem };
+  }
 
   const existing = await db.legalDocument.findMany({
     where: { slug, locale },
@@ -129,6 +148,14 @@ export async function restoreLegal(formData: FormData): Promise<void> {
   if (overDailyLimit(taken)) {
     redirect(`/admin/legal?doc=${old.slug}&lang=${old.locale}&error=limit`);
   }
+  // Прежняя «проверенная» редакция возвращается как проверенная — только если
+  // в ней нет пометок юриста и все поля владельца заполнены (как при публикации)
+  if (
+    !old.isDraft &&
+    (await approvalBlocker(old.title, (old.sections ?? []) as unknown as LegalSection[])) !== null
+  ) {
+    redirect(`/admin/legal?doc=${old.slug}&lang=${old.locale}&error=unapprovable`);
+  }
   // Прежняя редакция с тем же текстом, что и действующая, — не новая
   // редакция: иначе каждое нажатие «вернуть» копило бы одинаковые строки
   const current = taken.find((doc) => doc.isCurrent);
@@ -156,6 +183,18 @@ export async function restoreLegal(formData: FormData): Promise<void> {
   });
   refresh();
   redirect(`/admin/legal?doc=${old.slug}&lang=${old.locale}&saved=restored`);
+}
+
+/** Почему редакцию нельзя отметить «проверено юристом»; null — можно */
+async function approvalBlocker(
+  title: string,
+  sections: readonly LegalSection[]
+): Promise<{ code: 'lawyerMarks' } | { code: 'unfilled'; key: string } | null> {
+  const { values } = await getSiteProfile();
+  const { lawyerMarks, missing } = approvalProblems(title, sections, values);
+  if (lawyerMarks) return { code: 'lawyerMarks' };
+  const [key] = missing;
+  return key === undefined ? null : { code: 'unfilled', key };
 }
 
 function overDailyLimit(revisions: readonly { createdAt: Date }[]): boolean {

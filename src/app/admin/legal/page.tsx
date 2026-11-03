@@ -80,6 +80,12 @@ export default async function LegalAdminPage({ searchParams }: PageProps) {
           {LEGAL_LIMIT_TEXT}
         </p>
       )}
+      {params.error === 'unapprovable' && (
+        <p role="alert" className="mt-6 text-sm text-red-800">
+          Эту редакцию нельзя вернуть как проверенную юристом: в ней есть пометки ⟦ЮРИСТ: …⟧ или
+          пустые поля «Данных владельца». Заполните поля или опубликуйте исправленный текст.
+        </p>
+      )}
       {slug !== null && locale !== null ? (
         <DocumentEditor slug={slug} locale={locale} saved={params.saved} />
       ) : (

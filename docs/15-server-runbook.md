@@ -13,8 +13,21 @@ IP, вход в админку), отдано Cloudflare — на сервере
 
 1. Домен добавлен в Cloudflare (бесплатный тариф), DNS — у Cloudflare.
 2. Zero Trust включён (бесплатно до 50 пользователей): dash.cloudflare.com → Zero Trust.
-3. На сервере: Docker с compose, репозиторий, файл `.env` из `.env.example`
-   с правами `600` (`chmod 600 .env`).
+3. Сервер — чистый Debian 12/13 (ноутбук или VPS). Склонировать репозиторий и
+   запустить подготовку:
+
+   ```bash
+   sudo apt install -y git
+   git clone https://github.com/YafremauAliaksei/efremova.online.git && cd efremova.online
+   sudo bash infra/setup/install-debian.sh
+   ```
+
+   Скрипт (`infra/setup/install-debian.sh`, повторный запуск безопасен):
+   Docker из официального репозитория и автозапуск; автообновления
+   безопасности; firewall — все входящие закрыты (SSH — только из локальной
+   сети; туннелю входящие не нужны); ноутбук не засыпает при закрытой
+   крышке; синхронизация времени; права `600` на `.env`.
+4. Файл `.env` из `.env.example` (`cp .env.example .env`, `chmod 600 .env`).
 
 ## 2. Туннель
 
