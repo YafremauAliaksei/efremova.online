@@ -457,8 +457,11 @@ test('услуги: цены по валютам, выбор валюты, пу�
   await expect(site).toHaveURL(/\/pl\/services\?currency=EUR/);
   await expect(item).toContainText(/60,50\s€/);
 
-  // Новая цена закрывает прежнюю: на сайте новая, прежняя — в истории и в архиве
+  // Новая цена закрывает прежнюю: на сайте новая, прежняя — в истории и в архиве.
+  // Форму — только после того, как страница догрузила курсы (как и в первый
+  // раз): нажатие посреди догрузки в медленном CI уходило без ответа
   await admin.goto(pricesUrl);
+  await expect(admin.locator('main')).toContainText(/Курсы: |недоступен|прежние курсы/);
   await admin.getByLabel('Новая цена, EUR').fill('65');
   await admin.getByRole('button', { name: 'Сохранить цены' }).click();
   await saved(admin, 'Цены сохранены');

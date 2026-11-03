@@ -9,7 +9,7 @@ import type { LegalDocumentSeed } from './types';
  * разрешении споров. Все значения — метками из профиля владельца.
  */
 
-const VERSION = 'provider-2026-09-25-draft';
+const VERSION = 'provider-2026-11-03-draft';
 
 export const PROVIDER_DOCUMENTS: LegalDocumentSeed[] = [
   {
@@ -37,7 +37,7 @@ export const PROVIDER_DOCUMENTS: LegalDocumentSeed[] = [
           'Zasady etyki zawodowej: {{owner.ethicsCode}}',
         ],
         paragraphs: [
-          '⟦ЮРИСТ: potwierdzić obowiązki informacyjne z ustawy o zawodzie psychologa i samorządzie zawodowym psychologów⟧',
+          'Usługodawca wykonuje zawód psychologa zgodnie z przepisami o zawodzie psychologa i samorządzie zawodowym psychologów oraz z kodeksem etyki zawodowej wskazanym powyżej.',
         ],
       },
       {
@@ -48,7 +48,7 @@ export const PROVIDER_DOCUMENTS: LegalDocumentSeed[] = [
         heading: '4. Pozasądowe rozwiązywanie sporów',
         paragraphs: [
           'Konsument może skorzystać z pozasądowych sposobów rozpatrywania reklamacji i dochodzenia roszczeń, m.in. z pomocy miejskiego lub powiatowego rzecznika konsumentów oraz wojewódzkiego inspektora Inspekcji Handlowej. Informacje: prawakonsumenta.uokik.gov.pl.',
-          '⟦ЮРИСТ: platforma ODR UE została zamknięta w 2025 r. — potwierdzić, że odnośnik do niej nie jest już wymagany⟧',
+          'Unijna platforma ODR została zamknięta w 2025 r., dlatego odnośnik do niej nie jest podawany.',
         ],
       },
     ],
@@ -79,7 +79,7 @@ export const PROVIDER_DOCUMENTS: LegalDocumentSeed[] = [
           'Правила профессиональной этики: {{owner.ethicsCode}}',
         ],
         paragraphs: [
-          '⟦ЮРИСТ: подтвердить обязанности по информированию из закона о профессии психолога⟧',
+          'Исполнитель работает психологом в соответствии с польским законом о профессии психолога и профессиональном самоуправлении психологов и кодексом профессиональной этики, указанным выше.',
         ],
       },
       {
@@ -90,7 +90,7 @@ export const PROVIDER_DOCUMENTS: LegalDocumentSeed[] = [
         heading: '4. Внесудебное разрешение споров',
         paragraphs: [
           'Потребитель может воспользоваться внесудебными способами рассмотрения претензий, в том числе помощью городского или районного уполномоченного по правам потребителей (rzecznik konsumentów) и воеводской Торговой инспекции (Inspekcja Handlowa). Подробности: prawakonsumenta.uokik.gov.pl.',
-          '⟦ЮРИСТ: платформа ODR ЕС закрыта в 2025 году — подтвердить, что ссылка на неё больше не нужна⟧',
+          'Платформа ODR Европейского союза закрыта в 2025 году, поэтому ссылка на неё не приводится.',
         ],
       },
     ],
@@ -123,7 +123,7 @@ export const PROVIDER_DOCUMENTS: LegalDocumentSeed[] = [
           'Professional ethics rules: {{owner.ethicsCode}}',
         ],
         paragraphs: [
-          '⟦ЮРИСТ: confirm the disclosure duties under the Polish Act on the psychologist profession⟧',
+          'The provider practises as a psychologist in accordance with the Polish law on the psychologist profession and the professional self-government of psychologists, and with the code of professional ethics indicated above.',
         ],
       },
       {
@@ -134,7 +134,7 @@ export const PROVIDER_DOCUMENTS: LegalDocumentSeed[] = [
         heading: '4. Out-of-court dispute resolution',
         paragraphs: [
           'Consumers may use out-of-court complaint and redress procedures, including the help of municipal or district consumer ombudsmen (rzecznik konsumentów) and the regional Trade Inspection (Inspekcja Handlowa). Information: prawakonsumenta.uokik.gov.pl.',
-          '⟦ЮРИСТ: the EU ODR platform closed in 2025 — confirm that a link to it is no longer required⟧',
+          'The EU ODR platform closed in 2025, so no link to it is given.',
         ],
       },
     ],

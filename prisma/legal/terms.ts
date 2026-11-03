@@ -13,7 +13,7 @@ import type { LegalDocumentSeed } from './types';
  * вместе со своей редакцией условий.
  */
 
-const VERSION = 'terms-2026-09-25-draft';
+const VERSION = 'terms-2026-11-03-draft';
 
 export const TERMS_DOCUMENTS: LegalDocumentSeed[] = [
   {
@@ -26,7 +26,7 @@ export const TERMS_DOCUMENTS: LegalDocumentSeed[] = [
         heading: '1. Usługodawca i usługa',
         paragraphs: [
           'Konsultacje prowadzi {{owner.fullName}}, {{owner.professionalTitle}}. Pełne dane — na stronie „Informacje o usługodawcy”.',
-          'Konsultacja psychologiczna jest przeznaczona dla osób pełnoletnich i odbywa się w formie wideorozmowy. ⟦ЮРИСТ: forma (online / stacjonarnie) i czy konsultacja jest świadczeniem zdrowotnym⟧',
+          'Konsultacja psychologiczna jest przeznaczona dla osób pełnoletnich i odbywa się w formie wideorozmowy. Konsultacja psychologiczna nie jest świadczeniem zdrowotnym w rozumieniu przepisów o działalności leczniczej i nie zastępuje leczenia.',
         ],
       },
       {
@@ -39,7 +39,7 @@ export const TERMS_DOCUMENTS: LegalDocumentSeed[] = [
         heading: '3. Cena i płatność',
         paragraphs: [
           'Aktualne ceny są na stronie „Usługi”. Podana cena jest ceną całkowitą. {{owner.vatStatus}}',
-          'Sposób i termin płatności: ⟦ЮРИСТ: sposób i termin płatności⟧',
+          'Sposób i termin płatności: przelewem na rachunek bankowy usługodawcy, najpóźniej 24 godziny przed konsultacją. Dane do przelewu usługodawca przesyła wraz z potwierdzeniem terminu.',
         ],
       },
       {
@@ -49,7 +49,7 @@ export const TERMS_DOCUMENTS: LegalDocumentSeed[] = [
       {
         heading: '5. Zmiana terminu i odwołanie',
         paragraphs: [
-          'Termin można bezpłatnie zmienić lub odwołać ⟦ЮРИСТ: do ilu godzin przed konsultacją⟧. Zasady przy późniejszym odwołaniu: ⟦ЮРИСТ: zasady⟧',
+          'Termin można bezpłatnie zmienić lub odwołać najpóźniej 24 godziny przed konsultacją. Zasady przy późniejszym odwołaniu: przy odwołaniu później niż 24 godziny przed konsultacją albo nieobecności opłata nie podlega zwrotowi; usługodawca może jednorazowo zaproponować inny termin bez dodatkowej opłaty.',
         ],
       },
       {
@@ -58,13 +58,13 @@ export const TERMS_DOCUMENTS: LegalDocumentSeed[] = [
         paragraphs: [
           'Możesz odstąpić od umowy zawartej na odległość w ciągu 14 dni od jej zawarcia bez podawania przyczyny — wystarczy wiadomość na adres {{owner.email}}.',
           'Jeżeli konsultacja ma się odbyć przed upływem tych 14 dni, poprosimy o wyraźne żądanie rozpoczęcia usługi. Po jej pełnym wykonaniu prawo odstąpienia wygasa; przy odstąpieniu w trakcie płacisz za część wykonaną do tej chwili.',
-          '⟦ЮРИСТ: dołączyć wzór formularza odstąpienia od umowy i potwierdzić przepisy⟧',
+          'Wzór formularza odstąpienia od umowy stanowi załącznik nr 2 do ustawy z dnia 30 maja 2014 r. o prawach konsumenta. Oświadczenie można złożyć także w dowolnej formie, np. e-mailem na adres {{owner.email}}.',
         ],
       },
       {
         heading: '7. Poufność',
         paragraphs: [
-          'Treść konsultacji jest objęta tajemnicą zawodową. Konsultacje nie są nagrywane. ⟦ЮРИСТ: wyjątki od tajemnicy przewidziane prawem⟧',
+          'Treść konsultacji jest objęta tajemnicą zawodową. Konsultacje nie są nagrywane. Od tajemnicy można odstąpić wyłącznie w przypadkach przewidzianych przepisami prawa, w szczególności gdy jej zachowanie zagraża życiu lub zdrowiu klienta albo innych osób.',
         ],
       },
       {
@@ -76,7 +76,7 @@ export const TERMS_DOCUMENTS: LegalDocumentSeed[] = [
       {
         heading: '9. Reklamacje',
         paragraphs: [
-          'Reklamacje przyjmujemy na adres {{owner.email}} i odpowiadamy w ciągu 14 dni. Informacje o pozasądowych sposobach rozwiązywania sporów — na stronie „Informacje o usługodawcy”. ⟦ЮРИСТ: termin⟧',
+          'Reklamacje przyjmujemy na adres {{owner.email}} i odpowiadamy w ciągu 14 dni. Informacje o pozasądowych sposobach rozwiązywania sporów — na stronie „Informacje o usługodawcy”.',
         ],
       },
       {
@@ -97,7 +97,7 @@ export const TERMS_DOCUMENTS: LegalDocumentSeed[] = [
         heading: '1. Кто и что',
         paragraphs: [
           'Консультации ведёт {{owner.fullName}}, {{owner.professionalTitle}}. Полные данные — на странице «Данные владельца сайта».',
-          'Психологическая консультация предназначена для совершеннолетних и проходит по видеосвязи. ⟦ЮРИСТ: форма (онлайн / очно) и является ли консультация медицинской услугой⟧',
+          'Психологическая консультация предназначена для совершеннолетних и проходит по видеосвязи. Психологическая консультация не является медицинской услугой в смысле польского закона о медицинской деятельности и не заменяет лечения.',
           'Это перевод. При расхождении с польской версией действует польская.',
         ],
       },
@@ -111,7 +111,7 @@ export const TERMS_DOCUMENTS: LegalDocumentSeed[] = [
         heading: '3. Цена и оплата',
         paragraphs: [
           'Актуальные цены — на странице «Услуги». Указана итоговая цена. {{owner.vatStatus}}',
-          'Способ и срок оплаты: ⟦ЮРИСТ: способ и срок оплаты⟧',
+          'Способ и срок оплаты: банковским переводом на счёт исполнителя, не позднее чем за 24 часа до консультации. Реквизиты исполнитель присылает вместе с подтверждением времени.',
         ],
       },
       {
@@ -121,7 +121,7 @@ export const TERMS_DOCUMENTS: LegalDocumentSeed[] = [
       {
         heading: '5. Перенос и отмена',
         paragraphs: [
-          'Время можно бесплатно перенести или отменить ⟦ЮРИСТ: не позднее чем за сколько часов⟧. Правила при более поздней отмене: ⟦ЮРИСТ: правила⟧',
+          'Время можно бесплатно перенести или отменить не позднее чем за 24 часа до консультации. Правила при более поздней отмене: при отмене позднее чем за 24 часа или неявке оплата не возвращается; исполнитель может один раз предложить другое время без доплаты.',
         ],
       },
       {
@@ -130,13 +130,13 @@ export const TERMS_DOCUMENTS: LegalDocumentSeed[] = [
         paragraphs: [
           'Вы можете отказаться от договора, заключённого на расстоянии, в течение 14 дней с его заключения без объяснения причин — достаточно письма на {{owner.email}}.',
           'Если консультация должна пройти раньше, чем через 14 дней, мы попросим ваше явное требование начать услугу. После полного оказания услуги право на отказ прекращается; при отказе в процессе вы оплачиваете уже оказанную часть.',
-          '⟦ЮРИСТ: приложить образец формы отказа от договора и подтвердить нормы⟧',
+          'Образец формы отказа от договора приведён в приложении № 2 к польскому закону о правах потребителя от 30 мая 2014 года. Заявление можно направить и в свободной форме, например письмом на {{owner.email}}.',
         ],
       },
       {
         heading: '7. Конфиденциальность',
         paragraphs: [
-          'Содержание консультаций составляет профессиональную тайну. Консультации не записываются. ⟦ЮРИСТ: исключения из тайны, предусмотренные законом⟧',
+          'Содержание консультаций составляет профессиональную тайну. Консультации не записываются. Тайна может быть раскрыта только в случаях, предусмотренных законом, — прежде всего когда её сохранение угрожает жизни или здоровью клиента либо других людей.',
         ],
       },
       {
@@ -148,7 +148,7 @@ export const TERMS_DOCUMENTS: LegalDocumentSeed[] = [
       {
         heading: '9. Претензии',
         paragraphs: [
-          'Претензии принимаются по адресу {{owner.email}}, ответ — в течение 14 дней. О внесудебном разрешении споров — на странице «Данные владельца сайта». ⟦ЮРИСТ: срок⟧',
+          'Претензии принимаются по адресу {{owner.email}}, ответ — в течение 14 дней. О внесудебном разрешении споров — на странице «Данные владельца сайта».',
         ],
       },
       {
@@ -169,7 +169,7 @@ export const TERMS_DOCUMENTS: LegalDocumentSeed[] = [
         heading: '1. Provider and service',
         paragraphs: [
           'Consultations are provided by {{owner.fullName}}, {{owner.professionalTitle}}. Full details are on the “Service provider information” page.',
-          'The psychological consultation is intended for adults and takes place by video call. ⟦ЮРИСТ: format (online / in person) and whether a consultation is a health service⟧',
+          'The psychological consultation is intended for adults and takes place by video call. A psychological consultation is not a health service within the meaning of Polish law on medical activity and does not replace medical treatment.',
           'This is a translation. If it differs from the Polish version, the Polish version prevails.',
         ],
       },
@@ -183,7 +183,7 @@ export const TERMS_DOCUMENTS: LegalDocumentSeed[] = [
         heading: '3. Price and payment',
         paragraphs: [
           'Current prices are on the “Services” page. The price shown is the total price. {{owner.vatStatus}}',
-          'Payment method and deadline: ⟦ЮРИСТ: payment method and deadline⟧',
+          'Payment method and deadline: by bank transfer to the provider’s account, no later than 24 hours before the consultation. The provider sends the payment details together with the confirmation of the appointment.',
         ],
       },
       {
@@ -193,7 +193,7 @@ export const TERMS_DOCUMENTS: LegalDocumentSeed[] = [
       {
         heading: '5. Rescheduling and cancellation',
         paragraphs: [
-          'You can reschedule or cancel free of charge ⟦ЮРИСТ: how many hours in advance⟧. Rules for later cancellation: ⟦ЮРИСТ: rules⟧',
+          'You can reschedule or cancel free of charge up to 24 hours before the consultation. Rules for later cancellation: if you cancel later than 24 hours before the consultation or do not attend, the fee is not refunded; the provider may offer another time once at no extra charge.',
         ],
       },
       {
@@ -202,13 +202,13 @@ export const TERMS_DOCUMENTS: LegalDocumentSeed[] = [
         paragraphs: [
           'You may withdraw from a distance contract within 14 days of its conclusion without giving a reason — an e-mail to {{owner.email}} is enough.',
           'If the consultation is to take place within those 14 days, we will ask for your express request to start the service. Once the service has been fully performed, the right of withdrawal ends; if you withdraw during the service, you pay for the part already performed.',
-          '⟦ЮРИСТ: attach the model withdrawal form and confirm the provisions⟧',
+          'The model withdrawal form is Annex 2 to the Polish Consumer Rights Act of 30 May 2014. You may also withdraw in any other form, e.g. by e-mail to {{owner.email}}.',
         ],
       },
       {
         heading: '7. Confidentiality',
         paragraphs: [
-          'The content of consultations is covered by professional secrecy. Consultations are not recorded. ⟦ЮРИСТ: statutory exceptions to secrecy⟧',
+          'The content of consultations is covered by professional secrecy. Consultations are not recorded. Secrecy may be lifted only in cases provided for by law, in particular where keeping it endangers the life or health of the client or of other people.',
         ],
       },
       {
@@ -220,7 +220,7 @@ export const TERMS_DOCUMENTS: LegalDocumentSeed[] = [
       {
         heading: '9. Complaints',
         paragraphs: [
-          'Complaints can be sent to {{owner.email}}; we reply within 14 days. Out-of-court dispute resolution is described on the “Service provider information” page. ⟦ЮРИСТ: period⟧',
+          'Complaints can be sent to {{owner.email}}; we reply within 14 days. Out-of-court dispute resolution is described on the “Service provider information” page.',
         ],
       },
       {

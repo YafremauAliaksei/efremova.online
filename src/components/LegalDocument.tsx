@@ -17,9 +17,9 @@ import type { LegalDocumentView } from '@/lib/legal';
 
 const UI_TEXT = {
   pl: {
-    draftTitle: 'Wzór dokumentu — serwis w budowie',
+    draftTitle: 'To nie jest dokument prawny, a jedynie przykład',
     draftBody:
-      'Tekst przygotowano jako wzór przed weryfikacją prawną. Nie stanowi porady prawnej ani wiążącej informacji. Miejsca oznaczone ⟦…⟧ zostaną uzupełnione przed rozpoczęciem świadczenia usług.',
+      'Tekst pokazuje, jak będzie wyglądał dokument serwisu. Nie stanowi porady prawnej i nie wiąże ani usługodawcy, ani klientów. Ostateczną wersję przygotuje prawnik przed rozpoczęciem świadczenia usług.',
     version: 'Wersja dokumentu',
     updated: 'aktualizacja',
     otherLanguages: 'Wersje językowe',
@@ -33,9 +33,9 @@ const UI_TEXT = {
     unknown: 'Nie ma takiej wersji dokumentu. Obowiązująca wersja z dnia',
   },
   ru: {
-    draftTitle: 'Образец документа — сайт в разработке',
+    draftTitle: 'Это не юридический документ, а всего лишь пример',
     draftBody:
-      'Текст подготовлен как образец до проверки юристом. Не является юридической консультацией и не имеет обязательной силы. Места, отмеченные ⟦…⟧, будут заполнены до начала оказания услуг.',
+      'Текст показывает, как будет выглядеть документ сайта. Он не является юридической консультацией и не обязывает ни исполнителя, ни клиентов. Окончательную редакцию подготовит юрист до начала оказания услуг.',
     version: 'Версия документа',
     updated: 'обновлено',
     otherLanguages: 'Версии на других языках',
@@ -49,9 +49,9 @@ const UI_TEXT = {
     unknown: 'Такой редакции документа нет. Действующая редакция от',
   },
   en: {
-    draftTitle: 'Sample document — site under construction',
+    draftTitle: 'This is not a legal document, only an example',
     draftBody:
-      'This text is a sample prepared before legal review. It is not legal advice and is not binding. Places marked ⟦…⟧ will be completed before any services are provided.',
+      'This text shows what the site’s document will look like. It is not legal advice and binds neither the provider nor clients. A lawyer will prepare the final version before any services are provided.',
     version: 'Document version',
     updated: 'updated',
     otherLanguages: 'Other languages',
