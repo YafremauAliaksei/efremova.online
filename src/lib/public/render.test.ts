@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RenderableBlock } from '@/lib/blocks/registry';
+import type { LegalLookup, LegalRevisionLink } from '@/lib/legal';
 
 /**
  * Публичная страница — HTML без JavaScript из общего кэша Cloudflare (docs/14).
@@ -82,7 +83,8 @@ vi.mock('@/lib/content', () => ({
     ]),
 }));
 vi.mock('@/lib/testimonials/public', () => ({ getTestimonials: () => Promise.resolve([]) }));
-vi.mock('@/lib/legal', () => ({ getLegalDocument: () => Promise.resolve(null) }));
+let legal: LegalLookup = { kind: 'missing' };
+vi.mock('@/lib/legal', () => ({ getLegalDocument: () => Promise.resolve(legal) }));
 vi.mock('@/lib/db', () => ({
   db: {
     $queryRaw: () =>
@@ -103,13 +105,19 @@ function textBlock(title: string, body: string): RenderableBlock {
   };
 }
 
-async function page(locale: string, segments: string[], currency: string | null = null) {
-  const response = await publicPageResponse(locale, segments, currency);
+async function page(
+  locale: string,
+  segments: string[],
+  currency: string | null = null,
+  ver: string | null = null
+) {
+  const response = await publicPageResponse(locale, segments, currency, ver);
   return { response, html: await response.text() };
 }
 
 beforeEach(() => {
   databaseUp = true;
+  legal = { kind: 'missing' };
   profile = {};
   pages.clear();
   pages.set('home', { title: null, blocks: [textBlock('Witaj', 'Tekst')] });
@@ -277,5 +285,72 @@ describe('страницы со своим кодом', () => {
     expect(response.status).toBe(200);
     expect(html).toContain('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
     expect(html).toContain('noindex');
+  });
+});
+
+describe('редакции правового документа', () => {
+  const current: LegalRevisionLink = {
+    ver: '2026-06-11',
+    publishedAt: new Date('2026-06-11T10:00:00Z'),
+    isDraft: false,
+    isCurrent: true,
+  };
+  const old: LegalRevisionLink = {
+    ver: '2026-01-05',
+    publishedAt: new Date('2026-01-05T10:00:00Z'),
+    isDraft: true,
+    isCurrent: false,
+  };
+  const found = (shown: LegalRevisionLink): LegalLookup => ({
+    kind: 'found',
+    document: {
+      slug: 'privacy',
+      locale: 'pl',
+      version: `privacy-${shown.ver}`,
+      ver: shown.ver,
+      title: 'Polityka prywatności',
+      sections: [{ heading: 'Administrator', paragraphs: ['Tekst'] }],
+      isDraft: shown.isDraft,
+      publishedAt: shown.publishedAt,
+      isCurrent: shown.isCurrent,
+      current,
+      revisions: [current, old],
+      availableLocales: ['pl'],
+    },
+  });
+
+  it('без ?ver= — переброс на действующую, не в кэш', async () => {
+    legal = { kind: 'redirect', ver: current.ver };
+    const { response } = await page('pl', ['privacy']);
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('/pl/privacy?ver=2026-06-11');
+    expect(response.headers.get('cache-control')).toBe('no-store');
+  });
+
+  it('действующая: плашка с датой, список редакций, в индексе', async () => {
+    legal = found(current);
+    const { response, html } = await page('pl', ['privacy'], null, current.ver);
+    expect(response.status).toBe(200);
+    expect(html).toContain('Obowiązująca wersja z dnia 2026-06-11');
+    expect(html).toContain('href="/pl/privacy?ver=2026-01-05"');
+    expect(html).toContain('<link rel="canonical" href="https://efremova.online/pl/privacy"/>');
+    expect(html).not.toContain('noindex');
+  });
+
+  it('прежняя: плашка «устарела» со ссылкой на действующую, не в индекс', async () => {
+    legal = found(old);
+    const { response, html } = await page('pl', ['privacy'], null, old.ver);
+    expect(response.status).toBe(200);
+    expect(html).toContain('Ta wersja dokumentu jest nieaktualna');
+    expect(html).toContain('href="/pl/privacy?ver=2026-06-11"');
+    expect(html).toContain('noindex');
+  });
+
+  it('неизвестная редакция — 404 со ссылкой на действующую', async () => {
+    legal = { kind: 'unknownVersion', current };
+    const { response, html } = await page('pl', ['privacy'], null, '1999-01-01');
+    expect(response.status).toBe(404);
+    expect(html).toContain('Nie ma takiej wersji dokumentu');
+    expect(html).toContain('href="/pl/privacy?ver=2026-06-11"');
   });
 });
