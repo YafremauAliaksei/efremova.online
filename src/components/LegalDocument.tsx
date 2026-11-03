@@ -23,7 +23,7 @@ const UI_TEXT = {
     version: 'Wersja dokumentu',
     updated: 'aktualizacja',
     otherLanguages: 'Wersje językowe',
-    missing: 'Dokument nie został jeszcze wprowadzony do bazy danych.',
+    missing: 'Dokument jest chwilowo niedostępny.',
   },
   ru: {
     draftTitle: 'Образец документа — сайт в разработке',
@@ -32,7 +32,7 @@ const UI_TEXT = {
     version: 'Версия документа',
     updated: 'обновлено',
     otherLanguages: 'Версии на других языках',
-    missing: 'Документ ещё не заполнен в базе данных.',
+    missing: 'Документ временно недоступен.',
   },
   en: {
     draftTitle: 'Sample document — site under construction',
@@ -41,7 +41,7 @@ const UI_TEXT = {
     version: 'Document version',
     updated: 'updated',
     otherLanguages: 'Other languages',
-    missing: 'This document has not been added to the database yet.',
+    missing: 'This document is temporarily unavailable.',
   },
 } as const satisfies Record<Locale, Record<string, string>>;
 
@@ -143,7 +143,14 @@ export async function LegalDocument({
 export function LegalDocumentMissing({ locale }: { locale: Locale }) {
   return (
     <div className="rounded-lg border border-dashed border-[var(--color-line)] p-6 text-[var(--color-ink-soft)]">
-      {UI_TEXT[locale].missing} <code>npm run db:seed</code>
+      {UI_TEXT[locale].missing}
+      {/* Подсказка для разработчика — посетителю незачем знать устройство сайта */}
+      {process.env.NODE_ENV === 'development' && (
+        <>
+          {' '}
+          <code>npm run db:seed</code>
+        </>
+      )}
     </div>
   );
 }

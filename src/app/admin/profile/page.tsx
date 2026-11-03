@@ -155,25 +155,32 @@ async function saveProfile(formData: FormData) {
       })
     ).map((setting) => [setting.key, setting.value])
   );
+  // В рабочем режиме обязательное поле не стирается: переход в этот режим
+  // проверял, что все они заполнены, и стёртое поле появилось бы на
+  // проверенных юристом документах как «не заполнено»
+  const { status } = await getSiteProfile();
+  const writes = [];
   for (const field of PROFILE_FIELDS) {
     const raw = formData.get(field.key);
     if (typeof raw !== 'string') continue;
     const result = validateField(field.key, raw);
-    if (!result.ok) {
+    if (!result.ok || (status === 'live' && field.required && result.value === '')) {
       invalid.push(field.key);
       continue;
     }
     if ((before.get(field.key) ?? '') !== result.value) changed.push(field.key);
-    if (result.value === '') {
-      await db.siteSetting.deleteMany({ where: { key: field.key } });
-    } else {
-      await db.siteSetting.upsert({
-        where: { key: field.key },
-        create: { key: field.key, value: result.value },
-        update: { value: result.value },
-      });
-    }
+    writes.push(
+      result.value === ''
+        ? db.siteSetting.deleteMany({ where: { key: field.key } })
+        : db.siteSetting.upsert({
+            where: { key: field.key },
+            create: { key: field.key, value: result.value },
+            update: { value: result.value },
+          })
+    );
   }
+  // Одной транзакцией: сбой базы посреди формы не оставит половину полей старыми
+  await db.$transaction(writes);
   // Только имена полей: значения — данные владельца, им не место в журнале,
   // который нельзя чистить (src/lib/audit/actions.ts)
   if (changed.length > 0) await audit('profile.save', null, { fields: changed });
