@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { DEFAULT_LOCALE, isLocale, type Locale } from '@/lib/i18n';
 import { notFoundPage, resolvePublicPage } from '@/lib/public/pages';
 import type { PublicView } from '@/lib/public/view';
+import { relativeRedirect } from '@/lib/http/redirect';
 import {
   DEGRADED_CACHE_HEADERS,
   NOT_FOUND_CACHE_HEADERS,
@@ -37,13 +38,21 @@ export async function publicPageResponse(
   rawLocale: string,
   segments: readonly string[],
   /** Валюта цен из адреса (?currency=EUR); проверяется по списку валют с ценами */
-  currency: string | null = null
+  currency: string | null = null,
+  /** Редакция правового документа (?ver=2026-06-11) */
+  ver: string | null = null
 ): Promise<Response> {
   // Обработчик стоит под [locale], но язык всё равно из адреса: middleware
   // перебрасывает незнакомые языки, а сюда он мог прийти и в обход
   const locale = isLocale(rawLocale) ? rawLocale : null;
-  const view = locale === null ? null : await resolvePublicPage(locale, segments, currency);
-  const found = view !== null;
+  const resolved =
+    locale === null ? null : await resolvePublicPage(locale, segments, currency, ver);
+  if (resolved !== null && 'redirect' in resolved) {
+    // Действующая редакция меняется при публикации — переброс в кэш не кладём
+    return relativeRedirect(resolved.redirect, 307, { 'Cache-Control': 'no-store' });
+  }
+  const view = resolved;
+  const found = view !== null && view.status !== 404;
   const shownLocale = locale ?? DEFAULT_LOCALE;
 
   // <!DOCTYPE html> prerender ставит сам: корень разметки — <html>
