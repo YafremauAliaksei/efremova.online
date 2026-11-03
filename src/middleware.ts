@@ -30,6 +30,7 @@ import {
 } from '@/lib/security/headers';
 import { buildCanaryPayload, checkPathTrap, looksLikeLegitimateBot } from '@/lib/security/honeypot';
 import { siteUrl } from '@/lib/http/redirect';
+import { createFailureReporter, internalUrl, secretsEqual } from '@/lib/http/internal';
 import { isSameOriginRequest } from '@/lib/security/csrf';
 import { LOCALE_COOKIE, localeRedirectTarget, splitLocale } from '@/lib/i18n';
 import { createThrottle, throttleKey } from '@/lib/security/throttle';
@@ -68,6 +69,11 @@ const honeypotThrottle = createThrottle();
 /** Тот же приём для событий безопасности: поток отказов тоже бывает потоком */
 const eventThrottle = createThrottle();
 
+/** Сбой записи событий — в журнал контейнера, не чаще раза в минуту */
+const reportInternalFailure = createFailureReporter((message) => {
+  console.error(message);
+});
+
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
   const isDev = process.env.NODE_ENV === 'development';
@@ -85,11 +91,11 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   const userAgent = request.headers.get('user-agent') ?? '';
 
   // Легальный пентест по договору не должен спотыкаться о ловушки
-  const pentestToken = process.env.PENTEST_BYPASS_TOKEN;
-  const isAuthorizedPentest =
-    typeof pentestToken === 'string' &&
-    pentestToken.length > 0 &&
-    request.headers.get('x-pentest-token') === pentestToken;
+  // Сравнение за постоянное время: по скорости ответа токен не подбирается
+  const isAuthorizedPentest = await secretsEqual(
+    request.headers.get('x-pentest-token') ?? '',
+    process.env.PENTEST_BYPASS_TOKEN ?? ''
+  );
 
   if (process.env.HONEYPOT_ENABLED !== 'false' && !isAuthorizedPentest) {
     const hit = checkPathTrap(pathname);
@@ -325,7 +331,7 @@ async function reportHoneypotHit(
   hit: { trapId: string; trapType: string; scoreDelta: number },
   count: number
 ): Promise<void> {
-  await postInternal(request, '/api/internal/security/honeypot', {
+  await postInternal('/api/internal/security/honeypot', {
     trapId: hit.trapId,
     trapType: hit.trapType,
     scoreDelta: hit.scoreDelta,
@@ -347,7 +353,7 @@ async function reportSecurityEvent(
   count: number,
   details: Record<string, unknown>
 ): Promise<void> {
-  await postInternal(request, '/api/internal/security/event', {
+  await postInternal('/api/internal/security/event', {
     kind,
     severity,
     ip: clientIp(request),
@@ -358,13 +364,10 @@ async function reportSecurityEvent(
   });
 }
 
-async function postInternal(
-  request: NextRequest,
-  path: string,
-  payload: Record<string, unknown>
-): Promise<void> {
+async function postInternal(path: string, payload: Record<string, unknown>): Promise<void> {
   try {
-    await fetch(new URL(path, request.nextUrl.origin), {
+    // Не request.nextUrl.origin: за nginx это https://0.0.0.0:3000 (src/lib/http/internal.ts)
+    const response = await fetch(internalUrl(path, process.env.PORT), {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -373,18 +376,22 @@ async function postInternal(
       },
       body: JSON.stringify(payload),
     });
-  } catch {
-    // Молча: сбой записи события не должен ломать ответ пользователю.
-    // Потеря такого события отслеживается отдельно, по счётчику в мониторинге.
+    // Отказ обработчика (нет AUTH_SECRET, база упала) — та же потеря события
+    if (!response.ok) reportInternalFailure(path, `ответ ${String(response.status)}`);
+  } catch (error) {
+    // Ответ пользователю сбой не ломает, но и не молчит: потеря событий
+    // безопасности должна быть видна в журнале контейнера
+    reportInternalFailure(path, error);
   }
 }
 
 /**
  * Реальный IP клиента.
  *
- * ⚠️ Порядок важен. CF-Connecting-IP ставит сам Cloudflare и подделать его снаружи
- * нельзя — при условии, что firewall сервера принимает трафик ТОЛЬКО с IP-диапазонов
- * Cloudflare (см. infra/terraform). Без этого условия заголовку доверять нельзя.
+ * ⚠️ Порядок важен. CF-Connecting-IP подделать снаружи нельзя: входящих портов
+ * у сервера нет (туннель Cloudflare), а nginx перезаписывает заголовок адресом,
+ * который сам восстановил и только от cloudflared (infra/nginx/nginx.conf, real_ip).
+ * При запуске без nginx (разработка, e2e) заголовку доверять нельзя.
  */
 function clientIp(request: NextRequest): string {
   return (
