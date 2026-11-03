@@ -121,6 +121,7 @@ export async function processImage(
     // Поворот по EXIF до стирания метаданных: иначе фото «ляжет на бок».
     // Размеры после поворота известны из заголовка, распаковывать ради них не нужно
     const { width, height } = meta.autoOrient;
+    // AUDIT(input): чужой файл — тип по содержимому, потолок пикселей и размера; EXIF не сохраняется
     const oriented = sharp(input, { limitInputPixels: maxPixels, failOn: 'error' }).autoOrient();
 
     const variants: ImageVariant[] = [];

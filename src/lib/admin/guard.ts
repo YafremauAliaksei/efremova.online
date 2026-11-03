@@ -13,6 +13,7 @@ import { recordSecurityEvent } from '@/lib/security/recorder';
  * Сначала сессия, потом предел записей (src/lib/admin/limits.ts). Страницы
  * админки только читают и проверяют одну сессию — им предел не нужен.
  */
+// AUDIT(auth): каждое серверное действие админки вызывает это ПЕРВОЙ строкой — до любого чтения формы
 export async function requireAdminWrite(
   options: {
     /**
@@ -65,6 +66,7 @@ async function lockdown(sinceSession: number): Promise<void> {
 
 /** Размер базы в байтах: считает Postgres по файлам, а не перебором строк */
 async function databaseSize(): Promise<number> {
+  // AUDIT(sql): только шаблонная строка Prisma — параметры экранируются; $queryRawUnsafe и склейка строк запрещены
   const rows = await db.$queryRaw<{ bytes: bigint }[]>`
     SELECT pg_database_size(current_database()) AS bytes`;
   return Number(rows[0]?.bytes ?? 0);

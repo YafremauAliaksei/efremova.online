@@ -79,6 +79,7 @@ export async function saveUpload(bytes: Uint8Array, label: string): Promise<Uplo
 
 /** Сколько байт занимают все варианты, включая архив */
 async function storedMediaBytes(): Promise<number> {
+  // AUDIT(sql): только шаблонная строка Prisma — параметры экранируются; $queryRawUnsafe и склейка строк запрещены
   const rows = await db.$queryRaw<{ bytes: bigint | null }[]>`
     SELECT sum(octet_length(bytes)) AS bytes FROM media_variants`;
   return Number(rows[0]?.bytes ?? 0);

@@ -106,6 +106,7 @@ function linkFor(kind: ContactKind, raw: string): ContactLink | null {
  * затем почта и телефон. Пустое или испорченное значение пропускается —
  * лучше на одну кнопку меньше, чем кнопка, ведущая в никуда.
  */
+// AUDIT(html): href собирается только из проверенных значений (tel:, mailto:, https:) — без javascript: и data:
 export function contactLinks(values: Readonly<Record<string, string>>): ContactLink[] {
   const links: ContactLink[] = [];
   for (const kind of CONTACT_KINDS) {

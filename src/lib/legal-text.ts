@@ -58,6 +58,7 @@ export type LegalTextResult =
 
 const body = textField(LEGAL_TEXT_MAX_LENGTH, false);
 
+// AUDIT(html): документ хранится структурой, не разметкой — dangerouslySetInnerHTML не появляется
 export function parseLegalText(raw: unknown): LegalTextResult {
   if (typeof raw !== 'string') return { ok: false, error: { code: 'empty' } };
   if (raw.length > LEGAL_TEXT_MAX_LENGTH * 2) return { ok: false, error: { code: 'tooLong' } };
