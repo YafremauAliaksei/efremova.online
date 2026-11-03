@@ -45,5 +45,6 @@ export function isInternalRequest(request: Request): boolean {
   const a = createHash('sha256').update(provided).digest();
   const b = createHash('sha256').update(secret).digest();
 
+  // AUDIT(secret): пустой секрет не подходит никогда; сравнение хешей за постоянное время
   return timingSafeEqual(a, b);
 }

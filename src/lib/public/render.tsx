@@ -54,6 +54,7 @@ export async function publicPageResponse(
       () => false
     ),
   ]);
+  // AUDIT(cache): ответ ложится в общий кэш — в нём ничего от посетителя (cookie, страна, заголовки)
   return new Response(html, {
     status: found ? 200 : 404,
     headers: {
