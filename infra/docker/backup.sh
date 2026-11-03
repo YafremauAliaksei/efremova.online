@@ -100,4 +100,8 @@ if [ -n "${BACKUP_HEARTBEAT_URL:-}" ]; then
   curl -fsS -m 10 --retry 3 "${BACKUP_HEARTBEAT_URL}" > /dev/null || true
 fi
 
+# 5. Отметка для сторожа сервера (scripts/watchdog): время последнего
+#    успешного прохода. Старше суток — сторож пишет владельцу сам
+touch "${BACKUP_STATUS_DIR:-/status}/last-backup"
+
 echo "[$(date -u)] Резервное копирование завершено успешно"
