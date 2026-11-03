@@ -155,11 +155,57 @@ services:
     # Логи nginx удаляет задача rotate-logs.sh этого же контейнера
     volumes:
       - nginx-logs:/logs/nginx
+      - backup-status:/status # отметка успешного бэкапа — для сторожа
     depends_on:
       postgres: { condition: service_healthy }
     networks: [backend]
     security_opt: [no-new-privileges:true]
     logging: *default-logging
+
+  # ─────────────────────────── СТОРОЖ СЕРВЕРА ───────────────────────────
+  # Раз в минуту: сайт снаружи и изнутри, диск, память, нагрузка, свежесть
+  # бэкапа. Сбой — сообщение в Telegram / почту / ntfy, что задано в .env;
+  # раз в сутки — сводка; каждый круг — пульс в Healthchecks, который сам
+  # напишет владельцу, если умер весь сервер (scripts/watchdog, docs/16).
+  #
+  # Тот же закреплённый образ Node, что у сайта; кода сторожа в образе нет —
+  # папка смонтирована только для чтения. Доступа к Docker и к базе нет.
+  # Переменные — поимённо, не весь .env: секретов сайта сторож не видит
+  watchdog:
+    image: node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53
+    restart: unless-stopped
+    command: ['node', '/watchdog/watchdog.mjs']
+    user: node
+    working_dir: /watchdog
+    environment:
+      APP_URL: ${APP_URL:-}
+      WATCHDOG_NAME: ${WATCHDOG_NAME:-сервер}
+      ALERT_TELEGRAM_BOT_TOKEN: ${ALERT_TELEGRAM_BOT_TOKEN:-}
+      ALERT_TELEGRAM_CHAT_ID: ${ALERT_TELEGRAM_CHAT_ID:-}
+      ALERT_NTFY_URL: ${ALERT_NTFY_URL:-}
+      ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:-}
+      ALERT_EMAIL_FROM: ${ALERT_EMAIL_FROM:-}
+      ALERT_RESEND_API_KEY: ${ALERT_RESEND_API_KEY:-}
+      ALERT_HEARTBEAT_URL: ${ALERT_HEARTBEAT_URL:-}
+      WATCHDOG_DISK_PERCENT: ${WATCHDOG_DISK_PERCENT:-85}
+      WATCHDOG_MEMORY_PERCENT: ${WATCHDOG_MEMORY_PERCENT:-90}
+      WATCHDOG_LOAD_PER_CPU: ${WATCHDOG_LOAD_PER_CPU:-2}
+      WATCHDOG_SLOW_MS: ${WATCHDOG_SLOW_MS:-5000}
+      WATCHDOG_SUMMARY_HOUR_UTC: ${WATCHDOG_SUMMARY_HOUR_UTC:-7}
+    volumes:
+      - ./scripts/watchdog:/watchdog:ro
+      # Домашний каталог node есть в образе — новый том наследует его владельца
+      # (несуществующий каталог Docker создал бы от root, и записи бы не было)
+      - watchdog-state:/home/node
+      - backup-status:/status:ro
+    networks: [backend]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    logging: *default-logging
+    deploy:
+      resources:
+        limits: { cpus: '0.25', memory: 128M }
 
 networks:
   # Внутренняя сеть: наружу выхода нет вообще
@@ -174,3 +220,5 @@ volumes:
   certbot-certs:
   certbot-www:
   nginx-logs:
+  backup-status:
+  watchdog-state:
