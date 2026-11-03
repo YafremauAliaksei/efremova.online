@@ -40,6 +40,7 @@ const { channels, problems } = configuredChannels(env);
 const heartbeat = heartbeatUrl(env.ALERT_HEARTBEAT_URL);
 const publicUrl = siteHealthUrl(env.APP_URL);
 const internalUrl = 'http://app:3000/api/health';
+const nginxUrl = 'http://nginx:8081/healthz';
 
 /** @returns {Promise<{ status: number, ms: number, challenged: boolean } | { error: string }>} */
 async function probe(url) {
@@ -67,6 +68,9 @@ async function runChecks(now) {
     results.push(judgeHttp('public', 'Сайт снаружи', await probe(publicUrl), thresholds.slowMs));
   }
   results.push(judgeHttp('app', 'Приложение', await probe(internalUrl), thresholds.slowMs));
+  // nginx между туннелем и приложением: упал он — сайт снаружи недоступен,
+  // хотя приложение живо (порт 8081 только во внутренней сети, docs/15)
+  results.push(judgeHttp('nginx', 'nginx', await probe(nginxUrl), thresholds.slowMs));
 
   const disk = await statfs(STATE_DIR).then(diskUsedPercent, () => null);
   results.push(judgeLimit('disk', 'Диск', disk, thresholds.diskPercent, '%'));
