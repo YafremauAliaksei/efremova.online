@@ -149,25 +149,37 @@ services:
     logging: *default-logging
 
   # ─────────────────────────── БЭКАПЫ ───────────────────────────
-  # Ежедневно, зашифровано, в другую страну.
+  # Ежедневно, зашифровано, в три места: этот сервер, другой поставщик,
+  # офлайн-диск владельца (docs/17).
   # ⚠️ Бэкап без проверенного восстановления не считается бэкапом (docs/03)
   backup:
     build:
       context: ./infra/docker
       dockerfile: Dockerfile.backup
     restart: unless-stopped
-    env_file: .env
+    # Поимённо, не весь .env: секреты сайта (подпись сессий, 2FA, туннель)
+    # контейнеру бэкапов не нужны
     environment:
       PGHOST: postgres
       PGUSER: ${POSTGRES_USER}
       PGPASSWORD: ${POSTGRES_PASSWORD}
       PGDATABASE: ${POSTGRES_DB}
       BACKUP_SCHEDULE: '0 3 * * *'
+      BACKUP_LOCAL_DAYS: '14'
       BACKUP_RETENTION_DAYS: '30'
       NGINX_LOG_RETENTION_DAYS: '14'
+      BACKUP_AGE_PUBLIC_KEY: ${BACKUP_AGE_PUBLIC_KEY:-}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
+      AWS_ACCESS_KEY_ID: ${BACKUP_S3_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${BACKUP_S3_SECRET_ACCESS_KEY:-}
+      # Cloudflare R2 принимает «auto»; для B2 — регион бакета
+      AWS_DEFAULT_REGION: ${BACKUP_S3_REGION:-auto}
+      BACKUP_HEARTBEAT_URL: ${BACKUP_HEARTBEAT_URL:-}
     # Логи nginx удаляет задача rotate-logs.sh этого же контейнера
     volumes:
       - nginx-logs:/logs/nginx
+      - backups:/backups # копия на этом сервере — зашифрованная
       - backup-status:/status # отметка успешного бэкапа — для сторожа
     depends_on:
       postgres: { condition: service_healthy }
@@ -237,5 +249,6 @@ networks:
 volumes:
   postgres-data:
   nginx-logs:
+  backups:
   backup-status:
   watchdog-state:
