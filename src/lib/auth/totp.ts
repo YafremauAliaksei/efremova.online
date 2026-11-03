@@ -99,6 +99,7 @@ export function verifyTotp(
   for (const step of [now - 1, now, now + 1]) {
     const expected = Buffer.from(hotp(secret, step));
     // Сравнение в постоянном времени, и все три шага проверяются всегда
+    // AUDIT(secret): код — за постоянное время; использованный шаг не принимается повторно
     if (timingSafeEqual(expected, Buffer.from(clean)) && matched === null) matched = step;
   }
   if (matched === null) return null;

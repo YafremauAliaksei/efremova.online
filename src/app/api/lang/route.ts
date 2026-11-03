@@ -27,6 +27,7 @@ export function GET(request: Request): NextResponse {
     'Cache-Control': 'no-store',
     'X-Robots-Tag': 'noindex',
   });
+  // AUDIT(cookie): только код языка из белого списка; страницы от cookie не зависят (кэш)
   response.cookies.set(LOCALE_COOKIE, target.locale, {
     path: '/',
     maxAge: LOCALE_COOKIE_MAX_AGE,

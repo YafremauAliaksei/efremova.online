@@ -92,6 +92,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
   // Легальный пентест по договору не должен спотыкаться о ловушки
   // Сравнение за постоянное время: по скорости ответа токен не подбирается
+  // AUDIT(secret): сравнение токена — только за постоянное время
   const isAuthorizedPentest = await secretsEqual(
     request.headers.get('x-pentest-token') ?? '',
     process.env.PENTEST_BYPASS_TOKEN ?? ''
@@ -367,6 +368,7 @@ async function reportSecurityEvent(
 async function postInternal(path: string, payload: Record<string, unknown>): Promise<void> {
   try {
     // Не request.nextUrl.origin: за nginx это https://0.0.0.0:3000 (src/lib/http/internal.ts)
+    // AUDIT(net): только свой сервер (internalUrl разрешает лишь /api/internal/*) — в заголовке секрет
     const response = await fetch(internalUrl(path, process.env.PORT), {
       method: 'POST',
       headers: {

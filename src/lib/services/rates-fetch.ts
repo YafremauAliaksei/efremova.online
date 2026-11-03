@@ -45,6 +45,7 @@ const failedUntil = new Map<string, number>();
 
 async function fetchJson(url: string, fetchImpl: Fetch): Promise<unknown> {
   try {
+    // AUDIT(net): адрес — только зашитый в rates.ts; таймаут, лимит объёма, без переадресаций, ответ — по схеме
     const response = await fetchImpl(url, {
       redirect: 'error',
       signal: AbortSignal.timeout(TIMEOUT_MS),

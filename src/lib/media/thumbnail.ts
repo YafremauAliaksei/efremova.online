@@ -34,6 +34,7 @@ export async function fetchThumbnail(
   if (!isVideoId(id)) return null;
   for (const url of thumbnailUrls(id)) {
     try {
+      // AUDIT(net): только i.ytimg.com по id ролика; таймаут, лимит объёма, без переадресаций
       const response = await fetchImpl(url, {
         redirect: 'error',
         signal: AbortSignal.timeout(TIMEOUT_MS),
