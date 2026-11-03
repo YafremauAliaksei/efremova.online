@@ -131,10 +131,12 @@ export function looksLikeLegitimateBot(userAgent: string): boolean {
 export function checkPathTrap(pathname: string): TrapHit | null {
   const normalized = pathname.toLowerCase().replace(/\/+$/, '');
 
-  for (const [trapPath, score] of TRAP_PATHS) {
+  for (const [path, score] of TRAP_PATHS) {
+    // Ключ тоже в нижний регистр: «/.git/HEAD» иначе не совпадал никогда
+    const trapPath = path.toLowerCase();
     if (normalized === trapPath || normalized.startsWith(`${trapPath}/`)) {
       return {
-        trapId: trapPath,
+        trapId: path,
         trapType: 'PATH',
         scoreDelta: score,
         delayMs: randomDelay(2000, 5000),

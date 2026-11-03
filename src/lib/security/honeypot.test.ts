@@ -56,6 +56,12 @@ describe('ловушки по пути запроса', () => {
     expect(checkPathTrap('/wp-admin/setup.php')).not.toBeNull();
   });
 
+  it('ловушка с заглавными буквами в списке тоже срабатывает', () => {
+    // Путь приводится к нижнему регистру — ключ списка должен тоже
+    expect(checkPathTrap('/.git/HEAD')?.trapId).toBe('/.git/HEAD');
+    expect(checkPathTrap('/.git/head')).not.toBeNull();
+  });
+
   it('отвечает с задержкой — тормозит перебор', () => {
     const hit = checkPathTrap('/.env');
     expect(hit?.delayMs ?? 0).toBeGreaterThanOrEqual(1000);
