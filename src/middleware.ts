@@ -382,9 +382,10 @@ async function postInternal(
 /**
  * Реальный IP клиента.
  *
- * ⚠️ Порядок важен. CF-Connecting-IP ставит сам Cloudflare и подделать его снаружи
- * нельзя — при условии, что firewall сервера принимает трафик ТОЛЬКО с IP-диапазонов
- * Cloudflare (см. infra/terraform). Без этого условия заголовку доверять нельзя.
+ * ⚠️ Порядок важен. CF-Connecting-IP подделать снаружи нельзя: входящих портов
+ * у сервера нет (туннель Cloudflare), а nginx перезаписывает заголовок адресом,
+ * который сам восстановил и только от cloudflared (infra/nginx/nginx.conf, real_ip).
+ * При запуске без nginx (разработка, e2e) заголовку доверять нельзя.
  */
 function clientIp(request: NextRequest): string {
   return (
