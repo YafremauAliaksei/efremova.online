@@ -107,6 +107,7 @@ export async function createAdminSession(): Promise<void> {
     .sign(secretKey());
 
   const cookieStore = await cookies();
+  // AUDIT(cookie): сессия — __Host-, httpOnly, secure, короткий срок; ослаблять нельзя
   cookieStore.set(adminCookieName(), token, {
     httpOnly: true,
     // Префикс __Host- требует secure=true и работает только по HTTPS.
@@ -226,6 +227,7 @@ export async function createPendingSecondFactor(): Promise<void> {
   attempts.set(jti, 0);
 
   const cookieStore = await cookies();
+  // AUDIT(cookie): пропуск ко второму фактору — httpOnly, secure, минуты жизни
   cookieStore.set(pendingCookieName(), token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',

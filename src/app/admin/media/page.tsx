@@ -81,6 +81,7 @@ export default async function MediaAdminPage({ searchParams }: PageProps) {
     },
   });
   // Сколько весят все варианты — граница пересмотра хранения в базе
+  // AUDIT(sql): только шаблонная строка Prisma — параметры экранируются; $queryRawUnsafe и склейка строк запрещены
   const [{ total }] = await db.$queryRaw<[{ total: bigint | null }]>`
     SELECT SUM(octet_length(bytes))::bigint AS total FROM media_variants`;
   const totalMb = Number(total ?? 0n) / MB;

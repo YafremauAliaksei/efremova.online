@@ -1,9 +1,13 @@
-import { LegalDocument, LegalDocumentMissing } from '@/components/LegalDocument';
+import {
+  LegalDocument,
+  LegalDocumentMissing,
+  LegalVersionUnknown,
+} from '@/components/LegalDocument';
 import { SiteFooter } from '@/components/SiteFooter';
-import type { Locale } from '@/lib/i18n';
+import { localizedPath, type Locale } from '@/lib/i18n';
 import { getLegalDocument, type LegalSlug } from '@/lib/legal';
 import { messages, type Messages } from '@/lib/messages';
-import type { PublicView } from '@/lib/public/view';
+import type { PublicRedirect, PublicView } from '@/lib/public/view';
 
 /**
  * Страница правового документа — одна на все документы.
@@ -70,9 +74,18 @@ export const LEGAL_PAGES: readonly LegalPageOptions[] = [
   },
 ];
 
-export async function legalPage(options: LegalPageOptions, locale: Locale): Promise<PublicView> {
+export async function legalPage(
+  options: LegalPageOptions,
+  locale: Locale,
+  ver: string | null
+): Promise<PublicView | PublicRedirect> {
   const { slug, path, navKey, description } = options;
-  const document = await getLegalDocument(slug, locale);
+  const lookup = await getLegalDocument(slug, locale, ver);
+  if (lookup.kind === 'redirect') {
+    // Адрес с редакцией: сохранённая ссылка и через год откроет тот же текст
+    return { redirect: `${localizedPath(locale, path)}?ver=${encodeURIComponent(lookup.ver)}` };
+  }
+  const document = lookup.kind === 'found' ? lookup.document : null;
 
   return {
     meta: {
@@ -81,14 +94,23 @@ export async function legalPage(options: LegalPageOptions, locale: Locale): Prom
       path,
       // Перевода нет и показан польский текст — каноническая страница польская
       canonicalLocale: document?.locale ?? locale,
+      // Прежние редакции и «нет такой» в поиске не нужны: ищут действующую
+      noindex: lookup.kind === 'unknownVersion' || (document !== null && !document.isCurrent),
     },
+    ...(lookup.kind === 'unknownVersion' ? { status: 404 as const } : {}),
     body: (
       <>
         <main id="main" className="mx-auto max-w-3xl px-6 py-16">
-          {document === null ? (
-            <LegalDocumentMissing locale={locale} />
+          {lookup.kind === 'found' ? (
+            <LegalDocument document={lookup.document} path={path} />
+          ) : lookup.kind === 'unknownVersion' ? (
+            <LegalVersionUnknown
+              locale={locale}
+              href={`${localizedPath(locale, path)}?ver=${encodeURIComponent(lookup.current.ver)}`}
+              date={lookup.current.publishedAt}
+            />
           ) : (
-            <LegalDocument document={document} path={path} />
+            <LegalDocumentMissing locale={locale} />
           )}
         </main>
         <SiteFooter locale={locale} />

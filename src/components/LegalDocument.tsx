@@ -17,31 +17,52 @@ import type { LegalDocumentView } from '@/lib/legal';
 
 const UI_TEXT = {
   pl: {
-    draftTitle: 'Wzór dokumentu — serwis w budowie',
+    draftTitle: 'To nie jest dokument prawny, a jedynie przykład',
     draftBody:
-      'Tekst przygotowano jako wzór przed weryfikacją prawną. Nie stanowi porady prawnej ani wiążącej informacji. Miejsca oznaczone ⟦…⟧ zostaną uzupełnione przed rozpoczęciem świadczenia usług.',
+      'Tekst pokazuje, jak będzie wyglądał dokument serwisu. Nie stanowi porady prawnej i nie wiąże ani usługodawcy, ani klientów. Ostateczną wersję przygotuje prawnik przed rozpoczęciem świadczenia usług.',
     version: 'Wersja dokumentu',
     updated: 'aktualizacja',
     otherLanguages: 'Wersje językowe',
     missing: 'Dokument jest chwilowo niedostępny.',
+    current: 'Obowiązująca wersja z dnia',
+    outdated: 'Ta wersja dokumentu jest nieaktualna. Obowiązująca wersja z dnia',
+    open: 'otwórz',
+    history: 'Wszystkie wersje dokumentu',
+    currentTag: 'obowiązująca',
+    draftTag: 'projekt',
+    unknown: 'Nie ma takiej wersji dokumentu. Obowiązująca wersja z dnia',
   },
   ru: {
-    draftTitle: 'Образец документа — сайт в разработке',
+    draftTitle: 'Это не юридический документ, а всего лишь пример',
     draftBody:
-      'Текст подготовлен как образец до проверки юристом. Не является юридической консультацией и не имеет обязательной силы. Места, отмеченные ⟦…⟧, будут заполнены до начала оказания услуг.',
+      'Текст показывает, как будет выглядеть документ сайта. Он не является юридической консультацией и не обязывает ни исполнителя, ни клиентов. Окончательную редакцию подготовит юрист до начала оказания услуг.',
     version: 'Версия документа',
     updated: 'обновлено',
     otherLanguages: 'Версии на других языках',
     missing: 'Документ временно недоступен.',
+    current: 'Действующая редакция от',
+    outdated: 'Эта редакция документа устарела. Действующая редакция от',
+    open: 'открыть',
+    history: 'Все редакции документа',
+    currentTag: 'действующая',
+    draftTag: 'проект',
+    unknown: 'Такой редакции документа нет. Действующая редакция от',
   },
   en: {
-    draftTitle: 'Sample document — site under construction',
+    draftTitle: 'This is not a legal document, only an example',
     draftBody:
-      'This text is a sample prepared before legal review. It is not legal advice and is not binding. Places marked ⟦…⟧ will be completed before any services are provided.',
+      'This text shows what the site’s document will look like. It is not legal advice and binds neither the provider nor clients. A lawyer will prepare the final version before any services are provided.',
     version: 'Document version',
     updated: 'updated',
     otherLanguages: 'Other languages',
     missing: 'This document is temporarily unavailable.',
+    current: 'Current version of',
+    outdated: 'This version of the document is out of date. Current version of',
+    open: 'open',
+    history: 'All versions of the document',
+    currentTag: 'current',
+    draftTag: 'draft',
+    unknown: 'There is no such version of the document. Current version of',
   },
 } as const satisfies Record<Locale, Record<string, string>>;
 
@@ -99,6 +120,29 @@ export async function LegalDocument({
         </nav>
       )}
 
+      {/* Какая это редакция: ссылку с ?ver= человек сохраняет как «тот самый договор» */}
+      {document.isCurrent ? (
+        <p
+          role="status"
+          className="mt-6 rounded-lg border border-[var(--color-line)] p-4 text-sm text-[var(--color-ink-soft)]"
+        >
+          {`${t.current} ${day(document.publishedAt)}.`}
+        </p>
+      ) : (
+        <p
+          role="alert"
+          className="mt-6 rounded-lg border border-[var(--color-warning)] bg-[#fdf8f0] p-4 text-sm"
+        >
+          {`${t.outdated} ${day(document.current.publishedAt)}: `}
+          <a
+            href={revisionHref(document.locale, path, document.current.ver)}
+            className="font-medium underline underline-offset-4"
+          >
+            {t.open}
+          </a>
+        </p>
+      )}
+
       {isSample && (
         <div
           role="note"
@@ -136,7 +180,65 @@ export async function LegalDocument({
           )}
         </section>
       ))}
+
+      <section className="mt-12 border-t border-[var(--color-line)] pt-6">
+        <h2 className="text-lg font-semibold">{t.history}</h2>
+        <ul className="mt-3 space-y-1 text-sm text-[var(--color-ink-soft)]">
+          {document.revisions.map((revision) => {
+            const label =
+              revision.ver === day(revision.publishedAt)
+                ? revision.ver
+                : `${day(revision.publishedAt)} (${revision.ver})`;
+            return (
+              <li key={revision.ver}>
+                {revision.ver === document.ver ? (
+                  <strong aria-current="page">{label}</strong>
+                ) : (
+                  <a
+                    href={revisionHref(document.locale, path, revision.ver)}
+                    className="underline underline-offset-4"
+                  >
+                    {label}
+                  </a>
+                )}
+                {revision.isCurrent && ` — ${t.currentTag}`}
+                {revision.isDraft && ` · ${t.draftTag}`}
+              </li>
+            );
+          })}
+        </ul>
+      </section>
     </article>
+  );
+}
+
+/** Дата редакции, UTC */
+function day(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function revisionHref(locale: Locale, path: string, ver: string): string {
+  return `${localizedPath(locale, path)}?ver=${encodeURIComponent(ver)}`;
+}
+
+/** Ссылка на несуществующую редакцию: не молча подменять, а сказать и дать действующую */
+export function LegalVersionUnknown({
+  locale,
+  href,
+  date,
+}: {
+  locale: Locale;
+  href: string;
+  date: Date;
+}) {
+  const t = UI_TEXT[locale];
+  return (
+    <p role="alert" className="rounded-lg border border-[var(--color-warning)] bg-[#fdf8f0] p-6">
+      {`${t.unknown} ${day(date)}: `}
+      <a href={href} className="font-medium underline underline-offset-4">
+        {t.open}
+      </a>
+    </p>
   );
 }
 

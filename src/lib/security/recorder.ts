@@ -86,6 +86,7 @@ function pruneWindow(nowMs: number): number {
  * Ошибки не выбрасываются наружу: сбой записи события не должен превращаться
  * в сбой ответа посетителю. Но и молчать нельзя — сбой уходит в лог сервера.
  */
+// AUDIT(pii): IP и User-Agent посетителя — строка в карте ПД (docs/03 п.11), срок 60 дней, уборка в maybeCleanup
 export async function recordHoneypotHit(record: HoneypotRecord): Promise<void> {
   const now = new Date();
   const ipKey = record.ip ?? 'unknown';

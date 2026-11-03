@@ -9,7 +9,7 @@ import { HOME_SLUG, isFreePageSlug } from '@/lib/blocks/pages';
 import { getPriceArchive, getServices } from '@/lib/content';
 import { LOCALE_TAGS, localizedPath, type Locale } from '@/lib/i18n';
 import { messages } from '@/lib/messages';
-import type { PublicView } from '@/lib/public/view';
+import type { PublicRedirect, PublicView } from '@/lib/public/view';
 import { formatPrice } from '@/lib/services/edit';
 import { getSiteProfile } from '@/lib/site-profile';
 import { getTestimonials } from '@/lib/testimonials/public';
@@ -27,12 +27,16 @@ import { isVideoId, youtubeWatchUrl } from '@/lib/video';
  * currency — валюта цен из адреса (?currency=EUR, задача 9a). Кроме языка,
  * пути и этой валюты отрисовка не знает о запросе ничего: страница лежит
  * в общем кэше, и Cloudflare кэширует адрес вместе с параметром.
+ *
+ * ver — редакция правового документа (?ver=2026-06-11); документ без неё
+ * перебрасывает на действующую (src/lib/legal.ts).
  */
 export async function resolvePublicPage(
   locale: Locale,
   segments: readonly string[],
-  currency: string | null = null
-): Promise<PublicView | null> {
+  currency: string | null = null,
+  ver: string | null = null
+): Promise<PublicView | PublicRedirect | null> {
   const [first, ...rest] = segments;
   if (first === undefined) return blockPage(HOME_SLUG, locale, currency);
 
@@ -47,7 +51,7 @@ export async function resolvePublicPage(
   if (first === 'services') return servicesPage(locale, currency);
   if (first === 'testimonials') return testimonialsPage(locale);
   const legal = LEGAL_PAGES.find((page) => page.path === `/${first}`);
-  if (legal !== undefined) return legalPage(legal, locale);
+  if (legal !== undefined) return legalPage(legal, locale, ver);
 
   if (!isFreePageSlug(first) || first === HOME_SLUG) return null;
   return blockPage(first, locale, currency);

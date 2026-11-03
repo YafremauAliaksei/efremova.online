@@ -12,7 +12,8 @@ export async function GET(
   { params }: { params: Promise<{ locale: string; path: string[] }> }
 ): Promise<Response> {
   const { locale, path } = await params;
-  // Из запроса — только валюта цен: страница лежит в общем кэше (docs/14)
-  const currency = new URL(request.url).searchParams.get('currency');
-  return publicPageResponse(locale, path, currency);
+  // Из запроса — только валюта цен и редакция документа: страница лежит в
+  // общем кэше (docs/14), Cloudflare кэширует адрес вместе с параметрами
+  const query = new URL(request.url).searchParams;
+  return publicPageResponse(locale, path, query.get('currency'), query.get('ver'));
 }

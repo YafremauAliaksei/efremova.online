@@ -612,8 +612,12 @@ test('правовой документ: новая редакция, ошибк
 
   const site = await admin.context().newPage();
   await site.goto(`/pl/privacy#e2e-${RUN}`);
+  // Адрес документа всегда с редакцией: ссылку можно сохранить «на тот самый текст»
+  await expect(site).toHaveURL(/\/pl\/privacy\?ver=\d{4}-\d{2}-\d{2}/);
+  const published = site.url();
   await expect(site.locator(`#e2e-${RUN}`)).toContainText(`Akapit testowy ${RUN}`);
   await expect(site.locator('article')).toContainText(/privacy-\d{4}-\d{2}-\d{2}/);
+  await expect(site.locator('article [role=status]')).toContainText('Obowiązująca wersja');
 
   // Вернуть прежнюю: её текст публикуется новой редакцией, история растёт
   const history = admin.locator('main section li');
@@ -621,8 +625,12 @@ test('правовой документ: новая редакция, ошибк
   await history.nth(1).getByRole('button', { name: 'Вернуть этот текст' }).click();
   await saved(admin, 'Прежний текст опубликован');
   await expect(history).toHaveCount(before + 1);
-  await site.reload();
+  await site.goto('/pl/privacy');
   await expect(site.locator(`#e2e-${RUN}`)).toHaveCount(0);
+  // Сохранённая ссылка открывает тот же текст — с плашкой «устарела»
+  await site.goto(published);
+  await expect(site.locator(`#e2e-${RUN}`)).toContainText(`Akapit testowy ${RUN}`);
+  await expect(site.locator('article [role=alert]')).toContainText('nieaktualna');
   await site.close();
 
   await admin.goto('/admin/journal');

@@ -21,6 +21,7 @@ let cached: string | null = null;
 export function stylesheetHref(): string {
   if (cached !== null && process.env.NODE_ENV === 'production') return cached;
   try {
+    // AUDIT(fs): путь только из констант — ни части из запроса или базы
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- путь собран из констант, ничего извне в нём нет
     const css = readFileSync(join(process.cwd(), 'public', 'site.css'));
     const version = createHash('sha256').update(css).digest('hex').slice(0, 12);
