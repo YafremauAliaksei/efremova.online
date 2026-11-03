@@ -38,17 +38,20 @@ provider "cloudflare" {
 
 # ─────────────────────────────── DNS ───────────────────────────────
 
-# proxied = true — ключевая настройка. Она означает: трафик идёт ЧЕРЕЗ
-# Cloudflare, реальный IP сервера снаружи не виден, DDoS гасится у них.
-# Если поставить false — сервер окажется голым в интернете.
+# Сайт подключён туннелем Cloudflare (docs/15): запись указывает не на IP
+# сервера, а на туннель — IP нигде не публикуется, и переезд ноутбук → VPS
+# DNS не меняет. proxied = true обязателен: без него туннель не работает.
+#
+# ⚠️ Если туннель создан в панели с «Public hostname», панель сама заводит
+# эту запись — тогда импортировать её (terraform import), а не создавать.
 resource "cloudflare_record" "root" {
   zone_id = var.cloudflare_zone_id
   name    = "@"
-  content = var.server_ip
-  type    = "A"
+  content = "${var.cloudflare_tunnel_id}.cfargotunnel.com"
+  type    = "CNAME"
   proxied = true
   ttl     = 1 # 1 = автоматический, обязателен при proxied
-  comment = "Основной сервер, Hetzner"
+  comment = "Туннель Cloudflare к серверу сайта"
 }
 
 resource "cloudflare_record" "www" {

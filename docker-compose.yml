@@ -101,39 +101,52 @@ services:
     logging: *default-logging
 
   # ─────────────────────────── NGINX ───────────────────────────
-  # Единственный сервис, видимый из интернета
+  # Наружу не открыт: на хосте ни одного порта. Запросы приходят только
+  # из туннеля Cloudflare (сервис cloudflared ниже) по внутренней сети edge
   nginx:
     image: nginx:1.31-alpine@sha256:df221db836e1754089190208cee7eeda94f233197056426eda74a43ab1abeac2
     restart: unless-stopped
-    ports:
-      - '80:80'
-      - '443:443'
     volumes:
       - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./infra/nginx/conf.d:/etc/nginx/conf.d:ro
       - ./infra/nginx/proxy_params.conf:/etc/nginx/proxy_params.conf:ro
-      - ./infra/nginx/cloudflare-ips.conf:/etc/nginx/cloudflare-ips.conf:ro
-      - certbot-certs:/etc/letsencrypt:ro
-      - certbot-www:/var/www/certbot:ro
       - nginx-logs:/var/log/nginx
     depends_on:
       app: { condition: service_healthy }
-    networks: [backend, frontend]
+    networks:
+      backend: {}
+      edge:
+        ipv4_address: 172.30.0.3
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8081/healthz']
+      interval: 30s
+      timeout: 5s
+      retries: 3
     security_opt: [no-new-privileges:true]
     logging: *default-logging
 
-  # ─────────────────────────── SSL-СЕРТИФИКАТЫ ───────────────────────────
-  # Обновляются автоматически каждые 12 часов. Let's Encrypt, бесплатно.
-  certbot:
+  # ─────────────────────────── ТУННЕЛЬ CLOUDFLARE ───────────────────────────
+  # Единственный вход из интернета — и тот исходящий: cloudflared сам
+  # подключается к Cloudflare, входящих портов на сервере нет вовсе.
+  # Реальный IP сервера не виден, зайти «мимо Cloudflare» нельзя, TLS и
+  # сертификаты — забота Cloudflare. Токен туннеля — из панели Cloudflare
+  # (docs/15-server-runbook.md), хранится только в .env на сервере
+  cloudflared:
     # Закреплён по хешу: :latest на боевом сервере — чужой код без проверки
-    image: certbot/certbot:v5.8.0@sha256:f70ad0adbb7e117f0fe42a63c553f28ea451edabc0148757b6efcd9735acaa20
+    image: cloudflare/cloudflared:2026.10.1@sha256:a15a3b50b8dabd57ac2090e9484c0247dba9dfa1f0df4d298d4317f9d69eb2d5
     restart: unless-stopped
-    volumes:
-      - certbot-certs:/etc/letsencrypt
-      - certbot-www:/var/www/certbot
-    entrypoint: /bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done;'
+    command: ['tunnel', '--no-autoupdate', 'run']
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?CLOUDFLARE_TUNNEL_TOKEN не задан в .env}
+    depends_on:
+      nginx: { condition: service_healthy }
+    networks:
+      edge:
+        ipv4_address: 172.30.0.2
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     logging: *default-logging
-    networks: [backend]
 
   # ─────────────────────────── БЭКАПЫ ───────────────────────────
   # Ежедневно, зашифровано, в другую страну.
@@ -162,15 +175,19 @@ services:
     logging: *default-logging
 
 networks:
-  # Внутренняя сеть: наружу выхода нет вообще
+  # Сеть сервисов. Не internal: приложению нужен исходящий доступ (курсы
+  # валют, обложки YouTube). Входящего с хоста нет — портов не открыто
   backend:
     driver: bridge
     internal: false
-  frontend:
+  # Туннель ↔ nginx. Адреса фиксированы: nginx доверяет заголовку с IP
+  # посетителя только от cloudflared (infra/nginx/nginx.conf, set_real_ip_from)
+  edge:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/29
 
 volumes:
   postgres-data:
-  certbot-certs:
-  certbot-www:
   nginx-logs:
