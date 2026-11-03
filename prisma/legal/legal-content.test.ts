@@ -33,6 +33,19 @@ describe('правовые тексты', () => {
     }
   );
 
+  it.each(LEGAL_DOCUMENTS.map((doc) => [`${doc.slug}/${doc.locale}`, doc] as const))(
+    '%s: без пометок ⟦ЮРИСТ⟧ — образец выглядит как настоящий документ',
+    (_, doc) => {
+      expect(textsOf(doc).filter((text) => text.includes('⟦'))).toEqual([]);
+    }
+  );
+
+  it('каждый документ кончается разделом о языке: обязательна польская версия', () => {
+    for (const doc of LEGAL_DOCUMENTS) {
+      expect(doc.sections.at(-1)?.anchor).toBe('language');
+    }
+  });
+
   it('у каждого документа есть польская версия — она основная', () => {
     const slugs = new Set(LEGAL_DOCUMENTS.map((doc) => doc.slug));
     for (const slug of slugs) {

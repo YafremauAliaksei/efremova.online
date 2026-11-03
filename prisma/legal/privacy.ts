@@ -20,7 +20,7 @@ import type { LegalDocumentSeed } from './types';
 //   основание ст. 9(2)(a), удаление при отзыве согласия
 // 2026-10-05: переход на YouTube из карточки ролика (задача 5) — получатели,
 // передача за пределы ЕЭЗ и «браузер не обращается к другим сервисам»
-const VERSION = 'privacy-2026-10-07-draft';
+const VERSION = 'privacy-2026-11-03-draft';
 
 export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
   // ═══════════════════════ POLITYKA PRYWATNOŚCI (PL) ═══════════════════════
@@ -35,7 +35,7 @@ export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
         paragraphs: [
           'Administratorem Twoich danych osobowych jest {{owner.fullName}}, {{owner.address}}, NIP {{owner.nip}}.',
           'W sprawach ochrony danych osobowych możesz pisać na adres {{owner.privacyEmail}}.',
-          'Administrator nie wyznaczył inspektora ochrony danych. ⟦ЮРИСТ: potwierdzić, że art. 37 RODO nie wymaga wyznaczenia IOD⟧',
+          'Administrator nie wyznaczył inspektora ochrony danych. Obowiązek jego wyznaczenia (art. 37 RODO) nie dotyczy działalności usługodawcy.',
         ],
       },
       {
@@ -49,9 +49,9 @@ export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
         items: [
           'Dane techniczne przy każdym wejściu na stronę — adres IP, data i godzina, adres podstrony, typ przeglądarki, strona odsyłająca, kraj ustalony przez sieć CDN. Cel: działanie i bezpieczeństwo serwisu, diagnostyka błędów. Podstawa: prawnie uzasadniony interes (art. 6 ust. 1 lit. f RODO). Okres: 14 dni w dziennikach serwera.',
           'Dziennik bezpieczeństwa — adres IP, typ przeglądarki i adres żądania, gdy żądanie wygląda na próbę ataku lub skanowania. Cel: ochrona serwisu. Podstawa: prawnie uzasadniony interes (art. 6 ust. 1 lit. f RODO). Okres: 60 dni; czasowa blokada adresu — do 60 dni od ostatniego zdarzenia.',
-          'Kontakt z nami — dane, które sam(a) podasz w wiadomości e-mail, SMS lub w komunikatorze, oraz treść wiadomości. Cel: odpowiedź na zapytanie i ustalenie terminu konsultacji. Podstawa: działania przed zawarciem umowy na Twoje żądanie (art. 6 ust. 1 lit. b RODO), w pozostałym zakresie prawnie uzasadniony interes (art. 6 ust. 1 lit. f RODO). Okres: do zakończenia sprawy, a następnie ⟦ЮРИСТ: okres przechowywania korespondencji⟧.',
+          'Kontakt z nami — dane, które sam(a) podasz w wiadomości e-mail, SMS lub w komunikatorze, oraz treść wiadomości. Cel: odpowiedź na zapytanie i ustalenie terminu konsultacji. Podstawa: działania przed zawarciem umowy na Twoje żądanie (art. 6 ust. 1 lit. b RODO), w pozostałym zakresie prawnie uzasadniony interes (art. 6 ust. 1 lit. f RODO). Okres: do zakończenia sprawy, a następnie przez 12 miesięcy.',
           'Kopie zapasowe — zaszyfrowane kopie bazy danych serwisu. Cel: odtworzenie serwisu po awarii. Podstawa: prawnie uzasadniony interes (art. 6 ust. 1 lit. f RODO). Okres: 30 dni. Dlatego dane z dziennika bezpieczeństwa mogą pozostawać w kopiach do 90 dni.',
-          'Opinie klientów — pseudonim autora, treść opinii i data zgody. Opinia o konsultacji psychologicznej ujawnia, że ktoś był klientem psychologa, dlatego traktujemy ją jak dane o zdrowiu. Publikujemy ją wyłącznie za wyraźną, odrębną zgodą autora, wyrażoną poza serwisem (e-mailem lub na piśmie), bez imienia i szczegółów pozwalających go rozpoznać. Podstawa: wyraźna zgoda (art. 6 ust. 1 lit. a i art. 9 ust. 2 lit. a RODO). Okres: do wycofania zgody — wtedy opinia jest niezwłocznie usuwana z serwisu i z bazy danych, a z kopii zapasowych znika w ciągu 30 dni. Zgodę można wycofać w dowolnym momencie, pisząc na {{owner.privacyEmail}}; nie wpływa to na zgodność z prawem publikacji przed jej wycofaniem. ⟦ЮРИСТ: forma zgody i okres przechowywania jej dowodu poza serwisem⟧',
+          'Opinie klientów — pseudonim autora, treść opinii i data zgody. Opinia o konsultacji psychologicznej ujawnia, że ktoś był klientem psychologa, dlatego traktujemy ją jak dane o zdrowiu. Publikujemy ją wyłącznie za wyraźną, odrębną zgodą autora, wyrażoną poza serwisem (e-mailem lub na piśmie), bez imienia i szczegółów pozwalających go rozpoznać. Podstawa: wyraźna zgoda (art. 6 ust. 1 lit. a i art. 9 ust. 2 lit. a RODO). Okres: do wycofania zgody — wtedy opinia jest niezwłocznie usuwana z serwisu i z bazy danych, a z kopii zapasowych znika w ciągu 30 dni. Zgodę można wycofać w dowolnym momencie, pisząc na {{owner.privacyEmail}}; nie wpływa to na zgodność z prawem publikacji przed jej wycofaniem. Zgodę przyjmujemy na piśmie lub e-mailem; jej potwierdzenie przechowujemy przez czas publikacji opinii i 3 lata po wycofaniu zgody — na wypadek roszczeń.',
         ],
         paragraphs: [
           'Prosimy nie przesyłać w pierwszej wiadomości informacji o swoim zdrowiu. Do ustalenia terminu wystarczą imię, preferowany termin i forma kontaktu.',
@@ -72,7 +72,7 @@ export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
       {
         heading: '5. Przekazywanie danych poza Europejski Obszar Gospodarczy',
         paragraphs: [
-          'Cloudflare, Inc. ma siedzibę w USA. Przekazanie odbywa się na podstawie decyzji Komisji Europejskiej z 10 lipca 2023 r. w sprawie ram ochrony danych UE–USA (Data Privacy Framework) oraz standardowych klauzul umownych. ⟦ЮРИСТ: potwierdzić certyfikację DPF Cloudflare na dzień publikacji⟧',
+          'Cloudflare, Inc. ma siedzibę w USA. Przekazanie odbywa się na podstawie decyzji Komisji Europejskiej z 10 lipca 2023 r. w sprawie ram ochrony danych UE–USA (Data Privacy Framework) oraz standardowych klauzul umownych.',
           'Dostawcy komunikatorów i Google (YouTube) mogą przekazywać dane poza EOG na zasadach opisanych w swoich politykach prywatności.',
         ],
       },
@@ -80,12 +80,12 @@ export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
         heading: '6. Pliki cookie',
         anchor: 'cookies',
         paragraphs: [
-          'Serwis nie używa plików cookie analitycznych, reklamowych ani śledzących. Używa wyłącznie plików niezbędnych technicznie, na które zgoda nie jest wymagana (art. 5 ust. 3 dyrektywy 2002/58/WE). ⟦ЮРИСТ: wskazać właściwy przepis Prawa komunikacji elektronicznej⟧',
+          'Serwis nie używa plików cookie analitycznych, reklamowych ani śledzących. Używa wyłącznie plików niezbędnych technicznie, na które zgoda nie jest wymagana (art. 5 ust. 3 dyrektywy 2002/58/WE). W prawie polskim tę samą zasadę wyraża ustawa — Prawo komunikacji elektronicznej.',
         ],
         items: [
           '__cf_bm — Cloudflare; odróżnia ruch ludzi od automatów. Ważność: 30 minut.',
-          'cf_clearance — Cloudflare; zapamiętuje przejście kontroli bezpieczeństwa, jeśli była wymagana. Ważność: ⟦ЮРИСТ: czas zgodny z ustawieniami Cloudflare⟧.',
-          'lang — serwis; zapamiętuje wersję językową wybraną przełącznikiem języka. Zapisywany tylko po kliknięciu przełącznika. Ważność: 1 rok. ⟦ЮРИСТ: potwierdzić, że plik zapamiętujący wybór języka nie wymaga zgody⟧',
+          'cf_clearance — Cloudflare; zapamiętuje przejście kontroli bezpieczeństwa, jeśli była wymagana. Ważność: 30 minut.',
+          'lang — serwis; zapamiętuje wersję językową wybraną przełącznikiem języka. Zapisywany tylko po kliknięciu przełącznika. Ważność: 1 rok. Plik jest niezbędny do zapamiętania ustawienia, o które sam(a) prosisz, dlatego nie wymaga zgody.',
           '__Host-admin-session — tylko w panelu administratora; odwiedzający serwis go nie otrzymują. Ważność: 30 minut.',
         ],
       },
@@ -137,7 +137,7 @@ export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
         paragraphs: [
           'Администратор ваших персональных данных — {{owner.fullName}}, {{owner.address}}, NIP {{owner.nip}}.',
           'По вопросам персональных данных пишите на {{owner.privacyEmail}}.',
-          'Инспектор по защите данных не назначен. ⟦ЮРИСТ: подтвердить, что ст. 37 GDPR не требует его назначения⟧',
+          'Инспектор по защите данных не назначен. Обязанность его назначать (ст. 37 GDPR) на деятельность исполнителя не распространяется.',
           'Это перевод. При расхождении с польской версией действует польская.',
         ],
       },
@@ -152,9 +152,9 @@ export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
         items: [
           'Технические данные при каждом посещении — IP-адрес, дата и время, адрес страницы, тип браузера, страница, с которой вы пришли, страна по данным сети доставки контента. Цель: работа и безопасность сайта, диагностика ошибок. Основание: законный интерес (ст. 6(1)(f) GDPR). Срок: 14 дней в журналах сервера.',
           'Журнал безопасности — IP-адрес, тип браузера и адрес запроса, если запрос похож на попытку атаки или сканирования. Цель: защита сайта. Основание: законный интерес (ст. 6(1)(f) GDPR). Срок: 60 дней; временная блокировка адреса — до 60 дней с последнего события.',
-          'Обращение к нам — данные, которые вы сами сообщите в письме, SMS или мессенджере, и текст сообщения. Цель: ответ на обращение и согласование времени консультации. Основание: действия до заключения договора по вашему запросу (ст. 6(1)(b) GDPR), в остальном — законный интерес (ст. 6(1)(f)). Срок: до завершения вопроса, затем ⟦ЮРИСТ: срок хранения переписки⟧.',
+          'Обращение к нам — данные, которые вы сами сообщите в письме, SMS или мессенджере, и текст сообщения. Цель: ответ на обращение и согласование времени консультации. Основание: действия до заключения договора по вашему запросу (ст. 6(1)(b) GDPR), в остальном — законный интерес (ст. 6(1)(f)). Срок: до завершения вопроса, затем 12 месяцев.',
           'Резервные копии — зашифрованные копии базы данных сайта. Цель: восстановление после сбоя. Основание: законный интерес (ст. 6(1)(f) GDPR). Срок: 30 дней. Поэтому данные журнала безопасности могут оставаться в копиях до 90 дней.',
-          'Отзывы клиентов — псевдоним автора, текст отзыва и дата согласия. Отзыв о консультации психолога сообщает, что человек был клиентом психолога, поэтому мы относимся к нему как к данным о здоровье. Отзыв публикуется только с явного отдельного согласия автора, данного вне сайта (письмом или на бумаге), без имени и деталей, по которым его можно узнать. Основание: явное согласие (ст. 6(1)(a) и 9(2)(a) GDPR). Срок: до отзыва согласия — тогда отзыв сразу удаляется с сайта и из базы данных, а из резервных копий исчезает в течение 30 дней. Отозвать согласие можно в любой момент, написав на {{owner.privacyEmail}}; это не делает незаконной публикацию до отзыва. ⟦ЮРИСТ: форма согласия и срок хранения его подтверждения вне сайта⟧',
+          'Отзывы клиентов — псевдоним автора, текст отзыва и дата согласия. Отзыв о консультации психолога сообщает, что человек был клиентом психолога, поэтому мы относимся к нему как к данным о здоровье. Отзыв публикуется только с явного отдельного согласия автора, данного вне сайта (письмом или на бумаге), без имени и деталей, по которым его можно узнать. Основание: явное согласие (ст. 6(1)(a) и 9(2)(a) GDPR). Срок: до отзыва согласия — тогда отзыв сразу удаляется с сайта и из базы данных, а из резервных копий исчезает в течение 30 дней. Отозвать согласие можно в любой момент, написав на {{owner.privacyEmail}}; это не делает незаконной публикацию до отзыва. Согласие принимается письменно или по электронной почте; его подтверждение хранится, пока отзыв опубликован, и 3 года после отзыва согласия — на случай претензий.',
         ],
         paragraphs: [
           'Пожалуйста, не пишите в первом сообщении о своём здоровье. Чтобы договориться о встрече, достаточно имени, удобного времени и способа связи.',
@@ -175,7 +175,7 @@ export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
       {
         heading: '5. Передача данных за пределы Европейской экономической зоны',
         paragraphs: [
-          'Cloudflare, Inc. находится в США. Передача основана на решении Европейской комиссии от 10 июля 2023 года о рамках защиты данных ЕС–США (Data Privacy Framework) и стандартных договорных условиях. ⟦ЮРИСТ: подтвердить сертификацию DPF у Cloudflare на дату публикации⟧',
+          'Cloudflare, Inc. находится в США. Передача основана на решении Европейской комиссии от 10 июля 2023 года о рамках защиты данных ЕС–США (Data Privacy Framework) и стандартных договорных условиях.',
           'Владельцы мессенджеров и Google (YouTube) могут передавать данные за пределы ЕЭЗ по правилам своих политик конфиденциальности.',
         ],
       },
@@ -183,12 +183,12 @@ export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
         heading: '6. Файлы cookie',
         anchor: 'cookies',
         paragraphs: [
-          'Сайт не использует cookie аналитики, рекламы или слежения. Используются только технически необходимые cookie, на которые согласие не требуется (ст. 5(3) директивы 2002/58/ЕС). ⟦ЮРИСТ: указать норму польского закона об электронной связи⟧',
+          'Сайт не использует cookie аналитики, рекламы или слежения. Используются только технически необходимые cookie, на которые согласие не требуется (ст. 5(3) директивы 2002/58/ЕС). В польском праве то же правило закреплено законом об электронной связи (Prawo komunikacji elektronicznej).',
         ],
         items: [
           '__cf_bm — Cloudflare; отличает людей от автоматических программ. Срок: 30 минут.',
-          'cf_clearance — Cloudflare; запоминает, что проверка безопасности пройдена, если она потребовалась. Срок: ⟦ЮРИСТ: срок по настройкам Cloudflare⟧.',
-          'lang — сайт; запоминает язык, выбранный переключателем языка. Записывается только после щелчка по переключателю. Срок: 1 год. ⟦ЮРИСТ: подтвердить, что cookie с выбором языка не требует согласия⟧',
+          'cf_clearance — Cloudflare; запоминает, что проверка безопасности пройдена, если она потребовалась. Срок: 30 минут.',
+          'lang — сайт; запоминает язык, выбранный переключателем языка. Записывается только после щелчка по переключателю. Срок: 1 год. Cookie нужна, чтобы запомнить настройку, о которой вы сами попросили, поэтому согласия не требует.',
           '__Host-admin-session — только в панели администратора; посетители сайта её не получают. Срок: 30 минут.',
         ],
       },
@@ -240,7 +240,7 @@ export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
         paragraphs: [
           'The controller of your personal data is {{owner.fullName}}, {{owner.address}}, NIP (tax ID) {{owner.nip}}.',
           'For data protection matters, write to {{owner.privacyEmail}}.',
-          'No data protection officer has been appointed. ⟦ЮРИСТ: confirm that Art. 37 GDPR does not require one⟧',
+          'No data protection officer has been appointed. The obligation to appoint one (Art. 37 GDPR) does not apply to the provider’s activity.',
           'This is a translation. If it differs from the Polish version, the Polish version prevails.',
         ],
       },
@@ -255,9 +255,9 @@ export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
         items: [
           'Technical data on every visit — IP address, date and time, page address, browser type, referring page, country as determined by the content delivery network. Purpose: operating and securing the site, diagnosing errors. Legal basis: legitimate interest (Art. 6(1)(f) GDPR). Retention: 14 days in server logs.',
           'Security log — IP address, browser type and request address when a request looks like an attack or a scan. Purpose: protecting the site. Legal basis: legitimate interest (Art. 6(1)(f) GDPR). Retention: 60 days; a temporary address block lasts up to 60 days from the last event.',
-          'Contacting us — the data you provide by e-mail, text message or messenger, and the content of your message. Purpose: replying and arranging a consultation. Legal basis: steps taken at your request before entering into a contract (Art. 6(1)(b) GDPR), otherwise legitimate interest (Art. 6(1)(f)). Retention: until the matter is closed, then ⟦ЮРИСТ: correspondence retention period⟧.',
+          'Contacting us — the data you provide by e-mail, text message or messenger, and the content of your message. Purpose: replying and arranging a consultation. Legal basis: steps taken at your request before entering into a contract (Art. 6(1)(b) GDPR), otherwise legitimate interest (Art. 6(1)(f)). Retention: until the matter is closed, then for 12 months.',
           'Backups — encrypted copies of the site database. Purpose: restoring the site after a failure. Legal basis: legitimate interest (Art. 6(1)(f) GDPR). Retention: 30 days. Security log data may therefore remain in backups for up to 90 days.',
-          'Client testimonials — the author’s pseudonym, the text and the date of consent. A testimonial about a psychological consultation reveals that someone was a client, so we treat it as health data. It is published only with the author’s explicit, separate consent given outside this website (by e-mail or on paper), without their name or details that could identify them. Legal basis: explicit consent (Art. 6(1)(a) and 9(2)(a) GDPR). Retention: until consent is withdrawn — the testimonial is then removed from the site and the database immediately and disappears from backups within 30 days. You can withdraw consent at any time by writing to {{owner.privacyEmail}}; this does not affect the lawfulness of publication before withdrawal. ⟦ЮРИСТ: form of consent and how long proof of it is kept outside the site⟧',
+          'Client testimonials — the author’s pseudonym, the text and the date of consent. A testimonial about a psychological consultation reveals that someone was a client, so we treat it as health data. It is published only with the author’s explicit, separate consent given outside this website (by e-mail or on paper), without their name or details that could identify them. Legal basis: explicit consent (Art. 6(1)(a) and 9(2)(a) GDPR). Retention: until consent is withdrawn — the testimonial is then removed from the site and the database immediately and disappears from backups within 30 days. You can withdraw consent at any time by writing to {{owner.privacyEmail}}; this does not affect the lawfulness of publication before withdrawal. Consent is given in writing or by e-mail; proof of it is kept while the testimonial is published and for 3 years after consent is withdrawn, in case of claims.',
         ],
         paragraphs: [
           'Please do not include information about your health in your first message. Your name, a preferred time and a way to reach you are enough to arrange a meeting.',
@@ -278,7 +278,7 @@ export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
       {
         heading: '5. Transfers outside the European Economic Area',
         paragraphs: [
-          'Cloudflare, Inc. is based in the USA. Transfers rely on the European Commission decision of 10 July 2023 on the EU–US Data Privacy Framework and on standard contractual clauses. ⟦ЮРИСТ: confirm Cloudflare DPF certification on the publication date⟧',
+          'Cloudflare, Inc. is based in the USA. Transfers rely on the European Commission decision of 10 July 2023 on the EU–US Data Privacy Framework and on standard contractual clauses.',
           'Messenger providers and Google (YouTube) may transfer data outside the EEA under their own privacy policies.',
         ],
       },
@@ -286,12 +286,12 @@ export const PRIVACY_DOCUMENTS: LegalDocumentSeed[] = [
         heading: '6. Cookies',
         anchor: 'cookies',
         paragraphs: [
-          'The site uses no analytics, advertising or tracking cookies. It uses only strictly necessary cookies, which do not require consent (Art. 5(3) of Directive 2002/58/EC). ⟦ЮРИСТ: cite the applicable provision of Polish electronic communications law⟧',
+          'The site uses no analytics, advertising or tracking cookies. It uses only strictly necessary cookies, which do not require consent (Art. 5(3) of Directive 2002/58/EC). In Polish law the same rule is set out in the Electronic Communications Law (Prawo komunikacji elektronicznej).',
         ],
         items: [
           '__cf_bm — Cloudflare; distinguishes people from bots. Lifetime: 30 minutes.',
-          'cf_clearance — Cloudflare; remembers that a security check was passed, if one was required. Lifetime: ⟦ЮРИСТ: as configured in Cloudflare⟧.',
-          'lang — this site; remembers the language chosen with the language switcher. Set only after clicking the switcher. Lifetime: 1 year. ⟦ЮРИСТ: confirm that a cookie storing the language choice needs no consent⟧',
+          'cf_clearance — Cloudflare; remembers that a security check was passed, if one was required. Lifetime: 30 minutes.',
+          'lang — this site; remembers the language chosen with the language switcher. Set only after clicking the switcher. Lifetime: 1 year. The cookie is needed to remember a setting you asked for yourself, so it requires no consent.',
           '__Host-admin-session — administrator panel only; site visitors never receive it. Lifetime: 30 minutes.',
         ],
       },

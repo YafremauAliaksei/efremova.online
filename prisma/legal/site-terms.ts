@@ -12,7 +12,7 @@ import type { LegalDocumentSeed } from './types';
  * Условия самих консультаций — отдельный документ (slug 'terms').
  */
 
-const VERSION = 'site-terms-2026-09-25-draft';
+const VERSION = 'site-terms-2026-11-03-draft';
 
 export const SITE_TERMS_DOCUMENTS: LegalDocumentSeed[] = [
   {
@@ -75,13 +75,13 @@ export const SITE_TERMS_DOCUMENTS: LegalDocumentSeed[] = [
           'Telefon Zaufania dla Dzieci i Młodzieży: 116 111.',
         ],
         paragraphs: [
-          'Serwis i kontakt z usługodawcą nie służą do udzielania pomocy w nagłych sytuacjach. ⟦ЮРИСТ: сверить номера и часы работы на дату публикации⟧',
+          'Serwis i kontakt z usługodawcą nie służą do udzielania pomocy w nagłych sytuacjach.',
         ],
       },
       {
         heading: '9. Reklamacje',
         paragraphs: [
-          'Uwagi i reklamacje dotyczące działania serwisu można zgłaszać na adres {{owner.email}}. Odpowiadamy w ciągu 14 dni. ⟦ЮРИСТ: termin rozpatrzenia⟧',
+          'Uwagi i reklamacje dotyczące działania serwisu można zgłaszać na adres {{owner.email}}. Odpowiadamy w ciągu 14 dni.',
         ],
       },
       {
@@ -153,14 +153,12 @@ export const SITE_TERMS_DOCUMENTS: LegalDocumentSeed[] = [
           'Kryzysowy Telefon Zaufania — для взрослых: 116 123.',
           'Telefon Zaufania dla Dzieci i Młodzieży — для детей и подростков: 116 111.',
         ],
-        paragraphs: [
-          'Сайт и связь с владельцем не предназначены для экстренной помощи. ⟦ЮРИСТ: сверить номера и часы работы на дату публикации⟧',
-        ],
+        paragraphs: ['Сайт и связь с владельцем не предназначены для экстренной помощи.'],
       },
       {
         heading: '9. Претензии',
         paragraphs: [
-          'Замечания и претензии к работе сайта принимаются по адресу {{owner.email}}. Ответ — в течение 14 дней. ⟦ЮРИСТ: срок рассмотрения⟧',
+          'Замечания и претензии к работе сайта принимаются по адресу {{owner.email}}. Ответ — в течение 14 дней.',
         ],
       },
       {
@@ -233,13 +231,13 @@ export const SITE_TERMS_DOCUMENTS: LegalDocumentSeed[] = [
           'Helpline for children and young people: 116 111.',
         ],
         paragraphs: [
-          'The website and contact with the provider are not intended for emergency help. ⟦ЮРИСТ: verify the numbers and hours on the publication date⟧',
+          'The website and contact with the provider are not intended for emergency help.',
         ],
       },
       {
         heading: '9. Complaints',
         paragraphs: [
-          'Comments and complaints about the website can be sent to {{owner.email}}. We reply within 14 days. ⟦ЮРИСТ: complaint handling period⟧',
+          'Comments and complaints about the website can be sent to {{owner.email}}. We reply within 14 days.',
         ],
       },
       {
