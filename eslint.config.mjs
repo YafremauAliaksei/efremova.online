@@ -152,6 +152,7 @@ export default tseslint.config(
         Buffer: 'readonly',
         setTimeout: 'readonly',
         clearTimeout: 'readonly',
+        AbortSignal: 'readonly',
       },
     },
     rules: {

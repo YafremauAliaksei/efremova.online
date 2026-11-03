@@ -1,5 +1,5 @@
 import { textField, TITLE_MAX_LENGTH } from '@/lib/content-schema';
-import { PROFILE_FIELDS } from '@/lib/site-profile-fields';
+import { PROFILE_FIELDS, type ProfileValues, fillPlaceholders } from '@/lib/site-profile-fields';
 import type { LegalSection } from '../../prisma/legal-content';
 
 /**
@@ -27,7 +27,34 @@ export const LEGAL_SECTIONS_MAX = 80;
 const ANCHOR = /\s\{#([a-z0-9-]+)\}$/;
 const ITEM = /^-\s+(.+)$/;
 const PLACEHOLDER = /\{\{\s*([^}]*?)\s*\}\}/g;
+// Тот же вид пометки, что распознаёт показ (site-profile-fields.ts, TOKEN)
+const LAWYER_MARK = /⟦ЮРИСТ:[^⟧]*⟧/g;
 const KNOWN_KEYS = new Set(PROFILE_FIELDS.map((field) => field.key));
+
+/**
+ * Что мешает отметить редакцию «проверено юристом».
+ *
+ * Отметка снимает с документа плашку «образец» — значит, посетитель увидит
+ * текст как окончательный. Пометка ⟦ЮРИСТ: …⟧ или незаполненное поле
+ * владельца в таком тексте — служебный мусор на юридической странице.
+ */
+export function approvalProblems(
+  title: string,
+  sections: readonly LegalSection[],
+  values: ProfileValues
+): { lawyerMarks: boolean; missing: string[] } {
+  const texts = [
+    title,
+    ...sections.flatMap((s) => [s.heading, ...(s.paragraphs ?? []), ...(s.items ?? [])]),
+  ];
+  const missing = new Set<string>();
+  let lawyerMarks = false;
+  for (const part of texts.flatMap((text) => fillPlaceholders(text, values))) {
+    if (part.kind === 'lawyer') lawyerMarks = true;
+    if (part.kind === 'missing') missing.add(part.key);
+  }
+  return { lawyerMarks, missing: [...missing] };
+}
 
 export function sectionsToText(sections: readonly LegalSection[]): string {
   return sections
@@ -51,6 +78,9 @@ export type LegalTextError =
   | { code: 'paragraphAfterList'; line: number }
   | { code: 'emptySection'; line: number }
   | { code: 'duplicateAnchor'; line: number }
+  | { code: 'badAnchor'; line: number }
+  | { code: 'brokenPlaceholder'; line: number }
+  | { code: 'brokenLawyerMark'; line: number }
   | { code: 'placeholder'; line: number; key: string };
 
 export type LegalTextResult =
@@ -101,9 +131,22 @@ export function parseLegalText(raw: unknown): LegalTextResult {
       if (!KNOWN_KEYS.has(key))
         return { ok: false, error: { code: 'placeholder', line: lineNo, key } };
     }
+    // Недописанная метка ({{owner.nip} или ⟦ЮРИСТ: без ⟧) не распознаётся при
+    // показе и ушла бы посетителю буквальным текстом — лучше не сохранить
+    if (/\{\{|\}\}/.test(line.replace(PLACEHOLDER, ''))) {
+      return { ok: false, error: { code: 'brokenPlaceholder', line: lineNo } };
+    }
+    if (/[⟦⟧]/.test(line.replace(LAWYER_MARK, ''))) {
+      return { ok: false, error: { code: 'brokenLawyerMark', line: lineNo } };
+    }
 
     const heading = parseHeading(line);
     if (heading !== null) {
+      // Якорь с заглавными или «_» не распознаётся — и «{#…}» оказался бы
+      // в заголовке на сайте
+      if (heading.title.includes('{#')) {
+        return { ok: false, error: { code: 'badAnchor', line: lineNo } };
+      }
       const error = closeSection();
       if (error !== null) return { ok: false, error };
       const anchor = heading.anchor;
