@@ -101,76 +101,154 @@ services:
     logging: *default-logging
 
   # ─────────────────────────── NGINX ───────────────────────────
-  # Единственный сервис, видимый из интернета
+  # Наружу не открыт: на хосте ни одного порта. Запросы приходят только
+  # из туннеля Cloudflare (сервис cloudflared ниже) по внутренней сети edge
   nginx:
     image: nginx:1.31-alpine@sha256:df221db836e1754089190208cee7eeda94f233197056426eda74a43ab1abeac2
     restart: unless-stopped
-    ports:
-      - '80:80'
-      - '443:443'
     volumes:
       - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./infra/nginx/conf.d:/etc/nginx/conf.d:ro
       - ./infra/nginx/proxy_params.conf:/etc/nginx/proxy_params.conf:ro
-      - ./infra/nginx/cloudflare-ips.conf:/etc/nginx/cloudflare-ips.conf:ro
-      - certbot-certs:/etc/letsencrypt:ro
-      - certbot-www:/var/www/certbot:ro
       - nginx-logs:/var/log/nginx
     depends_on:
       app: { condition: service_healthy }
-    networks: [backend, frontend]
+    networks:
+      backend: {}
+      edge:
+        ipv4_address: 172.30.0.3
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8081/healthz']
+      interval: 30s
+      timeout: 5s
+      retries: 3
     security_opt: [no-new-privileges:true]
     logging: *default-logging
 
-  # ─────────────────────────── SSL-СЕРТИФИКАТЫ ───────────────────────────
-  # Обновляются автоматически каждые 12 часов. Let's Encrypt, бесплатно.
-  certbot:
+  # ─────────────────────────── ТУННЕЛЬ CLOUDFLARE ───────────────────────────
+  # Единственный вход из интернета — и тот исходящий: cloudflared сам
+  # подключается к Cloudflare, входящих портов на сервере нет вовсе.
+  # Реальный IP сервера не виден, зайти «мимо Cloudflare» нельзя, TLS и
+  # сертификаты — забота Cloudflare. Токен туннеля — из панели Cloudflare
+  # (docs/15-server-runbook.md), хранится только в .env на сервере
+  cloudflared:
     # Закреплён по хешу: :latest на боевом сервере — чужой код без проверки
-    image: certbot/certbot:v5.8.0@sha256:f70ad0adbb7e117f0fe42a63c553f28ea451edabc0148757b6efcd9735acaa20
+    image: cloudflare/cloudflared:2026.10.1@sha256:a15a3b50b8dabd57ac2090e9484c0247dba9dfa1f0df4d298d4317f9d69eb2d5
     restart: unless-stopped
-    volumes:
-      - certbot-certs:/etc/letsencrypt
-      - certbot-www:/var/www/certbot
-    entrypoint: /bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done;'
+    command: ['tunnel', '--no-autoupdate', 'run']
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?CLOUDFLARE_TUNNEL_TOKEN не задан в .env}
+    depends_on:
+      nginx: { condition: service_healthy }
+    networks:
+      edge:
+        ipv4_address: 172.30.0.2
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     logging: *default-logging
-    networks: [backend]
 
   # ─────────────────────────── БЭКАПЫ ───────────────────────────
-  # Ежедневно, зашифровано, в другую страну.
+  # Ежедневно, зашифровано, в три места: этот сервер, другой поставщик,
+  # офлайн-диск владельца (docs/17).
   # ⚠️ Бэкап без проверенного восстановления не считается бэкапом (docs/03)
   backup:
     build:
       context: ./infra/docker
       dockerfile: Dockerfile.backup
     restart: unless-stopped
-    env_file: .env
+    # Поимённо, не весь .env: секреты сайта (подпись сессий, 2FA, туннель)
+    # контейнеру бэкапов не нужны
     environment:
       PGHOST: postgres
       PGUSER: ${POSTGRES_USER}
       PGPASSWORD: ${POSTGRES_PASSWORD}
       PGDATABASE: ${POSTGRES_DB}
       BACKUP_SCHEDULE: '0 3 * * *'
+      BACKUP_LOCAL_DAYS: '14'
       BACKUP_RETENTION_DAYS: '30'
       NGINX_LOG_RETENTION_DAYS: '14'
+      BACKUP_AGE_PUBLIC_KEY: ${BACKUP_AGE_PUBLIC_KEY:-}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
+      AWS_ACCESS_KEY_ID: ${BACKUP_S3_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${BACKUP_S3_SECRET_ACCESS_KEY:-}
+      # Cloudflare R2 принимает «auto»; для B2 — регион бакета
+      AWS_DEFAULT_REGION: ${BACKUP_S3_REGION:-auto}
+      BACKUP_HEARTBEAT_URL: ${BACKUP_HEARTBEAT_URL:-}
     # Логи nginx удаляет задача rotate-logs.sh этого же контейнера
     volumes:
       - nginx-logs:/logs/nginx
+      - backups:/backups # копия на этом сервере — зашифрованная
+      - backup-status:/status # отметка успешного бэкапа — для сторожа
     depends_on:
       postgres: { condition: service_healthy }
     networks: [backend]
     security_opt: [no-new-privileges:true]
     logging: *default-logging
 
+  # ─────────────────────────── СТОРОЖ СЕРВЕРА ───────────────────────────
+  # Раз в минуту: сайт снаружи и изнутри, диск, память, нагрузка, свежесть
+  # бэкапа. Сбой — сообщение в Telegram / почту / ntfy, что задано в .env;
+  # раз в сутки — сводка; каждый круг — пульс в Healthchecks, который сам
+  # напишет владельцу, если умер весь сервер (scripts/watchdog, docs/16).
+  #
+  # Тот же закреплённый образ Node, что у сайта; кода сторожа в образе нет —
+  # папка смонтирована только для чтения. Доступа к Docker и к базе нет.
+  # Переменные — поимённо, не весь .env: секретов сайта сторож не видит
+  watchdog:
+    image: node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53
+    restart: unless-stopped
+    command: ['node', '/watchdog/watchdog.mjs']
+    user: node
+    working_dir: /watchdog
+    environment:
+      APP_URL: ${APP_URL:-}
+      WATCHDOG_NAME: ${WATCHDOG_NAME:-сервер}
+      ALERT_TELEGRAM_BOT_TOKEN: ${ALERT_TELEGRAM_BOT_TOKEN:-}
+      ALERT_TELEGRAM_CHAT_ID: ${ALERT_TELEGRAM_CHAT_ID:-}
+      ALERT_NTFY_URL: ${ALERT_NTFY_URL:-}
+      ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:-}
+      ALERT_EMAIL_FROM: ${ALERT_EMAIL_FROM:-}
+      ALERT_RESEND_API_KEY: ${ALERT_RESEND_API_KEY:-}
+      ALERT_HEARTBEAT_URL: ${ALERT_HEARTBEAT_URL:-}
+      WATCHDOG_DISK_PERCENT: ${WATCHDOG_DISK_PERCENT:-85}
+      WATCHDOG_MEMORY_PERCENT: ${WATCHDOG_MEMORY_PERCENT:-90}
+      WATCHDOG_LOAD_PER_CPU: ${WATCHDOG_LOAD_PER_CPU:-2}
+      WATCHDOG_SLOW_MS: ${WATCHDOG_SLOW_MS:-5000}
+      WATCHDOG_SUMMARY_HOUR_UTC: ${WATCHDOG_SUMMARY_HOUR_UTC:-7}
+    volumes:
+      - ./scripts/watchdog:/watchdog:ro
+      # Домашний каталог node есть в образе — новый том наследует его владельца
+      # (несуществующий каталог Docker создал бы от root, и записи бы не было)
+      - watchdog-state:/home/node
+      - backup-status:/status:ro
+    networks: [backend]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    logging: *default-logging
+    deploy:
+      resources:
+        limits: { cpus: '0.25', memory: 128M }
+
 networks:
-  # Внутренняя сеть: наружу выхода нет вообще
+  # Сеть сервисов. Не internal: приложению нужен исходящий доступ (курсы
+  # валют, обложки YouTube). Входящего с хоста нет — портов не открыто
   backend:
     driver: bridge
     internal: false
-  frontend:
+  # Туннель ↔ nginx. Адреса фиксированы: nginx доверяет заголовку с IP
+  # посетителя только от cloudflared (infra/nginx/nginx.conf, set_real_ip_from)
+  edge:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/29
 
 volumes:
   postgres-data:
-  certbot-certs:
-  certbot-www:
   nginx-logs:
+  backups:
+  backup-status:
+  watchdog-state:

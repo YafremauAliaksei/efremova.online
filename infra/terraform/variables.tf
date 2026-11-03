@@ -33,13 +33,13 @@ variable "cloudflare_plan" {
   }
 }
 
-variable "server_ip" {
-  description = "Публичный IPv4 сервера Hetzner. ⚠️ Снаружи не виден благодаря proxied=true"
+variable "cloudflare_tunnel_id" {
+  description = "ID туннеля Cloudflare (Zero Trust → Networks → Tunnels). IP сервера не нужен вовсе"
   type        = string
 
   validation {
-    condition     = can(regex("^(\\d{1,3}\\.){3}\\d{1,3}$", var.server_ip))
-    error_message = "Должен быть корректный IPv4-адрес."
+    condition     = can(regex("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", var.cloudflare_tunnel_id))
+    error_message = "Должен быть UUID туннеля."
   }
 }
 
