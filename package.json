@@ -53,7 +53,7 @@
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "^7.10.1",
     "jose": "^5.9.6",
-    "next": "^15.5.28",
+    "next": "^15.5.29",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "server-only": "^0.0.1",
